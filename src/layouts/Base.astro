@@ -1,7 +1,7 @@
 ---
 import '../styles/tokens.css';
 import '../styles/base.css';
-import BlobField from '../components/BlobField.astro';
+import { ViewTransitions } from 'astro:transitions';
 import Nav from '../components/Nav.astro';
 import Footer from '../components/Footer.astro';
 import { site } from '../site.config';
@@ -23,21 +23,9 @@ const headTitle = title ? `${title} · ${site.title}` : `${site.title} — ${sit
     <meta name="description" content={description} />
     {noindex && <meta name="robots" content="noindex" />}
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <script is:inline>
-      // 主题防闪：CSS 前决定 data-theme（默认跟随系统，手动选择写 localStorage）
-      (() => {
-        try {
-          const saved = localStorage.getItem('theme');
-          const dark = matchMedia('(prefers-color-scheme: dark)').matches;
-          document.documentElement.dataset.theme = saved ?? (dark ? 'dark' : 'light');
-        } catch {
-          document.documentElement.dataset.theme = 'light';
-        }
-      })();
-    </script>
+    <ViewTransitions />
   </head>
   <body>
-    <BlobField />
     <Nav />
     <main class="wrap main"><slot /></main>
     <Footer />

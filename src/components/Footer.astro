@@ -2,36 +2,32 @@
 import { site } from '../site.config';
 ---
 <footer class="foot">
-  <div class="wrap">
-    <div class="glass inner">
-      <p class="note">{site.footerNote}</p>
-      <p class="copy">
-        © <span data-year>2026</span> {site.title}
-        <span class="dot">·</span>
-        <a href="/">回到首页</a>
-      </p>
-    </div>
+  <div class="wrap inner">
+    <p class="note">{site.footerNote}</p>
+    <p class="copy">
+      © <span data-year>2026</span> {site.title}
+      <span class="dot">·</span>
+      <a href="/">回到首页</a>
+    </p>
   </div>
 </footer>
 
 <script>
-  // 年份跟随构建/浏览时间自动更新，避免静态年份过期
   const el = document.querySelector('[data-year]');
   if (el) el.textContent = String(new Date().getFullYear());
 </script>
 
 <style>
-  .foot { padding: 0 var(--gutter) clamp(24px, 5vw, 48px); }
+  .foot { border-top: 1px solid var(--glass-border); }
   .inner {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 8px 24px;
-    padding: 16px clamp(18px, 3vw, 28px);
-    border-radius: var(--radius-pill);
+    gap: 4px 24px;
+    padding-block: 18px;
   }
-  .note { margin: 0; font-size: 0.85rem; color: var(--text-2); }
+  .note { margin: 0; font-size: 0.85rem; color: var(--text-3); }
   .copy { margin: 0; font-size: 0.85rem; color: var(--text-3); }
   .copy a { color: var(--text-3); }
   .dot { padding: 0 8px; }

@@ -1,174 +1,253 @@
 ---
-import ThemeToggle from './ThemeToggle.astro';
+import SearchBox from './SearchBox.astro';
 import { site } from '../site.config';
 
 const path = Astro.url.pathname;
 const isActive = (href: string) =>
   href === '/' ? path === '/' : path.startsWith(href);
 ---
-<header class="navwrap">
-  <div class="glass navbar">
-    <a class="brand" href="/">{site.title}</a>
+<header class="topbar" data-topbar>
+  <div class="inner">
+    <a class="brand" href="/" data-nav-item-home>{site.title}</a>
 
-    <button class="burger" type="button" data-nav-btn aria-controls="nav-panel" aria-expanded="false" aria-label="展开菜单">
-      <span></span><span></span><span></span>
-    </button>
-
-    <nav class="links" data-nav-panel id="nav-panel" aria-label="主导航">
+    <nav class="links" data-nav aria-label="主导航">
+      <span class="slider" data-slider aria-hidden="true"></span>
       {
-        site.nav.map((n) => {
-          const active = isActive(n.href);
-          return (
-            <a
-              class:list={['link', active && 'is-active']}
-              href={n.href}
-              aria-current={active ? 'page' : undefined}
-            >{n.label}</a>
-          );
-        })
+        site.nav.map((n) => (
+          <a
+            class:list={['navlink', isActive(n.href) && 'is-active']}
+            data-nav-item
+            data-nav-href={n.href}
+            href={n.href}
+            aria-current={isActive(n.href) ? 'page' : undefined}
+          >{n.label}</a>
+        ))
       }
     </nav>
 
     <div class="tools">
-      <a class="tool" href="/search/" aria-label="站内搜索" title="搜索">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
-             stroke-width="2" stroke-linecap="round" aria-hidden="true">
-          <circle cx="11" cy="11" r="7"></circle>
-          <path d="M21 21l-4.3-4.3"></path>
-        </svg>
-      </a>
-      <ThemeToggle />
+      <div class="navsearch">
+        <SearchBox id="nav-q" compact />
+      </div>
+      <button class="menu-btn" type="button" data-menu-btn aria-expanded="false" aria-label="展开菜单">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+
+  <div class="drawer" data-menu hidden>
+    <nav class="drawer-links" aria-label="移动端导航">
+      {
+        site.nav.map((n) => (
+          <a
+            class:list={['drawer-link', isActive(n.href) && 'is-active']}
+            href={n.href}
+            data-drawer-link
+          >{n.label}</a>
+        ))
+      }
+    </nav>
+    <div class="drawer-search">
+      <SearchBox id="drawer-q" compact />
     </div>
   </div>
 </header>
 
 <script>
-  const btn = document.querySelector<HTMLButtonElement>('[data-nav-btn]');
-  const panel = document.querySelector('[data-nav-panel]');
-  btn?.addEventListener('click', () => {
-    const open = panel?.classList.toggle('open') ?? false;
-    btn.setAttribute('aria-expanded', String(open));
+  // —— 水滴滑块：量测当前栏目并弹性定位（View Transitions 保留旧 inline 值 →
+  //    页面切换后更新 left/width 即产生弹性滑动，见 spec §14.4/14.7） ——
+  const nav = document.querySelector<HTMLElement>('[data-nav]');
+  const slider = document.querySelector<HTMLElement>('[data-slider]');
+
+  function posSlider(animate: boolean): void {
+    if (!nav || !slider) return;
+    const act = nav.querySelector<HTMLElement>('[data-nav-item].is-active');
+    if (!act) {
+      slider.style.opacity = '0';
+      return;
+    }
+    const w = act.offsetWidth;
+    const l = act.offsetLeft;
+    if (!animate) {
+      slider.style.transition = 'none';
+      slider.style.width = `${w}px`;
+      slider.style.transform = `translateX(${l}px)`;
+      // 强制回流后恢复过渡
+      void slider.offsetWidth;
+      slider.style.transition = '';
+    } else {
+      slider.style.width = `${w}px`;
+      slider.style.transform = `translateX(${l}px)`;
+    }
+    slider.style.opacity = '1';
+    slider.classList.remove('land');
+    void slider.offsetWidth;
+    slider.classList.add('land');
+  }
+
+  window.addEventListener('astro:page-load', () => posSlider(true));
+  let t: number | undefined;
+  window.addEventListener('resize', () => {
+    window.clearTimeout(t);
+    t = window.setTimeout(() => posSlider(false), 150);
+  });
+  try { document.fonts?.ready?.then(() => posSlider(false)); } catch { /* 忽略 */ }
+
+  // —— 移动端抽屉 ——
+  const menuBtn = document.querySelector<HTMLButtonElement>('[data-menu-btn]');
+  const drawer = document.querySelector<HTMLElement>('[data-menu]');
+  menuBtn?.addEventListener('click', () => {
+    const open = drawer?.toggleAttribute('hidden') === false;
+    menuBtn.setAttribute('aria-expanded', String(open));
+    document.body.style.overflow = open ? 'hidden' : '';
   });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      const wasOpen = panel?.classList.contains('open') ?? false;
-      panel?.classList.remove('open');
-      btn?.setAttribute('aria-expanded', 'false');
-      if (wasOpen) btn?.focus(); // 仅关闭实际展开的菜单时归还焦点
+    if (e.key === 'Escape' && drawer && !drawer.hidden) {
+      drawer.hidden = true;
+      menuBtn?.setAttribute('aria-expanded', 'false');
+      document.body.style.overflow = '';
+      menuBtn?.focus();
     }
   });
 </script>
 
 <style>
-  /* 悬浮玻璃胶囊导航栏 */
-  .navwrap {
-    position: sticky;
-    top: 14px;
-    z-index: 40;
-    padding: 0 var(--gutter);
-    pointer-events: none; /* 空隙可点穿到页面内容 */
+  /* 固定整条顶栏（spec §14.4） */
+  .topbar {
+    position: fixed;
+    inset: 0 0 auto 0;
+    z-index: 60;
+    height: var(--nav-h);
+    background: rgba(255, 255, 255, 0.72);
+    -webkit-backdrop-filter: blur(14px) saturate(1.6);
+    backdrop-filter: blur(14px) saturate(1.6);
+    border-bottom: 1px solid var(--glass-border);
   }
-  .navbar {
-    pointer-events: auto;
+  .inner {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 4px;
-    padding: 8px 16px;
-    border-radius: var(--radius-pill);
+    height: 100%;
     max-width: var(--maxw);
     margin-inline: auto;
+    padding-inline: var(--gutter);
   }
   .brand {
+    margin-right: 10px;
     font-weight: 800;
     font-size: 1.06rem;
-    letter-spacing: 0.01em;
+    letter-spacing: 0.02em;
     color: var(--text-1);
-    padding: 6px 12px;
-    border-radius: 12px;
+    padding: 6px 10px;
+    border-radius: var(--radius-s);
     white-space: nowrap;
   }
-  .brand:hover { text-decoration: none; }
+  .brand:hover { text-decoration: none; color: var(--text-1); }
+
   .links {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 2px;
-    margin-inline: auto;
+    height: 100%;
   }
-  .link {
-    padding: 7px 13px;
-    border-radius: var(--radius-pill);
+  .navlink {
+    position: relative;
+    z-index: 1;
+    padding: 6px 13px;
+    border-radius: var(--radius-s);
     color: var(--text-2);
     font-size: 0.95rem;
     font-weight: 500;
     white-space: nowrap;
-    transition: color 0.15s ease-out, background 0.15s ease-out;
+    transition: color var(--t-fast) ease-out;
   }
-  .link:hover {
-    color: var(--text-1);
-    background: color-mix(in srgb, var(--text-1) 8%, transparent);
-    text-decoration: none;
+  .navlink:hover { color: var(--text-1); text-decoration: none; }
+  .navlink.is-active { color: var(--text-1); font-weight: 650; }
+
+  /* 水滴滑块（悬浮玻璃指示片） */
+  .slider {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    height: 34px;
+    transform: translateY(-50%);
+    border-radius: var(--radius-pill);
+    background:
+      radial-gradient(130% 70% at 50% 0%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0) 55%),
+      rgba(255, 255, 255, 0.78);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    box-shadow: var(--glass-shadow);
+    opacity: 0;
+    will-change: transform, width;
+    transition: width 0.6s var(--ease-spring), transform 0.6s var(--ease-spring),
+      opacity 0.25s ease;
+    pointer-events: none;
   }
-  .link.is-active {
-    color: var(--text-1);
-    background: color-mix(in srgb, var(--accent) 14%, transparent);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent);
+  .slider.land::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(80% 60% at 32% 0%, rgba(255, 255, 255, 0.9), transparent 60%);
+    animation: droplet-pulse 0.55s var(--ease-spring);
+    pointer-events: none;
   }
-  .tools { display: flex; align-items: center; gap: 4px; }
-  .tool {
-    display: grid;
-    place-items: center;
-    width: 38px;
-    height: 38px;
-    border-radius: 50%;
-    color: var(--text-2);
-    transition: color 0.15s ease-out, background 0.15s ease-out;
+  @keyframes droplet-pulse {
+    0% { opacity: 0; transform: scale(0.86); }
+    45% { opacity: 1; transform: scale(1.06); }
+    100% { opacity: 0; transform: scale(1); }
   }
-  .tool:hover {
-    color: var(--text-1);
-    background: color-mix(in srgb, var(--text-1) 8%, transparent);
-    text-decoration: none;
-  }
-  .burger {
+
+  .tools { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .navsearch { width: 190px; transition: width 0.35s var(--ease-spring); }
+  .navsearch:focus-within { width: 290px; }
+
+  .menu-btn {
     display: none;
     width: 38px;
     height: 38px;
-    margin-left: auto;
-    border-radius: 50%;
     border: 0;
+    border-radius: var(--radius-s);
     background: transparent;
     color: var(--text-1);
     cursor: pointer;
   }
-  .burger span {
-    display: block;
-    width: 18px;
-    height: 2px;
-    margin: 3px auto;
-    background: currentColor;
-    border-radius: 2px;
+  .menu-btn span { display: block; width: 18px; height: 2px; margin: 3px auto; background: currentColor; border-radius: 2px; }
+
+  /* 移动端抽屉 */
+  .drawer {
+    position: fixed;
+    inset: var(--nav-h) 0 0 0;
+    z-index: 59;
+    padding: 18px var(--gutter) 24px;
+    background: rgba(255, 255, 255, 0.96);
+    overflow-y: auto;
+  }
+  .drawer[hidden] { display: none; }
+  .drawer-links { display: flex; flex-direction: column; gap: 4px; margin-bottom: 18px; }
+  .drawer-link {
+    padding: 13px 16px;
+    border-radius: var(--radius-s);
+    color: var(--text-2);
+    font-size: 1.02rem;
+    font-weight: 550;
+  }
+  .drawer-link:hover { color: var(--text-1); text-decoration: none; }
+  .drawer-link.is-active {
+    color: var(--text-1);
+    background: radial-gradient(140% 100% at 50% 0%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.65) 60%);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    box-shadow: var(--glass-shadow);
   }
 
   @media (max-width: 880px) {
-    .burger { display: block; }
-    .navbar { position: relative; }
-    .links {
-      display: none;
-      position: absolute;
-      top: calc(100% + 8px);
-      left: 0;
-      right: 0;
-      flex-direction: column;
-      align-items: stretch;
-      gap: 2px;
-      padding: 10px;
-      border-radius: var(--radius-s);
-      border: 1px solid var(--glass-border);
-      background: var(--glass-bg-strong);
-      -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
-      backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
-      box-shadow: var(--glass-shadow-lg);
-    }
-    .links.open { display: flex; }
-    .link { text-align: center; }
+    .links, .navsearch { display: none; }
+    .menu-btn { display: block; margin-left: auto; }
+    .tools { margin-left: 0; }
+  }
+  @media (min-width: 881px) {
+    .drawer { display: none; }
   }
 </style>
