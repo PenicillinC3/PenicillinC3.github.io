@@ -48,7 +48,7 @@ function Backdrop() {
   );
 }
 
-/** 液态镜头：椭球折射体，随指针阻尼漂移 */
+/** 液态镜头：椭球折射体，全画布范围跟随指针（线性映射 + 边距钳制） */
 function Lens({
   ior, thickness, chromaticAberration, anisotropy, follow, ptr,
 }: Required<Omit<LensGlassProps, 'follow'>> & { follow: number; ptr: React.MutableRefObject<{ x: number; y: number }> }) {
@@ -58,14 +58,18 @@ function Lens({
   useFrame((state, delta) => {
     const m = mesh.current;
     if (!m) return;
-    const s = Math.min(viewport.width, viewport.height) * 0.55;
+    const s = Math.min(viewport.width, viewport.height) * 0.5;
     const breathe = 1 + Math.sin(state.clock.elapsedTime * 1.6) * 0.012;
     m.scale.set(s * breathe, s * breathe, s * breathe * 0.5); // 前后压扁 → 双凸面折射
-    // 指针阻尼跟随（easing.damp ≈ reactbits 手感）；follow 控制小范围程度
-    const destX = ptr.current.x * viewport.width * follow * 0.16;
-    const destY = ptr.current.y * viewport.height * follow * 0.16;
-    easing.damp3(m.position, [destX, destY, 0], 0.18, delta);
-    easing.dampE(m.rotation, [0, ptr.current.x * 0.12, ptr.current.y * 0.08], 0.22, delta);
+    // 指针线性映射：镜头在画布范围内移动（±(视口半宽 − 镜头半径 − 边距)），
+    // 明显跟随且永不越出画布
+    const radius = (s * breathe) / 2;
+    const maxX = viewport.width / 2 - radius - viewport.width * 0.03;
+    const maxY = viewport.height / 2 - radius - viewport.height * 0.03;
+    const destX = Math.max(-maxX, Math.min(maxX, ptr.current.x * maxX * follow));
+    const destY = Math.max(-maxY, Math.min(maxY, ptr.current.y * maxY * follow));
+    easing.damp3(m.position, [destX, destY, 0], 0.13, delta);
+    easing.dampE(m.rotation, [0, ptr.current.x * 0.08, ptr.current.y * 0.06], 0.2, delta);
   });
 
   return (
@@ -101,14 +105,15 @@ export default function LensGlass(props: LensGlassProps) {
   const ptr = useRef({ x: 0, y: 0 });
   const [ready, setReady] = useState(false);
 
-  // 窗口级指针 → 容器相对坐标（clamp ±1.4，小范围）
+  // 窗口级指针 → 整页归一化坐标（-1..1，超出页缘再放宽到 ±1.35）
+  // 镜头全画布范围跟随，指针停哪里镜头就追到哪
   useEffect(() => {
     const onMove = (e: PointerEvent) => {
       if (e.pointerType !== 'mouse') return;
-      const rect = wrap.current?.getBoundingClientRect();
-      if (!rect || rect.width === 0) return;
-      ptr.current.x = Math.max(-1.4, Math.min(1.4, ((e.clientX - (rect.left + rect.width / 2)) / (rect.width / 2)) * 0.9));
-      ptr.current.y = Math.max(-1.4, Math.min(1.4, ((e.clientY - (rect.top + rect.height / 2)) / (rect.height / 2)) * 0.9));
+      const nx = ((e.clientX / window.innerWidth) - 0.5) * 2;
+      const ny = ((e.clientY / window.innerHeight) - 0.5) * 2;
+      ptr.current.x = Math.max(-1.35, Math.min(1.35, nx));
+      ptr.current.y = Math.max(-1.35, Math.min(1.35, ny));
     };
     window.addEventListener('pointermove', onMove, { passive: true });
     const t = window.setTimeout(() => setReady(true), 80); // 等布局稳定再淡入
