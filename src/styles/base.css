@@ -5,6 +5,17 @@
   box-sizing: border-box;
 }
 
+/* 华文中宋子集（spec §28）：12MB TTF → 摄影栏目用字 51KB woff2。
+   系统装有华文中宋/STZhongsong 时走 local 不下载；否则回退子集字体；
+   子集外字形按 --font-song 栈逐字回退到系统宋体。子集更新：npm run fonts:subset */
+@font-face {
+  font-family: "Song Web";
+  src: local("华文中宋"), local("STZhongsong"),
+    url("/fonts/stzhongsong.woff2") format("woff2");
+  font-display: swap;
+  font-weight: 400 900;
+}
+
 html {
   -webkit-text-size-adjust: 100%;
 }
@@ -265,6 +276,7 @@ body.film-on .foot .inner {
 
 /* —— 暗房页（spec §21.1）：photos 模块页面 dark —— */
 body.page-dark {
+  font-family: var(--font-song); /* spec §28：摄影首页及其分页以华文中宋为正文字形 */
   --canvas: #0b0c10;
   --grid-line: rgba(255, 255, 255, 0.035);
   --text-1: #eceef4;
