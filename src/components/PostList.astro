@@ -44,29 +44,40 @@ const groups = groupByYear
 }
 
 <script>
-  // 标签过滤：点选高亮、卡片显隐；再点一次取消
-  const chips = [...document.querySelectorAll<HTMLButtonElement>('[data-tag-chip]')];
-  const cards = [...document.querySelectorAll<HTMLElement>('[data-tags]')];
+  // 标签过滤（事件委托，防 View Transitions 重渲染/脚本顺序问题）：
+  // 用 style.display 直控显隐（绕开 hidden 属性与 UA 样式的一切不确定性）
   let active: string | null = null;
+
+  const setVisible = (el: HTMLElement | null, show: boolean) => {
+    if (el) el.style.display = show ? '' : 'none';
+  };
+
   const apply = () => {
+    const cards = [...document.querySelectorAll<HTMLElement>('[data-tags]')];
     cards.forEach((c) => {
       const own = (c.dataset.tags ?? '').split(' ').filter(Boolean);
-      c.closest('.glasscard')!.hidden = !!active && !own.includes(active);
+      const match = !active || own.includes(active);
+      setVisible(c.closest('.glasscard'), match);
     });
     const groups = [...document.querySelectorAll<HTMLElement>('.ygroup')];
     groups.forEach((g) => {
-      const visible = [...g.querySelectorAll('.glasscard')].some((c) => !c.hidden);
-      g.hidden = !visible;
+      const anyVisible = [...g.querySelectorAll('.glasscard')].some((c) => c.style.display !== 'none');
+      setVisible(g, anyVisible);
     });
-    chips.forEach((ch) => ch.classList.toggle('on', ch.dataset.tag === active));
+    document.querySelectorAll<HTMLButtonElement>('[data-tag-chip]').forEach((ch) => {
+      const on = ch.dataset.tag === active;
+      ch.classList.toggle('on', on);
+      ch.setAttribute('aria-pressed', String(on));
+    });
   };
-  chips.forEach((ch) =>
-    ch.addEventListener('click', () => {
-      const t = ch.dataset.tag ?? null;
-      active = active === t ? null : t;
-      apply();
-    }),
-  );
+
+  document.addEventListener('click', (e) => {
+    const t = (e.target as HTMLElement).closest('[data-tag-chip]') as HTMLButtonElement | null;
+    if (!t) return;
+    const tag = t.dataset.tag ?? null;
+    active = active === tag ? null : tag;
+    apply();
+  });
 </script>
 
 <style>
@@ -92,7 +103,7 @@ const groups = groupByYear
   .yr { font-size: 1rem; color: var(--text-3); font-weight: 600; margin: 0 0 12px; }
   .pcols {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); /* 与摄影网格同宽基线 */
     gap: clamp(14px, 2vw, 20px);
   }
   .empty { padding: clamp(28px, 6vw, 60px); text-align: center; color: var(--text-2); }
