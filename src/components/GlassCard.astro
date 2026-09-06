@@ -10,7 +10,11 @@ const { hover = true, class: className } = Astro.props;
 </div>
 
 <style>
-  .glasscard { transition: transform var(--t-fast) ease-out, box-shadow var(--t-fast) ease-out; }
+  .glasscard {
+    transition: transform var(--t-fast) ease-out, box-shadow var(--t-fast) ease-out, opacity 0.2s ease;
+  }
+  /* 标签筛选淡出（spec §37）：PostList JS 加类 → 0.2s 原位透明，淡完才收合 */
+  .glasscard.is-out { opacity: 0; pointer-events: none; }
   .raise:hover {
     transform: translateY(var(--card-hover));
     box-shadow: var(--glass-inset), var(--glass-shadow-lg);
