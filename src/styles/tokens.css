@@ -13,22 +13,28 @@
   --accent: #2f62e6;
   --link-underline: rgba(47, 98, 230, 0.35);
 
-  /* 玻璃 v2.3（白底透版：网格线更清晰透过面板，模糊仅取软化） */
-  --glass-bg: rgba(255, 255, 255, 0.4);
+  /* 玻璃 v3（yzrt 水珠拟态，spec §17）：光源左上 → 右下外投加重 + 内影明暗对仗；面板高透，背景必透出 */
+  --glass-bg: rgba(255, 255, 255, 0.38);
   --glass-bg-strong: rgba(255, 255, 255, 0.8);
-  --glass-border: rgba(15, 23, 42, 0.08);
+  --glass-border: rgba(15, 23, 42, 0.06);
   --glass-hl: rgba(255, 255, 255, 0.8); /* 历史名保留：仅导航/滑块小高光使用 */
   --glass-blur: 2px;
-  --glass-sat: 1.35;
-  --glass-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 10px 28px rgba(16, 24, 40, 0.06);
-  --glass-shadow-lg: 0 2px 6px rgba(16, 24, 40, 0.06), 0 18px 44px rgba(16, 24, 40, 0.1);
+  --glass-sat: 1.3;
+  --glass-shadow:
+    0 1px 2px rgba(16, 24, 40, 0.06),
+    0 12px 24px -4px rgba(16, 24, 40, 0.12),
+    0 26px 52px -16px rgba(16, 24, 40, 0.16),
+    14px 20px 40px -20px rgba(16, 24, 40, 0.2); /* 右下重投（yzrt 光源左上一致） */
+  --glass-shadow-lg:
+    0 2px 4px rgba(16, 24, 40, 0.07),
+    0 16px 32px -4px rgba(16, 24, 40, 0.16),
+    0 36px 72px -16px rgba(16, 24, 40, 0.22),
+    18px 26px 52px -22px rgba(16, 24, 40, 0.26);
 
-  /* LGGC 厚度光影：对角白色高光 + 内侧暗细边（spec §16.1） */
+  /* 水珠厚度内影（yzrt）：右下内侧暗 + 左上内侧白 */
   --glass-inset:
-    inset 1.5px -1.5px 1px -1px rgba(255, 255, 255, 0.9),
-    inset -1.5px 1.5px 1px -1px rgba(255, 255, 255, 0.75),
-    inset 0 0 2px rgba(15, 23, 42, 0.08),
-    inset 0 0 0 0.5px rgba(15, 23, 42, 0.05);
+    inset 3px 3px 7px -2px rgba(15, 23, 42, 0.1),
+    inset -3px -3px 7px -2px rgba(255, 255, 255, 0.85);
 
   /* 圆角 v2：收敛 */
   --radius-s: 9px;    /* 控件/输入 */

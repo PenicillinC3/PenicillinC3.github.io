@@ -242,5 +242,15 @@ src/content/
    - 新增 `--glass-inset`（LGGC 对角高光 + 内侧暗边，四段 box-shadow）：`inset 1.5px -1.5px 1px -1px rgba(255,255,255,.9), inset -1.5px 1.5px 1px -1px rgba(255,255,255,.75), inset 0 0 2px rgba(15,23,42,.08), inset 0 0 0 .5px rgba(15,23,42,.05)`；
    - `.glass` 与 `.btn` 的 box-shadow 改为 `var(--glass-inset), var(--glass-shadow)`（外投影保留）；`.sform` 同步；hover/focus 覆盖 box-shadow 的规则（.btn:hover、GlassCard .raise:hover、PhotoCard .photocard:hover）改为 `var(--glass-inset), var(--glass-shadow-lg)`，浮起时不丢厚度光影；
    - `--glass-border` 由 `.07` 微调至 `.08`（与内侧暗边同值协调）。
+
+## 17. 玻璃配方 v3 —— 水珠拟态（2026-09-06，用户弃 LGGC 改以 gitee greyd097/yzrt「纯CSS液态玻璃」为参考；冲突处以此节为准）
+
+1. **光影结构换成 yzrt 水珠对仗式**（光源左上）：
+   - 外投加重并带方向：`--glass-shadow` 四层含 `14px 20px 40px -20px rgba(16,24,40,.2)` 右下重投；`--glass-shadow-lg` 更重（hover/浮起）；
+   - 内影对仗：`--glass-inset = inset 3px 3px 7px -2px rgba(15,23,42,.1)`（右下内侧暗）+ `inset -3px -3px 7px -2px rgba(255,255,255,.85)`（左上内侧白）；
+   - 取消 LGGC 式四段对角细棱与 0.5px 内描边（§16.1 的 --glass-inset 值被替换）。
+2. **透度继续上调**：`--glass-bg .38`、`--glass-blur 2px`、`--glass-sat 1.3` —— 背景（网格/内容）必须清晰透过面板（用户硬性要求）。
+3. **按钮水滴化**：`.btn` 有机形态圆角（`46% 54% 51% 49% / …`），hover 时形态流动（`border-radius` 随 `--ease-spring` 过渡）；表面左上高光点 `::before` 随 hover 位移（水珠反光）；`.btn--primary` 填充不变。
+4. 卡片/面板（`.glass`、`.btn`、`.sform`、photocard/imgshell 玻璃沿）自动继承新内外影；hover 的 box-shadow 覆盖一律为 `var(--glass-inset), var(--glass-shadow-lg)`（§16 保留）。
 2. **页脚回归玻璃样式**：底部栏为 `.glass` 液态玻璃条（radius-lg、吸底 flex 结构不变），内容=许可注记 + 版权行。
 3. 欢迎页两枚入口按钮与摄影卡/详情相框（`photocard`/`imgshell` 10px 玻璃沿）随之获得同套厚度光影与透底效果；hover 棱光环（§14.3）不变。

@@ -138,13 +138,14 @@ img { max-width: 100%; height: auto; display: block; }
   to { --prism-angle: 360deg; }
 }
 
-/* —— 按钮 v2：直角玻璃 + 交互棱光 —— */
+/* —— 按钮 v3：水珠液态玻璃（yzrt 参考，spec §17）——有机水滴圆角 + 明暗内影 + 右下重投；
+    hover 时水滴形态继续流动（尊重 reduced-motion 由全局兜底截断） —— */
 .btn {
   display: inline-flex;
   align-items: center;
   gap: 0.5em;
   padding: 0.62em 1.4em;
-  border-radius: var(--radius-m);
+  border-radius: 46% 54% 51% 49% / 49% 46% 54% 51%;
   border: 1px solid var(--glass-border);
   background: var(--glass-bg);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
@@ -156,10 +157,11 @@ img { max-width: 100%; height: auto; display: block; }
   cursor: pointer;
   box-shadow: var(--glass-inset), var(--glass-shadow);
   transition: transform var(--t-fast) ease-out, box-shadow var(--t-fast) ease-out,
-    color var(--t-fast) ease-out;
+    border-radius var(--t-med) var(--ease-spring), color var(--t-fast) ease-out;
 }
 .btn:hover {
   transform: translateY(-1px);
+  border-radius: 41% 59% 45% 55% / 55% 43% 57% 45%;
   box-shadow: var(--glass-inset), var(--glass-shadow-lg);
   text-decoration: none;
 }
@@ -170,6 +172,23 @@ img { max-width: 100%; height: auto; display: block; }
   box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 28%, transparent);
 }
 .btn--primary:hover { filter: brightness(1.05); }
+
+/* 水珠表面高光点（yzrt 参考）：左上小亮斑，hover 时随形态流动 */
+.btn { position: relative; }
+.btn::before {
+  content: "";
+  position: absolute;
+  top: 16%;
+  left: 24%;
+  width: 13%;
+  aspect-ratio: 1 / 0.55;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.2) 75%);
+  opacity: 0.9;
+  pointer-events: none;
+  transition: left var(--t-med) var(--ease-spring), top var(--t-med) var(--ease-spring);
+}
+.btn:hover::before { left: 30%; top: 20%; }
 
 /* —— 胶囊（标签等小件保留胶囊形） —— */
 .pill {
