@@ -1,65 +1,53 @@
-/* 设计 token —— 全站配色/圆角/阴影/动效唯一来源（spec §5.1）。
-   亮色为 :root 默认；暗色在 [data-theme='dark'] 覆盖。组件不得按主题分支。 */
+/* 设计 token v2 —— 纯白单主题（spec §14）。无暗色分支。
+   旧组件引用的历史名（--glass-radius/--glass-hl/--glass-border 等）以别名/新值保留。 */
 :root {
   color-scheme: light;
-  --canvas: #eef1f8;
-  --canvas-2: #e3e8f4;
 
-  --text-1: #1b1e27;
-  --text-2: #4a5164;
-  --text-3: #78809a;
-  --accent: #4f6bff;
-  --link-underline: rgba(79, 107, 255, 0.35);
+  --canvas: #ffffff;
 
-  --glass-bg: rgba(255, 255, 255, 0.55);
-  --glass-bg-strong: rgba(255, 255, 255, 0.82);
-  --glass-border: rgba(255, 255, 255, 0.72);
-  --glass-hl: rgba(255, 255, 255, 0.95);
-  --glass-blur: 20px;
-  --glass-sat: 1.8;
-  --glass-radius: 22px;
-  --radius-s: 14px;
+  --text-1: #17191f;
+  --text-2: #565d6e;
+  --text-3: #8b91a3;
+  --accent: #2f62e6;
+  --link-underline: rgba(47, 98, 230, 0.35);
+
+  /* 玻璃 v2（白底版，LGGC 配方校准，spec §14.2） */
+  --glass-bg: rgba(255, 255, 255, 0.62);
+  --glass-bg-strong: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(15, 23, 42, 0.07);
+  --glass-hl: rgba(255, 255, 255, 0.8); /* 历史名保留：仅导航/滑块小高光使用 */
+  --glass-blur: 6px;
+  --glass-sat: 1.5;
+  --glass-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 10px 28px rgba(16, 24, 40, 0.06);
+  --glass-shadow-lg: 0 2px 6px rgba(16, 24, 40, 0.06), 0 18px 44px rgba(16, 24, 40, 0.1);
+
+  /* 圆角 v2：收敛 */
+  --radius-s: 9px;    /* 控件/输入 */
+  --radius-m: 14px;   /* 卡片/面板 */
+  --radius-lg: 20px;  /* 顶栏滑块/大玻璃 */
   --radius-pill: 999px;
-  --glass-shadow: 0 8px 32px rgba(31, 38, 68, 0.12);
-  --glass-shadow-lg: 0 18px 48px rgba(31, 38, 68, 0.18);
-  --card-hover: -4px;
+  --glass-radius: var(--radius-m); /* 历史名别名（旧组件引用不破） */
 
-  --blob-a: rgba(93, 129, 255, 0.5);
-  --blob-b: rgba(190, 140, 255, 0.45);
-  --blob-c: rgba(255, 178, 130, 0.4);
-  --blob-d: rgba(96, 220, 190, 0.38);
+  /* 棱光色散（spec §14.3）：低饱和环，仅在交互态浮现 */
+  --prism-a: rgba(122, 168, 255, 0.55);
+  --prism-b: rgba(178, 140, 255, 0.45);
+  --prism-c: rgba(255, 158, 190, 0.4);
+  --prism-d: rgba(120, 224, 190, 0.45);
+  --prism-dur: 6s;
 
+  /* 字体 */
   --font-sans: -apple-system, "SF Pro Text", "PingFang SC", "HarmonyOS Sans SC",
     "Microsoft YaHei", system-ui, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Consolas, "Cascadia Mono", monospace;
+  --font-song: "华文中宋", "STZhongsong", "Songti SC", "SimSun", serif; /* 展示用 */
 
-  --nav-h: 64px;
+  /* 动效 */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --t-fast: 0.15s;
+  --t-med: 0.25s;
+  --card-hover: -2px;
+
+  --nav-h: 56px;
   --maxw: 1160px;
   --gutter: clamp(18px, 4vw, 28px);
-}
-
-[data-theme='dark'] {
-  color-scheme: dark;
-  --canvas: #0c0e16;
-  --canvas-2: #12141f;
-
-  --text-1: #eef0f6;
-  --text-2: #b3b9cd;
-  --text-3: #7a8299;
-  --accent: #93aaff;
-  --link-underline: rgba(147, 170, 255, 0.4);
-
-  --glass-bg: rgba(255, 255, 255, 0.07);
-  --glass-bg-strong: rgba(22, 25, 38, 0.85);
-  --glass-border: rgba(255, 255, 255, 0.16);
-  --glass-hl: rgba(255, 255, 255, 0.24);
-  --glass-blur: 24px;
-  --glass-sat: 1.6;
-  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
-  --glass-shadow-lg: 0 18px 48px rgba(0, 0, 0, 0.6);
-
-  --blob-a: rgba(63, 88, 214, 0.42);
-  --blob-b: rgba(122, 63, 208, 0.36);
-  --blob-c: rgba(176, 106, 46, 0.28);
-  --blob-d: rgba(43, 127, 116, 0.34);
 }

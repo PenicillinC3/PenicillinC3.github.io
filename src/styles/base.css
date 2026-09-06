@@ -1,4 +1,4 @@
-/* 全局基础 + 玻璃工具类 + 文章排版（spec §5） */
+/* 全局基础 + 玻璃 v2 + 棱光 + 按钮 + 排版（spec §14） */
 *,
 *::before,
 *::after {
@@ -22,7 +22,7 @@ body {
 }
 
 h1, h2, h3, h4 {
-  line-height: 1.25;
+  line-height: 1.3;
   font-weight: 700;
   color: var(--text-1);
   margin: 0 0 0.5em;
@@ -45,7 +45,7 @@ img { max-width: 100%; height: auto; display: block; }
 }
 
 ::selection {
-  background: color-mix(in srgb, var(--accent) 30%, transparent);
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 .wrap {
@@ -59,10 +59,9 @@ img { max-width: 100%; height: auto; display: block; }
   min-height: 62vh;
 }
 
-/* —— 玻璃面板（液态玻璃核心：半透明 + backdrop 模糊提饱和 + 高光描边） —— */
+/* —— 玻璃 v2（LGGC 配方白底化：极淡填充 + 发丝描边 + 灰阶轻投影） —— */
 .glass {
-  background:
-    linear-gradient(180deg, var(--glass-hl), transparent 34%) var(--glass-bg);
+  background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   border-radius: var(--glass-radius);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
@@ -70,26 +69,69 @@ img { max-width: 100%; height: auto; display: block; }
   box-shadow: var(--glass-shadow);
 }
 
-/* 降级：不支持 backdrop-filter → 高不透明度实心面板（spec §5.6） */
+/* 降级：无 backdrop-filter → 近实心白面板（spec §14 同款） */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  :root { --glass-bg: rgba(255, 255, 255, 0.94); --glass-bg-strong: rgba(255, 255, 255, 0.96); }
-  [data-theme='dark'] { --glass-bg: rgba(15, 17, 26, 0.94); --glass-bg-strong: rgba(15, 17, 26, 0.96); }
-  .glass {
-    background: linear-gradient(180deg, var(--glass-hl), transparent 22%),
-      var(--glass-bg);
-  }
+  .glass { background: rgba(255, 255, 255, 0.97); }
 }
 
-/* —— 按钮 —— */
+/* —— 棱光色散环（spec §14.3）：1px 低饱和渐变描边，交互态浮现 —— */
+@property --prism-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+.prism {
+  position: relative;
+  isolation: isolate;
+}
+.prism::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(
+    from var(--prism-angle),
+    transparent 0deg,
+    var(--prism-a) 50deg,
+    var(--prism-b) 110deg,
+    transparent 180deg,
+    var(--prism-c) 240deg,
+    var(--prism-d) 300deg,
+    transparent 360deg
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+.prism:hover::after,
+.prism:focus-visible::after,
+.prism[data-on]::after {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .prism:hover::after,
+  .prism:focus-visible::after {
+    animation: prism-spin var(--prism-dur) linear infinite;
+  }
+}
+@keyframes prism-spin {
+  to { --prism-angle: 360deg; }
+}
+
+/* —— 按钮 v2：直角玻璃 + 交互棱光 —— */
 .btn {
   display: inline-flex;
   align-items: center;
   gap: 0.5em;
-  padding: 0.55em 1.35em;
-  border-radius: var(--radius-pill);
+  padding: 0.62em 1.4em;
+  border-radius: var(--radius-m);
   border: 1px solid var(--glass-border);
-  background: linear-gradient(180deg, var(--glass-hl), transparent 40%),
-    var(--glass-bg);
+  background: var(--glass-bg);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
   backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
   color: var(--text-1);
@@ -98,11 +140,11 @@ img { max-width: 100%; height: auto; display: block; }
   line-height: 1.4;
   cursor: pointer;
   box-shadow: var(--glass-shadow);
-  transition: transform 0.18s ease-out, box-shadow 0.18s ease-out,
-    filter 0.18s ease-out;
+  transition: transform var(--t-fast) ease-out, box-shadow var(--t-fast) ease-out,
+    color var(--t-fast) ease-out;
 }
 .btn:hover {
-  transform: translateY(-2px);
+  transform: translateY(-1px);
   box-shadow: var(--glass-shadow-lg);
   text-decoration: none;
 }
@@ -110,11 +152,11 @@ img { max-width: 100%; height: auto; display: block; }
   background: var(--accent);
   border-color: transparent;
   color: #fff;
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--accent) 35%, transparent);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 28%, transparent);
 }
-.btn--primary:hover { filter: brightness(1.07); }
+.btn--primary:hover { filter: brightness(1.05); }
 
-/* —— 胶囊 —— */
+/* —— 胶囊（标签等小件保留胶囊形） —— */
 .pill {
   display: inline-block;
   padding: 0.12em 0.7em;
@@ -123,7 +165,7 @@ img { max-width: 100%; height: auto; display: block; }
   font-weight: 500;
   line-height: 1.7;
   color: var(--text-2);
-  background: color-mix(in srgb, var(--text-1) 7%, transparent);
+  background: color-mix(in srgb, var(--text-1) 6%, transparent);
   border: 1px solid var(--glass-border);
   white-space: nowrap;
 }
@@ -137,11 +179,8 @@ img { max-width: 100%; height: auto; display: block; }
   color: var(--text-1);
 }
 
-/* —— 文章阅读排版（详情页 .prose 容器） —— */
-.prose {
-  max-width: 68ch;
-  margin-inline: auto;
-}
+/* —— 文章阅读排版（与 v1 一致；代码块维持深色中性面板） —— */
+.prose { max-width: 68ch; margin-inline: auto; }
 .prose h2 { font-size: 1.5rem; margin-top: 2em; }
 .prose h3 { font-size: 1.2rem; margin-top: 1.6em; }
 .prose pre {
@@ -149,8 +188,8 @@ img { max-width: 100%; height: auto; display: block; }
   padding: 1em 1.2em;
   overflow-x: auto;
   border-radius: var(--radius-s);
-  background: rgba(9, 11, 20, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(15, 17, 26, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: var(--glass-shadow);
   color: #e8eaf2;
   font-family: var(--font-mono);
@@ -160,7 +199,7 @@ img { max-width: 100%; height: auto; display: block; }
 .prose :not(pre) > code {
   padding: 0.14em 0.45em;
   border-radius: 6px;
-  background: color-mix(in srgb, var(--text-1) 9%, transparent);
+  background: color-mix(in srgb, var(--text-1) 7%, transparent);
   border: 1px solid var(--glass-border);
   font-family: var(--font-mono);
   font-size: 0.86em;
@@ -171,7 +210,7 @@ img { max-width: 100%; height: auto; display: block; }
   border-left: 3px solid var(--accent);
   color: var(--text-2);
   background: linear-gradient(90deg,
-    color-mix(in srgb, var(--accent) 8%, transparent), transparent);
+    color-mix(in srgb, var(--accent) 6%, transparent), transparent);
 }
 .prose ul, .prose ol { padding-left: 1.4em; }
 .prose a {
@@ -180,31 +219,19 @@ img { max-width: 100%; height: auto; display: block; }
   text-underline-offset: 3px;
 }
 .prose a:hover { text-decoration-thickness: 2px; }
-.prose img {
-  border-radius: var(--radius-s);
-  box-shadow: var(--glass-shadow);
-  margin: 1.4em 0;
-}
+.prose img { border-radius: var(--radius-s); box-shadow: var(--glass-shadow); margin: 1.4em 0; }
 .prose hr {
-  border: 0;
-  height: 1px;
-  margin: 2.4em 0;
+  border: 0; height: 1px; margin: 2.4em 0;
   background: linear-gradient(90deg, transparent, var(--text-3), transparent);
 }
-.prose table {
-  border-collapse: collapse;
-  width: 100%;
-  margin: 1.4em 0;
-  font-size: 0.92rem;
-}
+.prose table { border-collapse: collapse; width: 100%; margin: 1.4em 0; font-size: 0.92rem; }
 .prose th, .prose td {
   border: 1px solid color-mix(in srgb, var(--text-3) 40%, transparent);
-  padding: 0.5em 0.8em;
-  text-align: left;
+  padding: 0.5em 0.8em; text-align: left;
 }
-.prose th { background: color-mix(in srgb, var(--text-1) 6%, transparent); }
+.prose th { background: color-mix(in srgb, var(--text-1) 5%, transparent); }
 
-/* —— 减少动效 —— */
+/* —— 减少动效（覆盖棱光旋转与水滴动效） —— */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
