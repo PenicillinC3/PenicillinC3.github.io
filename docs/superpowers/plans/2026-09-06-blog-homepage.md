@@ -2850,11 +2850,18 @@ const indexJson = JSON.stringify(docs).replace(/</g, '\\u003c');
 </script>
 
 <style>
+  /* 静态容器样式（Astro scoped，节点由模板渲染，带 scope 属性） */
   .head { padding: clamp(24px, 4vw, 40px) clamp(18px, 4vw, 40px); margin-bottom: clamp(20px, 3vw, 28px); }
   .sub { margin: 0 0 20px; color: var(--text-2); font-size: 0.92rem; }
   .count { margin: 12px 0 0; font-size: 0.88rem; color: var(--text-3); }
   .results { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
   .results:empty { display: none; }
+  .hint { margin-top: 18px; color: var(--text-3); font-size: 0.9rem; }
+  .hint[hidden] { display: none; }
+</style>
+<style is:global>
+  /* 客户端渲染节点的样式必须全局（search.ts 用 createElement/innerHTML 生成，
+     不带 Astro scope 属性 —— scoped 选择器永不命中；实测教训见评审） */
   .res {
     display: block;
     padding: 14px 20px;
@@ -2871,8 +2878,6 @@ const indexJson = JSON.stringify(docs).replace(/</g, '\\u003c');
   .res .rt .cc { font-size: 0.72rem; font-weight: 600; color: var(--accent); letter-spacing: 0.06em; flex: none; }
   .res .rs { margin: 0; color: var(--text-2); font-size: 0.9rem; line-height: 1.6; }
   mark.hit { background: color-mix(in srgb, var(--accent) 26%, transparent); color: var(--text-1); border-radius: 3px; padding: 0 1px; }
-  .hint { margin-top: 18px; color: var(--text-3); font-size: 0.9rem; }
-  .hint[hidden] { display: none; }
 </style>
 ```
 
@@ -2949,7 +2954,8 @@ function render(q: string): void {
     listEl.append(li);
   }
   if (countEl) countEl.textContent = q.trim() ? `共 ${hits.length} 条结果` : '';
-  if (emptyEl) emptyEl.hidden = q.trim() !== '' && hits.length > 0;
+  // 提示语仅「有查询词且零命中」时显示；空查询/有结果都隐藏
+  if (emptyEl) emptyEl.hidden = q.trim() === '' || hits.length > 0;
 }
 
 let timer: number | undefined;
