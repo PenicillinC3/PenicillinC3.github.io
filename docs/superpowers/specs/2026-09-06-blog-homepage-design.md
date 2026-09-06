@@ -240,6 +240,7 @@ src/content/
 1. **玻璃可见性根因**：此前 `blur(6px)` 把 22px 网格下 1px 细线全部糊平 → 面板内呈死白，「不透明」。修正为 LGGC 同思路的**低模糊透底** + **厚度光影**组合：
    - `--glass-bg: rgba(255,255,255,.55)`（更透）、`--glass-blur: 3px`（线条穿过面板但被软化 → 透明感成立）、`--glass-sat: 1.35`；
    - 新增 `--glass-inset`（LGGC 对角高光 + 内侧暗边，四段 box-shadow）：`inset 1.5px -1.5px 1px -1px rgba(255,255,255,.9), inset -1.5px 1.5px 1px -1px rgba(255,255,255,.75), inset 0 0 2px rgba(15,23,42,.08), inset 0 0 0 .5px rgba(15,23,42,.05)`；
-   - `.glass` 与 `.btn` 的 box-shadow 改为 `var(--glass-inset), var(--glass-shadow)`（外投影保留）；`.sform` 同步。
+   - `.glass` 与 `.btn` 的 box-shadow 改为 `var(--glass-inset), var(--glass-shadow)`（外投影保留）；`.sform` 同步；hover/focus 覆盖 box-shadow 的规则（.btn:hover、GlassCard .raise:hover、PhotoCard .photocard:hover）改为 `var(--glass-inset), var(--glass-shadow-lg)`，浮起时不丢厚度光影；
+   - `--glass-border` 由 `.07` 微调至 `.08`（与内侧暗边同值协调）。
 2. **页脚回归玻璃样式**：底部栏为 `.glass` 液态玻璃条（radius-lg、吸底 flex 结构不变），内容=许可注记 + 版权行。
 3. 欢迎页两枚入口按钮与摄影卡/详情相框（`photocard`/`imgshell` 10px 玻璃沿）随之获得同套厚度光影与透底效果；hover 棱光环（§14.3）不变。
