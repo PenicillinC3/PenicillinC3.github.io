@@ -10,5 +10,7 @@ dist/
 .DS_Store
 Thumbs.db
 
+.astro/
+
 # SDD 进度 scratch（git 忽略）
 .superpowers/
