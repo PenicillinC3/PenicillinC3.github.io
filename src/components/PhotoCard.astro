@@ -27,7 +27,7 @@ const { title, alt, date, location, img, href } = Astro.props;
   }
   .photocard:hover {
     transform: translateY(var(--card-hover));
-    box-shadow: var(--glass-shadow-lg);
+    box-shadow: var(--glass-inset), var(--glass-shadow-lg);
     text-decoration: none;
   }
   .frame { position: relative; display: block; overflow: hidden; border-radius: var(--radius-s); }

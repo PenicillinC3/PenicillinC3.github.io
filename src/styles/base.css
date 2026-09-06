@@ -160,7 +160,7 @@ img { max-width: 100%; height: auto; display: block; }
 }
 .btn:hover {
   transform: translateY(-1px);
-  box-shadow: var(--glass-shadow-lg);
+  box-shadow: var(--glass-inset), var(--glass-shadow-lg);
   text-decoration: none;
 }
 .btn--primary {
