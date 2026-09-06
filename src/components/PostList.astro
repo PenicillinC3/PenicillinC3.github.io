@@ -44,12 +44,15 @@ const groups = groupByYear
 }
 
 <script>
-  // —— 笔记标签过滤：快速淡出 + FLIP 平滑上浮（spec §54）——
+  // —— 笔记标签过滤：快速淡出 + FLIP 平滑上浮 + 分组锁高（spec §54/§55）——
   // 交互模型（§53 占位保留版与 §37 收合版均作废）：点 tag → 不匹配卡 0.2s 快速淡出
   // （期间保留占位，剩余卡不提前乱动）→ 淡完统一 display:none 释放空间 → 剩余卡
   // FLIP 上浮填位。取消/换 tag：回归卡在自身 DOM 位原位淡入，被其挤开的卡同一次
   // FLIP 反向下滑。FLIP = First(记各卡点击时文档坐标) → 一次切 display → Last(重测)
   // → invert(反位 transform 视觉停回原位) → Play(过渡归零)。
+  // 锁高（spec §55）：筛选期间把每个分组 .pcols 钉在未筛选态的原高 —— 卡片照旧上浮
+  // 聚拢，空出的版面全部沉到分组末尾成留白，页面总高/滚动条/分组位置全程不变
+  // （此前反复投诉的「页面缩短」就此消除；余量随取消筛选一并释放还原）。
   // 全程卡片只平移、不形变；连点（动画未完）自动降级直切不排队；reduced-motion 直切。
   const FADE_MS = 200; // 与 GlassCard opacity 0.2s 过渡对齐
   const GLIDE_MS = 300;
@@ -59,6 +62,7 @@ const groups = groupByYear
   let busyUntil = 0; // 上一轮动画预算结束时刻：未结束又点击 → 本轮直切
   let timer = 0;
   const hidden = new Set<HTMLElement>(); // 已 display:none 离场的卡片
+  const locks = new Map<HTMLElement, number>(); // 分组 .pcols → 未筛选态原高（筛选期锁高用）
 
   const owns = (art: HTMLElement, tag: string | null) =>
     !tag || (art.dataset.tags ?? '').split(' ').filter(Boolean).includes(tag);
@@ -68,12 +72,18 @@ const groups = groupByYear
       .filter((w): w is HTMLElement => !!w);
   // 文档坐标：淡出等待期间用户滚动也不影响 FLIP 差值
   const docTop = (el: HTMLElement) => el.getBoundingClientRect().top + window.scrollY;
+  const groups = () => [...document.querySelectorAll<HTMLElement>('.pcols')];
 
   const refresh = () => {
     window.clearTimeout(timer);
     const now = performance.now();
     const anim = !reduced && now >= busyUntil;
     busyUntil = now + (anim ? FADE_MS + GLIDE_MS + 120 : 120);
+
+    // 进入筛选态且尚未锁高 → 量取各分组的未筛选原高（此刻布局即未筛选布局）
+    if (active && locks.size === 0) {
+      groups().forEach((g) => { if (g.offsetHeight > 0) locks.set(g, g.offsetHeight); });
+    }
 
     // FLIP First：当前布局快照（本轮要淡出的卡仍在列，最后会被隐藏集排除；
     // 回归卡此前离场无旧位可滑 → 只淡入）
@@ -90,7 +100,10 @@ const groups = groupByYear
     }
 
     const finish = () => {
-      // 阶段 B：一次性切换布局 —— 离场卡出流（display:none），回归卡回流（从透明起步）
+      // 阶段 B：一次性切换布局 —— 离场卡出流（display:none），回归卡回流（从透明起步）；
+      // 同一趟布局里上锁/解锁分组高度（离场释放与锁高同时生效 → 无「先缩短再撑回」的闪跳）
+      if (active) locks.forEach((h, g) => { g.style.minHeight = `${h}px`; });
+      else { locks.forEach((_, g) => { g.style.minHeight = ''; }); locks.clear(); }
       cards().forEach((w) => {
         const art = w.querySelector<HTMLElement>('[data-tags]');
         const show = !!art && owns(art, active);
