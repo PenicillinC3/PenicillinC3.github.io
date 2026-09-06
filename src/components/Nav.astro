@@ -101,19 +101,33 @@ const isActive = (href: string) =>
 
   if (!W.__vibeNavBound) {
     W.__vibeNavBound = true;
-    window.addEventListener('astro:page-load', () => placeSlider(true));
+    // Astro 事件实际派发在 document（window 上也挂一份双保险）；换页时页面模块
+    // 脚本不保证重跑 → 再加 MutationObserver 兜底：导航高亮/布局一有变动就重定位
+    const onLoad = () => placeSlider(true);
+    document.addEventListener('astro:page-load', onLoad);
+    window.addEventListener('astro:page-load', onLoad);
     let rsT: number | undefined;
     window.addEventListener('resize', () => {
       window.clearTimeout(rsT);
       rsT = window.setTimeout(() => placeSlider(false), 150);
+    });
+    let moT: number | undefined;
+    const mo = new MutationObserver(() => {
+      window.clearTimeout(moT);
+      moT = window.setTimeout(() => placeSlider(true), 80);
+    });
+    mo.observe(document.body, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ['class', 'style'],
     });
     // 系统字体首次生效可能改动测量 → 首次布局后校正一次（此后字体已缓存，
     // 每次都校正会把跨页滑动掐成瞬移）
     try { document.fonts?.ready?.then(() => { if (W.__vibeSliderX == null) placeSlider(false); }); } catch { /* 忽略 */ }
   }
 
-  // 模块每次执行时：无位置记录（首次）直接落位；有记录则按旧位动画到当前栏 ——
-  // 脚本若晚于换页执行即立刻滑动；若早于/未执行则由上方 page-load 兜底
+  // 模块每次执行时：无位置记录（首次）直接落位；有记录则按旧位动画到当前栏
   if (W.__vibeSliderX == null) placeSlider(false);
   else placeSlider(true);
 
