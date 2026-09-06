@@ -1,0 +1,16 @@
+---
+title: 照片标题
+date: 2026-09-06
+image: ./同名文件.jpg
+alt: 图片内容描述（无障碍必填，空则构建失败）
+location: 拍摄地点（可省）
+camera:
+  body: 机身
+  lens: 镜头
+  f: f/2.8
+  ss: 1/500s
+  iso: ISO 100
+album: 相册名（可省）
+draft: true
+---
+照片原件与本文档同名同目录（如 tokyo-night.jpg）。可留空正文。

@@ -1,0 +1,9 @@
+---
+title: 文章标题（必填）
+date: 2026-09-06
+summary: 列表卡片上的一句话摘要（可留空，留空自动取正文开头）
+tags: [标签一, 标签二]
+draft: true
+---
+文件名 = URL slug，用英文 kebab-case、不要带日期（如 my-first-post.md）。
+正文用 Markdown 书写。写完把 draft 改为 false（或删掉该行）才会出现在站点上。

@@ -1,0 +1,7 @@
+---
+title: 迷思标题
+date: 2026-09-06
+summary: 一句话摘要（可留空）
+draft: true
+---
+个人迷思没有标签字段。文件名用英文 kebab-case，如 a-small-thought.md。
