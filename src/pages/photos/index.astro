@@ -236,10 +236,10 @@ const n = covers.length;
     pointer-events: none;
     cursor: default;
     background: linear-gradient(165deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.015) 50%, rgba(255, 255, 255, 0.035) 100%);
-    border-color: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.3); /* spec §48：边缘提亮 */
     box-shadow:
-      inset 1px 1px 0 rgba(255, 255, 255, 0.13),
-      inset -1px -1px 0 rgba(0, 0, 0, 0.25),
+      inset 1px 1px 0 rgba(255, 255, 255, 0.24),
+      inset -1px -1px 0 rgba(0, 0, 0, 0.2),
       0 0 24px -10px rgba(255, 70, 70, 0.22); /* 红光泛在玻璃面上 */
   }
 
