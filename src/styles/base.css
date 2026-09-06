@@ -257,3 +257,8 @@ img { max-width: 100%; height: auto; display: block; }
     scroll-behavior: auto !important;
   }
 }
+
+/* —— 摄影胶片页（spec §19）：body.film-on 时页脚泛选中色柔光 —— */
+body.film-on .foot .inner {
+  box-shadow: var(--glass-inset), var(--glass-shadow), 0 0 44px -6px color-mix(in srgb, var(--accent) 45%, transparent);
+}

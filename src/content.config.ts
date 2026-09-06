@@ -46,6 +46,14 @@ export const collections = {
       }
     }),
   }),
+  series: defineCollection({
+    type: 'content',
+    schema: z.object({
+      ...base,
+      location: z.string().optional(),
+      cover: z.string(), // 卷封面 = 卷内某照片的 slug
+    }),
+  }),
   photos: defineCollection({
     type: 'content',
     schema: ({ image }) =>
@@ -55,6 +63,7 @@ export const collections = {
         alt: z.string().min(1, 'alt 必填'),
         location: z.string().optional(),
         album: z.string().optional(),
+        series: z.string().optional(), // 所属卷（对应 series slug），有则挂靠胶片
         camera: z
           .object({
             body: z.string().optional(),

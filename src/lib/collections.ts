@@ -90,3 +90,31 @@ export async function projectItems(): Promise<ProjectItem[]> {
 export async function photoEntries(): Promise<CollectionEntry<'photos'>[]> {
   return listSorted('photos');
 }
+
+export interface SeriesRoll {
+  entry: CollectionEntry<'series'>;
+  photos: CollectionEntry<'photos'>[];
+  cover: CollectionEntry<'photos'>;
+}
+
+/** 卷：photos 按 series 字段挂靠、date 升序；封面缺省退第一张（构建期 console.warn） */
+export async function seriesRolls(): Promise<SeriesRoll[]> {
+  const allPhotos = await getCollection('photos');
+  const allSeries = (await getCollection('series'))
+    .filter((s) => !s.data.draft)
+    .sort((a, b) => b.data.date.localeCompare(a.data.date));
+  return allSeries.map((s) => {
+    const photos = allPhotos
+      .filter((p) => p.data.series === s.slug)
+      .sort((a, b) => a.data.date.localeCompare(b.data.date));
+    let cover = photos.find((p) => p.slug === s.data.cover);
+    if (!cover && photos.length > 0) {
+      cover = photos[0];
+      console.warn(`[series] ${s.slug} 封面 ${s.data.cover} 不在卷内，回退 ${cover.slug}`);
+    }
+    if (!cover) {
+      throw new Error(`[series] ${s.slug} 卷内无照片（photos 需带 series: ${s.slug}）`);
+    }
+    return { entry: s, photos, cover };
+  });
+}
