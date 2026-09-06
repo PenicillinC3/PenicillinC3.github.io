@@ -44,23 +44,96 @@ const groups = groupByYear
 }
 
 <script>
-  // 标签过滤（事件委托，防 View Transitions 重渲染/脚本顺序问题）：
-  // 原位淡出 + 占位保留（spec §53，§37 的收合方案作废）：不匹配卡片加
-  // .glasscard.is-out —— opacity 0.2s 淡出、visibility 延迟隐藏 —— 但始终
-  // 留在文档流中占位，页面高度/卡片位置/滚动条全程不变，不再塌缩跳动。
-  // 重新匹配即移除 is-out：visibility 立即恢复、opacity 淡回（GlassCard
-  // 两侧 transition 规则分别处理延迟方向）。
+  // —— 笔记标签过滤：快速淡出 + FLIP 平滑上浮（spec §54）——
+  // 交互模型（§53 占位保留版与 §37 收合版均作废）：点 tag → 不匹配卡 0.2s 快速淡出
+  // （期间保留占位，剩余卡不提前乱动）→ 淡完统一 display:none 释放空间 → 剩余卡
+  // FLIP 上浮填位。取消/换 tag：回归卡在自身 DOM 位原位淡入，被其挤开的卡同一次
+  // FLIP 反向下滑。FLIP = First(记各卡点击时文档坐标) → 一次切 display → Last(重测)
+  // → invert(反位 transform 视觉停回原位) → Play(过渡归零)。
+  // 全程卡片只平移、不形变；连点（动画未完）自动降级直切不排队；reduced-motion 直切。
+  const FADE_MS = 200; // 与 GlassCard opacity 0.2s 过渡对齐
+  const GLIDE_MS = 300;
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
   let active: string | null = null;
+  let busyUntil = 0; // 上一轮动画预算结束时刻：未结束又点击 → 本轮直切
+  let timer = 0;
+  const hidden = new Set<HTMLElement>(); // 已 display:none 离场的卡片
+
+  const owns = (art: HTMLElement, tag: string | null) =>
+    !tag || (art.dataset.tags ?? '').split(' ').filter(Boolean).includes(tag);
+  const cards = () =>
+    [...document.querySelectorAll<HTMLElement>('[data-tags]')]
+      .map((a) => a.closest<HTMLElement>('.glasscard'))
+      .filter((w): w is HTMLElement => !!w);
+  // 文档坐标：淡出等待期间用户滚动也不影响 FLIP 差值
+  const docTop = (el: HTMLElement) => el.getBoundingClientRect().top + window.scrollY;
 
   const refresh = () => {
-    document.querySelectorAll<HTMLElement>('[data-tags]').forEach((art) => {
-      const w = art.closest<HTMLElement>('.glasscard');
-      if (!w) return;
-      const own = (art.dataset.tags ?? '').split(' ').filter(Boolean);
-      const show = !active || own.includes(active);
-      w.classList.toggle('is-out', !show);
-    });
-    // chip 激活态即时同步
+    window.clearTimeout(timer);
+    const now = performance.now();
+    const anim = !reduced && now >= busyUntil;
+    busyUntil = now + (anim ? FADE_MS + GLIDE_MS + 120 : 120);
+
+    // FLIP First：当前布局快照（本轮要淡出的卡仍在列，最后会被隐藏集排除；
+    // 回归卡此前离场无旧位可滑 → 只淡入）
+    const prev = anim ? new Map<HTMLElement, number>() : null;
+    if (prev) cards().forEach((w) => { if (!hidden.has(w)) prev.set(w, docTop(w)); });
+
+    // 阶段 A：仅透明切换 —— 淡出卡仍占位、回归卡仍离场，布局零变化
+    if (anim) {
+      cards().forEach((w) => {
+        const art = w.querySelector<HTMLElement>('[data-tags]');
+        const show = !!art && owns(art, active);
+        if (!show && !hidden.has(w)) w.classList.add('is-out');
+      });
+    }
+
+    const finish = () => {
+      // 阶段 B：一次性切换布局 —— 离场卡出流（display:none），回归卡回流（从透明起步）
+      cards().forEach((w) => {
+        const art = w.querySelector<HTMLElement>('[data-tags]');
+        const show = !!art && owns(art, active);
+        if (!show) {
+          w.classList.remove('is-out');
+          w.style.display = 'none';
+          hidden.add(w);
+        } else if (hidden.has(w)) {
+          hidden.delete(w);
+          w.classList.add('is-out'); // 回归从 opacity:0 起步，Play 段去类淡入
+          w.style.display = '';
+        }
+      });
+      // invert：仍可见且布局位有变的卡，反位移回旧位（视觉停在原地等滑行）
+      const glideEls: HTMLElement[] = [];
+      if (prev) {
+        cards().forEach((w) => {
+          if (hidden.has(w) || !prev.has(w)) return;
+          const d = prev.get(w)! - docTop(w);
+          if (Math.abs(d) < 0.5) return;
+          w.style.transform = `translateY(${d}px)`;
+          glideEls.push(w);
+        });
+        void document.body.offsetHeight; // 统一回流：让反位 transform 落地
+      }
+      // Play：反位卡过渡归零 = 滑向新位；回归卡去 is-out = 原位淡入
+      glideEls.forEach((w) => {
+        w.style.transition = `transform ${GLIDE_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`; // 上浮缓出
+        w.style.transform = '';
+      });
+      cards().forEach((w) => {
+        if (!hidden.has(w)) w.classList.remove('is-out');
+      });
+      if (glideEls.length) {
+        window.setTimeout(() => {
+          glideEls.forEach((w) => { w.style.transition = ''; }); // 还权 CSS（hover raise 过渡）
+        }, GLIDE_MS + 80);
+      }
+    };
+    if (anim) timer = window.setTimeout(finish, FADE_MS);
+    else finish();
+
+    // 芯片激活态即时同步
     document.querySelectorAll<HTMLButtonElement>('[data-tag-chip]').forEach((ch) => {
       const on = ch.dataset.tag === active;
       ch.classList.toggle('on', on);

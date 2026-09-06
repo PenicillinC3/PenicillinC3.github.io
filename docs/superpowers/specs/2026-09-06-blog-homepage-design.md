@@ -464,3 +464,16 @@ setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160）
 ## 53. 标签筛选占位保留（2026-09-07，用户指定「还是缩小，解决」；§37 的收合方案作废）
 
 §37 选型（淡出后收合、页面变短）不满足需求，改**占位保留**：不匹配卡片加 `.glasscard.is-out` —— `opacity` 0.2s 淡出、`visibility` 延迟 0.2s 转 hidden，但**始终留在文档流占位**；年份组永不折叠、页面高度/卡片位置/滚动条全程不变（实测点 Git：scrollH 恒 1173、卡片 top 267/527/787 不变，被滤卡片 opacity 0 + visibility hidden 原位留空）。移除 is-out 时 `visibility` 立即恢复、`opacity` 淡回（GlassCard 两侧 transition 分别处理延迟方向）。JS 简化为事件委托 + `classList.toggle`，不再有定时器/世代号/display 操作。
+
+---
+
+## §54（2026-09-07）笔记标签筛选：快速淡出 + FLIP 平滑上浮（覆盖 §53 占位保留版与 §37 收合版）
+
+用户最终要求（§53 反馈迭代）：点击 tag 时，**没有此 tag 的帖子快速淡出，有 tag 的帖子快速上浮**填位。
+
+- §37 收合版（切 display 直跳、页面/卡片瞬缩、卡顿）与 §53 占位保留版（筛后残留等高空洞、可见卡无法聚拢）均不再采用。
+- 时序：点 tag → 不匹配卡 0.2s 快速淡出（期间**保留占位**，剩余卡不提前乱动）→ 淡完统一 `display:none` 释放空间 → 剩余卡 FLIP 平滑上浮。
+- FLIP = First（记录点击时刻各卡文档坐标）→ 一次性切 display → Last（重测）→ invert（反位 `translateY` 视觉停回原位）→ Play（过渡归零滑向新位）。取消/换 tag：回归卡在自身 DOM 位从透明原位淡入，被其挤开的卡同一次 FLIP 反向下滑。
+- **全程卡片只平移、不形变**（不再出现「卡片缩小」观感）；页面总高随筛选顺滑收/涨，宽度因 `html scrollbar-gutter: stable`（base.css）不跳。
+- 测量用文档坐标（`rect.top + scrollY`），淡出等待期间用户滚动不错位；动画未完又点击 → 自动降级直切（不排队、无交错）；`prefers-reduced-motion` → 纯 display 切换。
+- 实现：`PostList.astro`（事件委托 + FLIP 流程）、`GlassCard.astro`（`.is-out` 只留 opacity:0 + pointer-events:none 透明锚点，visibility 延迟占位技巧删除）。
