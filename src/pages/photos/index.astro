@@ -99,8 +99,8 @@ const n = covers.length;
       const W = arena.clientWidth;
       const H = arena.clientHeight;
       const bh = 22;
-      // 胶片再放大（spec §38）：宽限 46%→54%，高余量按拉远的字幕重算 160→196
-      const fw = Math.min(W * 0.54, (H - 196) * 1.5, 980);
+      // 胶片持续放大（spec §38→§41）：宽限 →62%、封顶 1180px（H 余量 196 配合字幕）
+      const fw = Math.min(W * 0.62, (H - 196) * 1.5, 1180);
       const fh = fw / 1.5;
       const peek = Math.min(160, Math.max(80, W * 0.085));
       const step = Math.max(fw + 40, W / 2 + fw / 2 - peek); // 相邻中心距 → 邻卷只露一点
