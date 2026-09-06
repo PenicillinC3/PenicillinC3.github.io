@@ -1,4 +1,4 @@
-/** 去除 Markdown 标记，仅保留可读文本（供搜索索引/摘要用） */
+/** 去除 Markdown 标记，仅保留可读文本（供摘要与正文提取用） */
 export function stripMarkdown(md: string): string {
   return md
     .replace(/```[\s\S]*?```/g, ' ') // 代码块整体视为空格
