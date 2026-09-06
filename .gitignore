@@ -1,0 +1,14 @@
+# Node
+node_modules/
+dist/
+*.log
+
+# Claude Code 个人本地设置（不提交）
+.claude/settings.local.json
+
+# 系统
+.DS_Store
+Thumbs.db
+
+# SDD 进度 scratch（git 忽略）
+.superpowers/
