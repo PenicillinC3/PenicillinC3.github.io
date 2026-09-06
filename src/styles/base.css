@@ -261,8 +261,8 @@ img { max-width: 100%; height: auto; display: block; }
   font-size: 0.88rem;
   line-height: 1.65;
 }
-/* prism 高亮（spec §29.2/§32）：注释 = JetBrains 斜体，中文逐字回退斜体 Maple；
-   其余 token 轻配色 */
+/* prism 高亮（spec §29.2/§32/§57）：注释 = JetBrains 斜体，中文逐字回退斜体 Maple；
+   非注释代码的中文经 --font-mono 字链逐字落正体 Maple；其余 token 轻配色 */
 .prose pre code { font-family: var(--font-mono); } /* 直击 code 元素（UA 默认 monospace 会压过继承） */
 .token.comment,
 .token.prolog,

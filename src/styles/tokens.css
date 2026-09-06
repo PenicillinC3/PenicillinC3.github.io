@@ -50,11 +50,14 @@
   --prism-d: rgba(120, 224, 190, 0.45);
   --prism-dur: 6s;
 
-  /* 字体（spec §29）：MapleMono = 全站正文（摄影页 page-dark 覆写为华文中宋）；
-     JetBrains Mono = 代码（注释走斜体面） */
+  /* 字体（spec §29/§57）：MapleMono = 全站正文（摄影页 page-dark 覆写为华文中宋）；
+     代码 = JetBrains Mono 打头：拉丁字形它全包；
+     §57 起 --font-mono 链紧随正体 Maple —— JetBrains 缺中文字形，代码里的中文
+     （字符串/标识符等非注释部分）逐字落正体 Maple；--font-comment 注释栈不变，
+     注释中文仍逐字落斜体 Maple */
   --font-sans: "MapleMono Web", "Maple Mono NF CN", "PingFang SC", "HarmonyOS Sans SC",
     "Microsoft YaHei", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono Web", ui-monospace, "SF Mono", Consolas, "Cascadia Mono", monospace;
+  --font-mono: "JetBrains Mono Web", "MapleMono Web", ui-monospace, "SF Mono", Consolas, "Cascadia Mono", monospace;
   --font-comment: "JetBrains Mono Web", "MapleMono Italic Web", ui-monospace, "SF Mono", Consolas, monospace; /* 注释（spec §32）：中文逐字落斜体 Maple */
   --font-song: "Song Web", "华文中宋", "STZhongsong", "Songti SC", "SimSun", serif; /* 展示用（spec §28） */
 
