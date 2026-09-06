@@ -144,7 +144,7 @@ img { max-width: 100%; height: auto; display: block; }
   align-items: center;
   gap: 0.5em;
   padding: 0.62em 1.5em;
-  border-radius: var(--radius-s); /* 小圆角矩形（用户指定） */
+  border-radius: 12px; /* 小圆角矩形（用户指定 12px） */
   border: 1px solid var(--glass-border);
   background: var(--glass-bg);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
