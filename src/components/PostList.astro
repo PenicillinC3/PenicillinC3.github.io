@@ -45,25 +45,70 @@ const groups = groupByYear
 
 <script>
   // 标签过滤（事件委托，防 View Transitions 重渲染/脚本顺序问题）：
-  // 用 style.display 直控显隐（绕开 hidden 属性与 UA 样式的一切不确定性）
+  // 两段式显隐（spec §37）：不匹配卡片先原位淡出（.glasscard.is-out，0.2s，
+  // GlassCard.astro 提供 opacity/pointer-events 规则），淡出结束后整批从文档流
+  // 收合（display:none），空年份组随之下沉隐藏 —— 不做瞬时塌缩跳页；
+  // 重新匹配的卡片先恢复文档流、从透明淡入。每次操作递增世代号，作废上一批
+  // 未到期的折叠定时器，快速连点 chip 时中间态不互相踩踏。
   let active: string | null = null;
+  let gen = 0;
+  const FADE = 200;
 
-  const setVisible = (el: HTMLElement | null, show: boolean) => {
-    if (el) el.style.display = show ? '' : 'none';
+  const cards = () =>
+    [...document.querySelectorAll<HTMLElement>('[data-tags]')]
+      .map((el) => el.closest<HTMLElement>('.glasscard'))
+      .filter((w): w is HTMLElement => !!w);
+
+  const syncGroups = () => {
+    document.querySelectorAll<HTMLElement>('.ygroup').forEach((g) => {
+      const anyVisible = [...g.querySelectorAll<HTMLElement>('.glasscard')]
+        .some((c) => c.style.display !== 'none');
+      g.style.display = anyVisible ? '' : 'none';
+    });
   };
 
-  const apply = () => {
-    const cards = [...document.querySelectorAll<HTMLElement>('[data-tags]')];
-    cards.forEach((c) => {
-      const own = (c.dataset.tags ?? '').split(' ').filter(Boolean);
-      const match = !active || own.includes(active);
-      setVisible(c.closest('.glasscard'), match);
+  const refresh = () => {
+    const my = ++gen;
+    const fadeIn: HTMLElement[] = [];
+    cards().forEach((w) => {
+      const own = ((w.querySelector('[data-tags]') as HTMLElement | null)?.dataset.tags ?? '')
+        .split(' ')
+        .filter(Boolean);
+      const show = !active || own.includes(active);
+      const hidden = w.style.display === 'none';
+      const out = w.classList.contains('is-out');
+      if (show) {
+        if (out) w.classList.remove('is-out'); // 正在淡出 → 取消并淡回
+        if (hidden) {
+          w.style.display = '';
+          const g = w.closest<HTMLElement>('.ygroup');
+          if (g) g.style.display = '';
+          w.classList.add('is-out'); // 从透明起步
+          fadeIn.push(w);
+        }
+      } else if (!out) {
+        w.classList.add('is-out'); // 原地淡出
+      }
     });
-    const groups = [...document.querySelectorAll<HTMLElement>('.ygroup')];
-    groups.forEach((g) => {
-      const anyVisible = [...g.querySelectorAll('.glasscard')].some((c) => c.style.display !== 'none');
-      setVisible(g, anyVisible);
-    });
+    if (fadeIn.length) {
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() =>
+          fadeIn.forEach((w) => w.classList.remove('is-out')),
+        ),
+      );
+    }
+    // 淡出收合：整批在淡出完成后统一移出文档流（期间若有新操作则本批作废）
+    window.setTimeout(() => {
+      if (my !== gen) return;
+      cards().forEach((w) => {
+        if (w.classList.contains('is-out') && w.style.display !== 'none') {
+          w.classList.remove('is-out');
+          w.style.display = 'none';
+        }
+      });
+      syncGroups();
+    }, FADE + 30);
+    // chip 激活态即时同步
     document.querySelectorAll<HTMLButtonElement>('[data-tag-chip]').forEach((ch) => {
       const on = ch.dataset.tag === active;
       ch.classList.toggle('on', on);
@@ -76,7 +121,7 @@ const groups = groupByYear
     if (!t) return;
     const tag = t.dataset.tag ?? null;
     active = active === tag ? null : tag;
-    apply();
+    refresh();
   });
 </script>
 

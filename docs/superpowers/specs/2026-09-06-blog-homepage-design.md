@@ -387,3 +387,8 @@ src/content/
 
 1. **标题悬停只变色**：PostCard/LinkCard/ProjectCard 的 `.pt a:hover`/`.lt a:hover` 移除 `text-decoration: underline`（更高特异性压过 base.css 的 `a:hover` 下划线）——悬停仅变 `--accent`。
 2. **整卡可点（stretched link）**：三卡 `.pcard/.lcard/.prjcard` 加 `position:relative; cursor:pointer`；标题链接 `::after{position:absolute; inset:0}` 铺满整卡 → 点卡片任意处 = 点标题链接（notes/musings 进详情、links/projects 打开外链/仓库，语义与标题一致；Tab 聚焦标题链接即可键盘进入）。ProjectCard「在线演示/源代码」两枚按钮 `.acts` 抬 `position:relative; z-index:1` 保持独立可点。副作用：卡内正文不可拖选（stretched link 通病，接受）。
+
+## 37. 标签筛选两段式显隐 + 滚动条宽度锁定（2026-09-07，用户选型「原位淡出并收合」；§20.3 的即时折叠作废）
+
+1. **两段式显隐**：PostList 过滤 = 不匹配卡片先加 `.glasscard.is-out` 原位淡出 0.2s（GlassCard.astro 提供 `opacity .2s` 过渡与 `.is-out{opacity:0; pointer-events:none}`），淡出完成整批 `display:none` 收合、空年份组随之下沉隐藏；恢复匹配的卡片先回文档流、从透明淡入。每次操作递增世代号作废未到期的折叠定时器——快速连点不互相踩踏。仍事件委托 + style.display 直控（勿回归 hidden 属性方案）。实测依据：旧即时折叠在滚动位置 300 处点 chip，页面总高 1173→~900，滚动被钳回 0 造成跳页。
+2. **列宽锁定**：base.css `html { scrollbar-gutter: stable }` —— 长短页/筛选切换时右侧滚动条出现/消失不再改变内容宽度（Windows 经典滚动条下卡片宽度随滚动条切换抖动 ≈ 17px）；`html:has(body.page-gallery) { scrollbar-gutter: auto }`（画廊锁死不滚动，预留槽无意义）。

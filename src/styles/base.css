@@ -52,6 +52,7 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  scrollbar-gutter: stable; /* 筛选/长短页切换时右侧滚动条不出现/消失 → 列宽恒定不跳 */
 }
 
 body {
@@ -370,7 +371,10 @@ body.page-immersive .stage {
 
 /* —— 画廊页（spec §27.1）：视口锁高、无滚动，保留页脚；
      main 弹性占满顶栏与页脚之间 → 胶片画廊在其中自适应 —— */
-html:has(body.page-gallery) { height: 100%; }
+html:has(body.page-gallery) {
+  height: 100%;
+  scrollbar-gutter: auto; /* 画廊锁死不滚动，无需（也不应）预留滚动条槽 */
+}
 body.page-gallery {
   height: 100%;
   overflow: hidden;
