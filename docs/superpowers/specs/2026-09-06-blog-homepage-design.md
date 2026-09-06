@@ -331,3 +331,9 @@ src/content/
    - **Rays overlay 收进 arena 容器**（spec §26 overlay 变体改 absolute inset:0 z20，容器相对定位即可，勿 fixed 全屏——会盖到页脚）。
 3. **示例第二卷「郊野 · 七月」**：`src/content/series/field-roll.md` + `src/content/photos/dsc0007.md(.jpg)`（img/ 原件 3599×1852 超宽，验证 contain 与末卷灰黑占位）。系列按日期降序 → 本卷排在 Nikon 卷后。
 4. 卷备忘页 `/photos/<slug>/`（§21.3 布局 + §26 backdrop 射线）不变。
+
+## 28. 华文中宋子集嵌入（2026-09-07，用户放行字体文件并指定范围）
+
+1. **子集管线**：`font/STZHONGS.TTF`（12MB 原件）→ `scripts/subset-song.mjs`（subset-font，harfbuzz wasm）按「摄影首页及其分页实际用字」抽字形 → `public/fonts/stzhongsong.woff2`（当前 51KB，0.4%）。新增照片/卷文案后执行 `npm run fonts:subset` 重新生成并提交。devDependencies 增 `subset-font`（构建期工具，例外同 §26 ogl）。
+2. **@font-face「Song Web」**（base.css）：src 顺序 local 华文中宋 → local STZhongsong → woff2 —— 系统已装则零下载；未装则拉 51KB 子集；子集外字形沿 `--font-song` 栈逐字回退系统宋体。`font-display: swap`。
+3. **应用范围**：`--font-song` 首项改为 "Song Web"（欢迎页站名等既有宋体处自动受益）；`body.page-dark { font-family: var(--font-song) }` —— 摄影作品集首页（画廊）及其分页（卷备忘页）正文/时间戳/标题统一华文中宋书卷感。数字/域名等 mono 覆写不受影响。
