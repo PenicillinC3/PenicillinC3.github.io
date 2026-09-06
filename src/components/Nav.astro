@@ -45,32 +45,44 @@ const isActive = (href: string) =>
 </header>
 
 <script>
-  // —— 水滴滑块：跨页存活 + 弹性位移（spec §14.4）——
-  // 滑块带 transition:persist：View Transitions 换页时节点不重建、保留当前位置与
-  // 宽度 → 量测新栏目后由 CSS 过渡完成真正的液态滑动（此前重建节点只做「着陆」）。
-  // 垂直居中在 CSS 侧 translateY(-50%)；JS 只写 --sx（历史坑：直接盖 style.transform
-  // 会挤掉 -50%，滑块沿 top:50% 顶边下挂半身）。
-  const nav = document.querySelector<HTMLElement>('[data-nav]');
-  const slider = document.querySelector<HTMLElement>('[data-slider]');
+  // —— 水滴滑块：跨页存活 + 自查询重定位（spec §22.1）——
+  // 滑块带 transition:persist：换页时节点不重建、旧位置保留 → 量测新栏目后由
+  // CSS 过渡完成液态滑动。垂直居中在 CSS 侧 translateY(-50%)；JS 只写 --sx
+  // （历史坑：直盖 style.transform 会挤掉 -50%，滑块沿 top:50% 顶边下挂半身）。
+  // 时序要点（真实踩坑）：模块顶层抓死的节点在 View Transitions 换页后成死引用，
+  // 且页面脚本可能先于换页执行/不重跑 → 监听只绑一次到 window，回调内**自查询**
+  // 当前文档；可靠信号是 astro:page-load（换页完成后于 window 派发）。
+  const W = window as unknown as {
+    __vibeSliderX?: number;
+    __vibeSliderW?: number;
+    __vibeNavBound?: boolean;
+  };
 
   function placeSlider(animate: boolean, retry = 0): void {
+    const nav = document.querySelector<HTMLElement>('[data-nav]');
+    const slider = document.querySelector<HTMLElement>('[data-slider]');
     if (!nav || !slider) return;
     const act = nav.querySelector<HTMLElement>('[data-nav-item].is-active');
     if (!act) {
-      slider.style.opacity = '0'; // 首页品牌/404：无栏目高亮 → 隐藏
+      slider.style.opacity = '0'; // 首页品牌/404：无栏目高亮 → 隐藏（保留旧 x 供回程滑动）
       return;
     }
     if (act.offsetWidth === 0) {
-      // 换页瞬间布局未就绪 → 逐帧重试（最多 ~12 帧 ≈ 200ms）
-      if (retry < 12) requestAnimationFrame(() => placeSlider(animate, retry + 1));
+      // 布局未就绪（换页瞬间/移动端折叠）→ 逐帧重试（~16 帧后放弃）
+      if (retry < 16) requestAnimationFrame(() => placeSlider(animate, retry + 1));
       return;
     }
     const x = act.offsetLeft;
     const w = act.offsetWidth;
-    const raw = slider.style.getPropertyValue('--sx').trim();
-    const fromX = raw ? parseFloat(raw) || 0 : 0;
-    const sliding = Math.abs(x - fromX) > 2; // 真跨栏位移才触发着陆脉冲
-    if (!animate) slider.style.transition = 'none';
+    const moving = animate && W.__vibeSliderX != null && Math.abs(W.__vibeSliderX - x) > 2;
+    if (moving || !animate) slider.style.transition = 'none';
+    if (moving) {
+      // 两段式：无过渡先落到旧位（节点重建时连宽度一起复位）→ 恢复过渡改到新位 → 弹簧滑动
+      slider.style.setProperty('--sx', `${W.__vibeSliderX}px`);
+      slider.style.width = `${W.__vibeSliderW ?? w}px`;
+      void slider.offsetWidth;
+      slider.style.transition = '';
+    }
     slider.style.setProperty('--sx', `${x}px`);
     slider.style.width = `${w}px`;
     slider.style.opacity = '1';
@@ -78,29 +90,32 @@ const isActive = (href: string) =>
       void slider.offsetWidth; // 强制回流后恢复过渡（防回跳）
       slider.style.transition = '';
     }
-    if (animate && sliding) {
+    if (moving) {
       slider.classList.remove('land');
       void slider.offsetWidth;
       slider.classList.add('land');
     }
+    W.__vibeSliderX = x;
+    W.__vibeSliderW = w;
   }
 
-  // 首次落位（无动画）。仅当滑块没有内联 --sx（全新加载）才执行：
-  // 换页时 persist 保留了旧位置，由随后的 astro:page-load 从旧位弹簧滑到新栏，
-  // 若这里落位会把滑动掐成瞬移。
-  if (slider?.style.getPropertyValue('--sx').trim() === '') placeSlider(false);
-  window.addEventListener('astro:page-load', () => placeSlider(true));
-  let rsT: number | undefined;
-  window.addEventListener('resize', () => {
-    window.clearTimeout(rsT);
-    rsT = window.setTimeout(() => placeSlider(false), 150);
-  });
-  // 系统字体首次生效可能改动测量 → 仅在会话首次布局时做一次校正（后续字体已缓存，
-  // 每次导航都校正会把跨页滑动掐成瞬移）
-  if (!window.__vibeNavInit) {
-    window.__vibeNavInit = true;
-    try { document.fonts?.ready?.then(() => placeSlider(false)); } catch { /* 忽略 */ }
+  if (!W.__vibeNavBound) {
+    W.__vibeNavBound = true;
+    window.addEventListener('astro:page-load', () => placeSlider(true));
+    let rsT: number | undefined;
+    window.addEventListener('resize', () => {
+      window.clearTimeout(rsT);
+      rsT = window.setTimeout(() => placeSlider(false), 150);
+    });
+    // 系统字体首次生效可能改动测量 → 首次布局后校正一次（此后字体已缓存，
+    // 每次都校正会把跨页滑动掐成瞬移）
+    try { document.fonts?.ready?.then(() => { if (W.__vibeSliderX == null) placeSlider(false); }); } catch { /* 忽略 */ }
   }
+
+  // 模块每次执行时：无位置记录（首次）直接落位；有记录则按旧位动画到当前栏 ——
+  // 脚本若晚于换页执行即立刻滑动；若早于/未执行则由上方 page-load 兜底
+  if (W.__vibeSliderX == null) placeSlider(false);
+  else placeSlider(true);
 
   // —— 移动端抽屉 ——
   const menuBtn = document.querySelector<HTMLButtonElement>('[data-menu-btn]');
