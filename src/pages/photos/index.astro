@@ -58,14 +58,22 @@ const json = JSON.stringify(covers).replace(/</g, '\\u003c');
     const prevImg = stage.querySelector<HTMLImageElement>('[data-prev-img]')!;
     const nextImg = stage.querySelector<HTMLImageElement>('[data-next-img]')!;
     let i = 0;
+    // 请求令牌：render 每次自增，过期 Image onload 不再覆盖 bg（快速切换竞态）
+    let req = 0;
 
     const render = () => {
       const c = covers[i];
+      const my = ++req;
       bg.alt = c.title;
       bg.style.opacity = '0';
       // 预加载完成后淡入
       const img = new Image();
-      img.onload = () => { bg.src = img.src; bg.style.opacity = '1'; };
+      img.onload = () => {
+        if (my !== req) return; // 已被更新的 render 覆盖 → 丢弃过期加载
+        bg.src = img.src;
+        bg.srcset = c.big.srcset ?? '';
+        bg.style.opacity = '1';
+      };
       img.src = c.big.src;
       ts.textContent = c.date;
       loc.textContent = c.location || '未标注地点';
@@ -82,10 +90,13 @@ const json = JSON.stringify(covers).replace(/</g, '\\u003c');
     const go = (d: number) => { i = (i + d + covers.length) % covers.length; render(); };
     const enter = () => { window.location.href = `/photos/${covers[i].slug}/`; };
 
-    prevBtn.addEventListener('click', (e) => { e.stopPropagation(); go(-1); });
-    nextBtn.addEventListener('click', (e) => { e.stopPropagation(); go(1); });
+    prevBtn.addEventListener('click', (e) => { e.stopPropagation(); go(-1); stage.focus({ preventScroll: true }); });
+    nextBtn.addEventListener('click', (e) => { e.stopPropagation(); go(1); stage.focus({ preventScroll: true }); });
     stage.addEventListener('click', enter);
     stage.addEventListener('keydown', (e) => {
+      // 仅 stage 自身聚焦时处理按键；strip 按钮的 Enter/Space 由原生 click 触发，
+      // 不再冒泡到此误导航
+      if (e.target !== stage) return;
       if (e.key === 'ArrowLeft') go(-1);
       else if (e.key === 'ArrowRight') go(1);
       else if (e.key === 'Enter') enter();

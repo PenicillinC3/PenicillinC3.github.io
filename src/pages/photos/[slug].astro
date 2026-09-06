@@ -33,7 +33,7 @@ const imgs = await Promise.all(
   }),
 );
 ---
-<Base title={s.data.title} description={s.data.summary ?? `摄影备忘录：${s.data.title}`}>
+<Base title={s.data.title} description={s.data.summary ?? `摄影备忘录：${s.data.title}`} dark>
   <article class="memo">
     <p class="crumb"><a href="/photos/">← 摄影作品集</a></p>
     <header class="glass memohead">
@@ -103,4 +103,9 @@ const imgs = await Promise.all(
   @media (max-width: 879px) {
     .shot.portrait { grid-template-columns: 1fr; }
   }
+
+  /* 暗房点缀（spec §21.3）：页头红光发丝线 */
+  .memohead { border-bottom: 1px solid rgba(255, 107, 107, 0.45); box-shadow: var(--glass-inset), var(--glass-shadow), 0 10px 40px -18px rgba(255, 77, 77, 0.5); }
+  .memohead .page-title { color: #fff; text-shadow: 0 0 24px rgba(255, 77, 77, 0.35); }
+  .meta { color: var(--text-3); }
 </style>
