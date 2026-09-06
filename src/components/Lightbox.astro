@@ -1,0 +1,79 @@
+---
+// 原生 <dialog> 灯箱：零依赖。逻辑在 scripts/lightbox.ts（由页面挂载时 import）。
+---
+<dialog class="lb" id="lightbox" aria-label="照片查看器">
+  <div class="panel">
+    <button class="ctl close" type="button" data-lb-close aria-label="关闭">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <path d="M18 6L6 18M6 6l12 12"></path>
+      </svg>
+    </button>
+    <button class="ctl prev" type="button" data-lb-prev aria-label="上一张">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M15 18l-6-6 6-6"></path>
+      </svg>
+    </button>
+    <button class="ctl next" type="button" data-lb-next aria-label="下一张">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M9 6l6 6-6 6"></path>
+      </svg>
+    </button>
+    <figure class="stage">
+      <img data-lb-img alt="" />
+      <figcaption data-lb-cap></figcaption>
+    </figure>
+  </div>
+</dialog>
+
+<style>
+  .lb { padding: 0; border: 0; background: transparent; max-width: none; max-height: none; }
+  .lb::backdrop {
+    background: rgba(8, 10, 20, 0.55);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+  }
+  .panel {
+    position: relative;
+    border-radius: var(--glass-radius);
+    padding: 10px;
+    background: rgba(20, 22, 34, 0.88);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow: var(--glass-shadow-lg);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+    max-width: min(1240px, 94vw);
+  }
+  .stage { margin: 0; max-width: min(1200px, 92vw); }
+  .stage img { max-height: 82vh; width: auto; max-width: 100%; margin-inline: auto; border-radius: calc(var(--radius-s) - 4px); }
+  .stage figcaption {
+    padding: 12px 4px 2px;
+    color: var(--text-1);
+    font-size: 0.92rem;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 4px 16px;
+  }
+  .stage figcaption em { font-style: normal; color: var(--text-3); }
+  .ctl {
+    position: absolute;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    cursor: pointer;
+    transition: background 0.15s ease-out;
+  }
+  .ctl:hover { background: rgba(255, 255, 255, 0.24); }
+  .close { top: 18px; right: 18px; }
+  .prev { left: 18px; top: 50%; transform: translateY(-50%); }
+  .next { right: 18px; top: 50%; transform: translateY(-50%); }
+</style>
