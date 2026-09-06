@@ -1,6 +1,7 @@
 ---
 import { getImage } from 'astro:assets';
 import Base from '../../layouts/Base.astro';
+import Rays from '../../components/Rays.astro';
 import { seriesRolls } from '../../lib/collections';
 
 const rolls = await seriesRolls();
@@ -42,6 +43,9 @@ const first = covers[0];
             <button class="strip prev prism" data-prev aria-label="上一卷" hidden><img data-prev-img alt="" loading="lazy" /></button>
             <button class="strip next prism" data-next aria-label="下一卷" hidden><img data-next-img alt="" loading="lazy" /></button>
           </div>
+
+          {/* 红色射线氛围（spec §26）：滤色叠光于照片/齿孔带之上，信息栏 z 抬升不被遮挡 */}
+          <Rays variant="overlay" />
 
           {/* 底部信息栏（贴于底片下方，齿孔带不遮挡） */}
           <div class="dock">
@@ -267,7 +271,7 @@ const first = covers[0];
     padding: 10px clamp(18px, 4vw, 44px) 12px;
     background: linear-gradient(180deg, #07080d, #05060a);
     border-top: 1px solid rgba(255, 255, 255, 0.05);
-    z-index: 2;
+    z-index: 59; /* 高于射线叠光层(58)：信息栏文字不被红光干扰 */
   }
   .meta {
     margin: 0;
@@ -317,6 +321,7 @@ const first = covers[0];
     place-items: center;
     margin: 0;
     color: rgba(255, 255, 255, 0.5);
+    z-index: 59; /* 空态文字位于射线叠光层之上 */
   }
   /* 两侧底片条：半伸出、hover 展开（位于底片主体的垂直中线；在 .film 内 →
      top:50% 即照片区中线，不含底部信息栏） */

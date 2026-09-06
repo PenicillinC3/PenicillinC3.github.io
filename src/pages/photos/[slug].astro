@@ -3,6 +3,7 @@ import { getImage } from 'astro:assets';
 import { render } from 'astro:content';
 import type { CollectionEntry } from 'astro:content';
 import Base from '../../layouts/Base.astro';
+import Rays from '../../components/Rays.astro';
 import { seriesRolls } from '../../lib/collections';
 import { formatDate } from '../../lib/date';
 
@@ -34,6 +35,8 @@ const imgs = await Promise.all(
 );
 ---
 <Base title={s.data.title} description={s.data.summary ?? `摄影备忘录：${s.data.title}`} dark>
+  {/* 红色射线氛围（spec §26）：backdrop 沉于玻璃卡后方，随正文滚动 */}
+  <Rays variant="backdrop" />
   <article class="memo">
     <p class="crumb"><a href="/photos/">← 摄影作品集</a></p>
     <header class="glass memohead">
