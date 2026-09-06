@@ -222,3 +222,15 @@ src/content/
 5. **欢迎页独立单屏**：全屏垂直居中 = 华文中宋大字站名（字栈 `"华文中宋","STZhongsong","Songti SC","SimSun",serif`）+ 灰调副标 + 「写字 · 拍照 · 收藏」小字 + 两枚玻璃入口；删除首页五栏预览流（§3 站点地图首页行作废）。
 6. **全局同步**：`.glass/.btn/.pill/.prose/卡片 hover` 统一 v2（hover 微浮 2px + 棱光环泛起）；代码块维持深色中性面板。卡片一律不内打光。
 7. 其余（内容模型 §4、搜索 §7、图片管线 §8、部署 §9、schema 校验 §10）不变。
+
+## 15. 改版记录 v2.1（2026-09-06，用户逐点批准；冲突处以此节为准）
+
+1. **网格背景**：全站底色改为细灰线方格（`--grid-line: rgba(15,23,42,.05)`、`--grid-size: 22px`，body 双层 linear-gradient 平铺），以衬托玻璃边缘棱光；无其他装饰光。§14.1 的纯白静底作废。
+2. **页脚吸底**：body 改 flex 纵向（`min-height: 100dvh`），`.main { flex: 1 0 auto }`——内容不满一屏时页脚贴视口底；内容超长时随滚动出现在末尾。含 `.welcome` 的页：`.main:has(.welcome)` 取消纵向大留白并改用 `min-height: calc(100dvh - var(--nav-h) - 84px)` 的居中单屏。
+3. **摄影作品独立详情页**（替代画廊灯箱）：
+   - `/photos/[slug]`：标题/日期/地点/相册/相机参数信息 + 正文（markdown 可图可文）；
+   - 布局按画面比例：**横图（宽≥高）→ 图片在上、文字与信息在下**；**竖图（宽<高）→ 图左、文字右**（`grid-template-columns: minmax(0,1.5fr) minmax(0,1fr)`）；窄屏（<880px）一律上下叠放；
+   - 方向判断构建期完成（内容集合 `image()` 元数据自带 width/height，无需客户端 JS）；
+   - 底部「上一篇/下一篇」跨照片导航（按日期倒序，边界隐藏）；
+   - 画廊缩略图由「点击弹灯箱」改为「点击进详情页」；删除 `Lightbox.astro`、`scripts/lightbox.ts`、`photo-collection` 内嵌 JSON 与 PhotoCard 的按钮/展示分支（PhotoCard 收敛为带 href 的链接卡，首页预览仍指向 `/photos/`）。
+   - 摄影正文仍可自由 Markdown 插图配文（每篇照片 md 的 body 即可放更多图与长文）。
