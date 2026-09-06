@@ -294,3 +294,8 @@ body.page-dark .slider {
 body.page-immersive .foot { display: none; }
 body.page-immersive .main { padding: 0; }
 body.page-immersive .wrap { max-width: none; }
+/* 舞台固定铺满（避免 dvh/高度计算在部分浏览器塌陷成 0：inset 定死四边） */
+body.page-immersive .stage {
+  position: fixed;
+  inset: var(--nav-h) 0 0 0;
+}
