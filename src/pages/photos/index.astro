@@ -27,7 +27,7 @@ const n = covers.length;
 ---
 <!-- 长胶卷画廊（spec §30）：所有卷封面 3:2 等宽排成一条连续 135 底片（上下齿孔带
      贯穿整条）；视口中心 = 当前卷，左右邻卷在画面边缘半露；翻卷 = 整条底片
-     非线性平移（弹簧过渡）；首尾以纯灰色底片占位。dark + gallery 由 Base 挂类 -->
+     缓出非线性平移（spec §38 去弹簧过冲）；首尾以纯灰色底片占位。dark + gallery 由 Base 挂类 -->
 <Base title="摄影作品集" description="暗房 · 摄影作品集" dark gallery>
   <section class="gallery" data-gallery>
     <div class="arena" data-arena tabindex="0" aria-label="摄影作品浏览">
@@ -99,7 +99,8 @@ const n = covers.length;
       const W = arena.clientWidth;
       const H = arena.clientHeight;
       const bh = 22;
-      const fw = Math.min(W * 0.46, (H - 160) * 1.5, 900);
+      // 胶片再放大（spec §38）：宽限 46%→54%，高余量按拉远的字幕重算 160→196
+      const fw = Math.min(W * 0.54, (H - 196) * 1.5, 980);
       const fh = fw / 1.5;
       const peek = Math.min(160, Math.max(80, W * 0.085));
       const step = Math.max(fw + 40, W / 2 + fw / 2 - peek); // 相邻中心距 → 邻卷只露一点
@@ -125,7 +126,7 @@ const n = covers.length;
 
     const pan = () => {
       const W = arena.clientWidth;
-      reel.style.setProperty('--tx', `${W / 2 - ((i + 1) * geom.step + geom.fw / 2)}px`); // CSS 弹簧 → 非线性平移
+      reel.style.setProperty('--tx', `${W / 2 - ((i + 1) * geom.step + geom.fw / 2)}px`); // CSS 缓出 → 非线性平移
     };
 
     const applyMeta = () => {
@@ -194,7 +195,7 @@ const n = covers.length;
     align-items: flex-start;
     padding-block: var(--bh); /* 帧区缩进，避开上/下齿孔带 */
     will-change: transform;
-    transition: transform 0.62s cubic-bezier(0.22, 1.18, 0.32, 1); /* 非线性弹簧平移 */
+    transition: transform 0.56s cubic-bezier(0.22, 1, 0.36, 1); /* 非线性缓出平移（spec §38：去弹簧过冲） */
     transform: translateX(var(--tx));
   }
   /* 每个单元（含纯灰占位）后跟等宽间距 → 帧中心距 = step 恒定 */
@@ -264,8 +265,9 @@ const n = covers.length;
     z-index: 30; /* 高于射线叠光(20)与胶卷 */
     pointer-events: none;
   }
-  .cap--top { top: calc(50% - var(--fh) / 2 - 52px); }
-  .cap--bottom { top: calc(50% + var(--fh) / 2 + 26px); }
+  /* spec §38：字幕离胶片更远（上 52→76、下 26→44），避开齿孔带留白呼吸 */
+  .cap--top { top: calc(50% - var(--fh) / 2 - 76px); }
+  .cap--bottom { top: calc(50% + var(--fh) / 2 + 44px); }
   .ts {
     color: #fff;
     font-size: clamp(0.95rem, 2vw, 1.35rem);
