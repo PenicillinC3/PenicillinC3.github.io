@@ -55,6 +55,7 @@
   --font-sans: "MapleMono Web", "Maple Mono NF CN", "PingFang SC", "HarmonyOS Sans SC",
     "Microsoft YaHei", system-ui, sans-serif;
   --font-mono: "JetBrains Mono Web", ui-monospace, "SF Mono", Consolas, "Cascadia Mono", monospace;
+  --font-comment: "JetBrains Mono Web", "MapleMono Italic Web", ui-monospace, "SF Mono", Consolas, monospace; /* 注释（spec §32）：中文逐字落斜体 Maple */
   --font-song: "Song Web", "华文中宋", "STZhongsong", "Songti SC", "SimSun", serif; /* 展示用（spec §28） */
 
   /* 动效 */

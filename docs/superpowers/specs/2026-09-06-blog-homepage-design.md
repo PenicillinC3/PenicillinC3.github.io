@@ -358,3 +358,8 @@ src/content/
 真实折射色差需 WebGL（react-three MeshTransmissionMaterial），纯 CSS 以两层近似：
 1. **Nav 水滴滑块**：`.slider::before` 两段 7% 边缘渐变（左 `rgba(255,72,72,.22)` 红 / 右 `rgba(96,176,255,.22)` 青，`mix-blend:screen`）→ 接触栏目文字时呈现折射色散；同时滑块加 `backdrop-filter: blur(2px) saturate(1.35)` 玻璃折射感、底色透降至 .62。
 2. **.glass 面板**：box-shadow 追加 ±1px 红/青发散线（`rgba(255,74,74,.13)` / `rgba(96,178,255,.13)`），全程贴边（接触网格/内容的色差）。hover 覆写 shadow 的规则不追加（hover 已有棱光环 §14.3）。
+
+## 32. 射线新配方 + 中文注释斜体（2026-09-07，用户选定；冲突处以此节为准，§30.5 的 overlay 增强配方作废）
+
+1. **SideRays 全栏目统一配方**（Rays.astro DEFAULTS，overlay 与 backdrop 同用；首页不再单独增强）：speed 2.5 · `#ff0000` / `#ffffff` · intensity 1.7 · spread 2 · top-right · tilt 0 · saturation 1.5 · blend 0.75 · falloff 1.6 · opacity 1 —— 白+红双色，右上角实测呈粉白射线（R≈178），远场因 falloff 1.6 衰减较暗属预期。微调入口：`src/components/Rays.astro` DEFAULTS（或页面 `config` 覆盖）。
+2. **中文注释 = MapleMono 斜体**：`font/MapleMono-NF-CN-MediumItalic.ttf`（21MB）→ 与常规同字形集子集 → `public/fonts/maple-mono-italic.woff2`（217KB）。`@font-face "MapleMono Italic Web"`（font-style: italic）。新 `--font-comment: "JetBrains Mono Web", "MapleMono Italic Web", ...`；`.token.comment` 等用此栈 —— 按字形逐字回退：英文注释 = JetBrains Italic，**中文字符落到斜体 Maple**（JetBrains woff2 无 CJK）。`npm run fonts:subset` 现产出 song/maple/maple-italic 三件。
