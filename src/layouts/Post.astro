@@ -41,5 +41,7 @@ const { label, backHref, title, date, tags = [], summary } = Astro.props;
   .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 0 0 6px; color: var(--text-3); font-size: 0.9rem; }
   .tagrow { display: inline-flex; gap: 6px; }
   .sum { color: var(--text-2); margin: 10px 0 0; }
+  /* 用户指定：正文与摄影页同宽（取消 .prose 的 68ch 窄栏） */
+  .prose.body { max-width: none; }
   .body { color: var(--text-1); font-size: 1.02rem; line-height: 1.85; }
 </style>
