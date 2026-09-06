@@ -1,0 +1,30 @@
+---
+import Base from '../layouts/Base.astro';
+---
+<Base title="页面不存在" description="404 · 页面走丢了" noindex>
+  <section class="glass nf">
+    <p class="code" aria-hidden="true">404</p>
+    <h1 class="page-title">页面走丢了</h1>
+    <p class="msg">这块玻璃后面没有路 —— 也许内容被搬走了。</p>
+    <div class="acts">
+      <a class="btn btn--primary" href="/">回到首页</a>
+      <a class="btn" href="/search/">试试搜索</a>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .nf { padding: clamp(48px, 10vw, 110px) clamp(20px, 5vw, 60px); text-align: center; }
+  .code {
+    margin: 0 0 4px;
+    font-size: clamp(4rem, 14vw, 8rem);
+    font-weight: 800;
+    line-height: 1;
+    background: linear-gradient(120deg, var(--accent), #b26be0 60%, #ff9db1);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .msg { color: var(--text-2); margin-bottom: 26px; }
+  .acts { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+</style>
