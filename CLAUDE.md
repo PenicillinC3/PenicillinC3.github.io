@@ -42,7 +42,7 @@ npm run fonts:subset # 新增内容后重建 woff2 子集（song §28 + maple §
 7. **JS 别直写 `style.transform` 覆盖 CSS 组合位移** —— Nav 滑块曾因此把 `translateY(-50%)` 居中挤掉、整体下挂半身。组合位移（含 `-50%`、`--sx` 变量）写在 CSS，JS 只设变量。
 8. 依赖上限纪律：`dependencies` = `astro` + `ogl`（射线着色器 §26）——React/three 栈已随首页液态玻璃镜头删除而全量移除（spec §35；历史安装注记含 `--legacy-peer-deps` 原因见 §34.1，勿加回）。devDependencies = typescript + `subset-font`（字体子集构建 §28/§29）。**禁止再加 UI 框架/运行时依赖**。字体：允许嵌入（font/ 原件 + public/fonts 子集；新文案后跑 `npm run fonts:subset`）。
 9. 图片管线：真实 JPEG 走构建期 sharp 自动出响应式 webp；SVG 直通不优化。`img/`（根目录原件）已 gitignore。
-10. 上线占位待替换：`astro.config.mjs` 的 `USERNAME`、`src/content/projects/this-blog.md` 的 repo 链接（站点名已定 PenicillinC3，见 site.config.ts）。部署 = 推送 main 触发 `.github/workflows/deploy.yml`。
+10. 已上线：远端 origin = `PenicillinC3/PenicillinC3.github.io`（空仓首推建成，base '/' 主页仓形态）；`astro.config.mjs` 的 `site` 与 `this-blog.md` 的 repo 链接已填真实地址。部署 = 推送 main 触发 `.github/workflows/deploy.yml`（configure-pages 自动启用 Pages，无需手动 Settings）。
 
 ## 目录速览（细节可自行发现处从略）
 
