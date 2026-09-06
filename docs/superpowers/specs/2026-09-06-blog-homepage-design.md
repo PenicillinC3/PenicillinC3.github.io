@@ -418,3 +418,7 @@ src/content/
 ## 42. 日期/地点字幕放大（2026-09-07，用户指定）
 
 日期 `.ts` 字号 `clamp(0.95rem,2vw,1.35rem)` → `clamp(1.15rem,2.8vw,1.8rem)`；地点 `.loc` `clamp(0.85rem,1.6vw,1.05rem)` → `clamp(1rem,2.4vw,1.4rem)`。字距/红光描边不变；绝对定位只向上/下扩张，不与胶片重叠。
+
+## 43. 胶片帧距收窄（2026-09-07，用户指定）
+
+setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160），改显式：`corridor = W/2−fw/2`、`peek = min(220, max(150, W*0.12))`、`gap = max(64, corridor−peek)`、`step = fw+gap`。帧距与邻卷露出共用侧廊预算 —— 帧越近邻卷露越多（1440×900：gap 151→101px、邻卷露 122→173px；1920×1080：gap 212→152、露至 220 上限）。
