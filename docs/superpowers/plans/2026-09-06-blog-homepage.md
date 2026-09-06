@@ -2843,9 +2843,10 @@ const indexJson = JSON.stringify(docs).replace(/</g, '\\u003c');
   </p>
 </Base>
 
-<script is:inline type="application/json" id="search-index">{indexJson}</script>
+{/* 实测(Task 6): is:inline script 内容不插值表达式，须 set:html；页面在 src/pages/search/ 下，import 需两级上溯 */}
+<script is:inline type="application/json" id="search-index" set:html={indexJson}></script>
 <script>
-  import '../scripts/search.ts';
+  import '../../scripts/search.ts';
 </script>
 
 <style>
