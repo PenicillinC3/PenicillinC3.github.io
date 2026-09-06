@@ -382,3 +382,8 @@ src/content/
 1. **镜头删除**：用户删除首页中央液态玻璃镜头——`index.astro` 移除 `LensGlass` 与 `.lens-slot`（含 <900px 隐藏规则与 `.stack` 的定位上下文），欢迎页回归站名 + tagline + 两枚入口按钮。
 2. **React 栈全量下线**：删 `src/components/LensGlass.tsx`；`astro.config.mjs` 移除 `react()` 集成；npm 卸载 `@astrojs/react`/`react`/`react-dom`/`three`/`@react-three/fiber`/`@react-three/drei`/`maath`（package.json 与 lock 同步）。首页构建 chunk 体积警告随之消失。依赖清单回到 `astro` + `ogl`（Rays §26）。
 3. 首页不再有框架岛；未来若重做折射镜头，实现与安装注记（含 `--legacy-peer-deps` 原因）保留在本节以上 §34。
+
+## 36. 列表卡片标题去下划线 + 整卡可点（2026-09-07，用户指定）
+
+1. **标题悬停只变色**：PostCard/LinkCard/ProjectCard 的 `.pt a:hover`/`.lt a:hover` 移除 `text-decoration: underline`（更高特异性压过 base.css 的 `a:hover` 下划线）——悬停仅变 `--accent`。
+2. **整卡可点（stretched link）**：三卡 `.pcard/.lcard/.prjcard` 加 `position:relative; cursor:pointer`；标题链接 `::after{position:absolute; inset:0}` 铺满整卡 → 点卡片任意处 = 点标题链接（notes/musings 进详情、links/projects 打开外链/仓库，语义与标题一致；Tab 聚焦标题链接即可键盘进入）。ProjectCard「在线演示/源代码」两枚按钮 `.acts` 抬 `position:relative; z-index:1` 保持独立可点。副作用：卡内正文不可拖选（stretched link 通病，接受）。
