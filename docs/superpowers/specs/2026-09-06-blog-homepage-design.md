@@ -376,3 +376,9 @@ src/content/
 2. **组件 `src/components/LensGlass.tsx`**：FluidGlass（react-bits）思路的独立实现——`MeshTransmissionMaterial`（ior 1.15 / thickness 3.5 / chromaticAberration 0.1 / anisotropy 0.02 / distortion 0.15 / temporalDistortion 0.08）椭球镜头（sphere 压扁 z0.5 → 双凸折射）+ **画布内自绘背景**（浅底平面 + XZ gridHelper 正对相机 + 三枚低饱和色斑）供折射采样。⚠ 镜头折射的是 WebGL 场景内容，**不传输页面 DOM**（与参考 demo 一致）。
 3. **跟随（v2 修复“几乎不动”的 bug）**：窗口级 pointermove → **整页归一化坐标**（`(client/innerSize−0.5)×2`，clamp ±1.35）；dest = 指针 ×（视口半宽/半高 − 镜头半径 − 3% 边距）—— 镜头**全画布范围明显跟随**且永不越出；`easing.damp3` τ0.13 / `dampE` 微旋 τ0.2；呼吸 ±1.2%；镜头直径 = min(视口宽,高)×0.5、z 压扁 0.5。曾用容器局部 ×0.16 系数导致位移肉眼不可见（v1 bug）；坐标自检法：useFrame 临时挂 `window.__lensPos`（实测 rest 0 → 左上 (−1.98,−1.04) → 右下 (+1.97,+1.04)）。
 4. **DOM**：`.lens-slot` absolute 于 `.stack` 右上（top -11vh / right -6vw，min 46vh/60vw×34vh 封顶 560×420），pointer-events none（不拦页面交互），<900px 隐藏；`client:visible` 水合、data-ready 后淡入 0.7s。调参入口：槽位 CSS、`Lens` 内 s 与 damp、页面传入 ior/thickness/chromaticAberration/follow。
+
+## 35. 首页液态玻璃镜头删除 + React 栈下线（2026-09-07，用户指定；§33.3/§34 作废）
+
+1. **镜头删除**：用户删除首页中央液态玻璃镜头——`index.astro` 移除 `LensGlass` 与 `.lens-slot`（含 <900px 隐藏规则与 `.stack` 的定位上下文），欢迎页回归站名 + tagline + 两枚入口按钮。
+2. **React 栈全量下线**：删 `src/components/LensGlass.tsx`；`astro.config.mjs` 移除 `react()` 集成；npm 卸载 `@astrojs/react`/`react`/`react-dom`/`three`/`@react-three/fiber`/`@react-three/drei`/`maath`（package.json 与 lock 同步）。首页构建 chunk 体积警告随之消失。依赖清单回到 `astro` + `ogl`（Rays §26）。
+3. 首页不再有框架岛；未来若重做折射镜头，实现与安装注记（含 `--legacy-peer-deps` 原因）保留在本节以上 §34。

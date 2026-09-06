@@ -1,8 +1,8 @@
 ---
 import Base from '../layouts/Base.astro';
-import LensGlass from '../components/LensGlass';
 import { site } from '../site.config';
 ---
+<!-- spec §35：液态玻璃镜头已删除（React 栈随之下线），欢迎页回归纯站名 + tagline + 入口 -->
 <Base>
   <section class="welcome">
     <div class="stack">
@@ -11,11 +11,6 @@ import { site } from '../site.config';
       <div class="acts">
         <a class="btn prism" href="/notes/">个人笔记</a>
         <a class="btn prism" href="/photos/">摄影作品集</a>
-      </div>
-      <!-- 液态玻璃镜头（spec §34）：React+Three 全真折射，位于站名右上，
-           小范围阻尼跟随鼠标；折射画布内自绘背景（非页面 DOM） -->
-      <div class="lens-slot" aria-hidden="true">
-        <LensGlass client:visible follow={1.1} ior={1.15} thickness={3.5} chromaticAberration={0.1} anisotropy={0.02} />
       </div>
     </div>
   </section>
@@ -31,7 +26,6 @@ import { site } from '../site.config';
     padding-block: clamp(24px, 6vh, 72px);
   }
   .stack {
-    position: relative; /* lens-slot 定位上下文 */
     display: grid;
     justify-items: center;
   }
@@ -57,19 +51,5 @@ import { site } from '../site.config';
     flex-wrap: wrap;
     justify-content: center;
     gap: 12px;
-  }
-
-  /* —— 液态玻璃镜头槽（spec §34）：覆盖站名右上区域 —— */
-  .lens-slot {
-    position: absolute;
-    top: -11vh;
-    right: -6vw;
-    width: min(46vh, 60vw, 560px);
-    height: min(34vh, 46vw, 420px);
-    pointer-events: none; /* 镜头不拦交互（内部跟随走窗口事件） */
-    z-index: 6;
-  }
-  @media (max-width: 900px) {
-    .lens-slot { display: none; } /* 窄屏省算力，镜头仅桌面 */
   }
 </style>
