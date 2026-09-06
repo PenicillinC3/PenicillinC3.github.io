@@ -13,12 +13,12 @@
   --accent: #2f62e6;
   --link-underline: rgba(47, 98, 230, 0.35);
 
-  /* 玻璃 v2（白底版，LGGC 配方校准，spec §14.2） */
-  --glass-bg: rgba(255, 255, 255, 0.55);
+  /* 玻璃 v2.3（白底透版：网格线更清晰透过面板，模糊仅取软化） */
+  --glass-bg: rgba(255, 255, 255, 0.4);
   --glass-bg-strong: rgba(255, 255, 255, 0.8);
   --glass-border: rgba(15, 23, 42, 0.08);
   --glass-hl: rgba(255, 255, 255, 0.8); /* 历史名保留：仅导航/滑块小高光使用 */
-  --glass-blur: 3px;
+  --glass-blur: 2px;
   --glass-sat: 1.35;
   --glass-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 10px 28px rgba(16, 24, 40, 0.06);
   --glass-shadow-lg: 0 2px 6px rgba(16, 24, 40, 0.06), 0 18px 44px rgba(16, 24, 40, 0.1);
