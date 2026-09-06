@@ -14,8 +14,11 @@ interface Props {
   dark?: boolean;
   /** 沉浸页（spec §21.1）：body.page-immersive 隐藏页脚、main padding 归零 */
   immersive?: boolean;
+  /** 画廊页（spec §27.1）：body.page-gallery —— 视口锁高无滚动，页脚保留，
+      main 占顶栏与页脚之间的全部剩余（胶片画廊形态） */
+  gallery?: boolean;
 }
-const { title, description = site.tagline, noindex, dark = false, immersive = false } = Astro.props;
+const { title, description = site.tagline, noindex, dark = false, immersive = false, gallery = false } = Astro.props;
 const headTitle = title ? `${title} · ${site.title}` : `${site.title} — ${site.tagline}`;
 ---
 <!doctype html>
@@ -29,7 +32,7 @@ const headTitle = title ? `${title} · ${site.title}` : `${site.title} — ${sit
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <ViewTransitions />
   </head>
-  <body class:list={['base-body', dark && 'page-dark', immersive && 'page-immersive']}>
+  <body class:list={['base-body', dark && 'page-dark', immersive && 'page-immersive', gallery && 'page-gallery']}>
     <Nav />
     <main class="wrap main"><slot /></main>
     <Footer />

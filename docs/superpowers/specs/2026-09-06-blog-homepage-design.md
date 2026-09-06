@@ -320,3 +320,14 @@ src/content/
    - `variant="backdrop"` —— 卷备忘页 `/photos/<slug>/`：`fixed; z-index:-1`，玻璃卡后/正文下透出红光（负 z 子元素位于根背景之上、内容之下；勿置于有 transform/堆叠上下文的祖先内）。
 4. **生命周期**：rAF 循环内 `gl.canvas.isConnected` 守卫（VT 换页后旧画布脱离文档即停）；`devicePixelRatio` 上限 2；resize 重设大小与 iResolution；无 IntersectionObserver（摄影页常驻，简化）。
 5. 摄影暗房其余设计（§22/§25.2）不变；`redlamp`/film 泛光等 CSS 氛围与射线并存。
+
+## 27. 胶片画廊形态（2026-09-07，用户逐点批准；冲突处以此节为准）
+
+1. **页面形态 page-gallery**：Base 新增 `gallery?: boolean` → `body.page-gallery`：视口锁高无滚动、**页脚保留可见**（§21.2 immersive 的隐藏页脚不适用本页）。base.css：`html:has(body.page-gallery){height:100%}`、body `height:100%; overflow:hidden`；`.main` flex 占满顶栏与页脚之间（`flex:1 1 0; min-height:0; display:flex; column; width:100%` —— main 身兼 .wrap，曾测到非 100% 收缩宽度，须显式 width）、`.wrap{max-width:none; height:100%}`。
+2. **/photos 首页 = 胶片画廊**（§21.2/§22.2 整屏 cover、全宽齿孔带版式作废）：`<section class="gallery">` flex 列 = `.arena`（flex:1，居中舞台）+ `.dock` 信息栏（时间/地点红光字、N 张、提示；dock 之下即页脚）。
+   - **主体胶片 3:2 片窗**：`.film` aspect-ratio 3/2，宽由 JS `fit()` = `min(62% 舞台宽, 舞台高×1.5×0.92, 1000px)`（resize 防抖 120ms）；居中；10px 圆角黑边 + 红光泛光 + 暗角；上下缘发丝渐变（胶片感，不再占画幅）。常规 3:2 源 `object-fit:cover`，**超宽源（宽高比 >1.55）`object-fit:contain`**（片窗内左右留黑边，如 dsc0007 1.94:1）。
+   - **左右槽位常驻「半露按钮 + 灰黑占位」互斥（hidden 切换）**：按钮 190px、3:2、`translate(±58%)` 半伸出、hover 弹性滑入；**首/末卷的占位 = 灰黑渐变底片**（`linear-gradient(150deg,#191a20,#0b0c10 55%,#15161c)` + 低透明齿孔纹 + inset 微光），不可点。⚠ 教训：SSR 必须两槽都渲染、以 hidden 互斥——只渲染「存在的那个」会在翻卷后留下死按钮/缺占位（已踩）。
+   - **翻卷不循环**：`go(d)` 越界即 return（首尾由占位暗示）；点击胶片进备忘页；peek 点击 / ←/→（arena 聚焦）翻卷；换卷两段式线性动画同 §22。
+   - **Rays overlay 收进 arena 容器**（spec §26 overlay 变体改 absolute inset:0 z20，容器相对定位即可，勿 fixed 全屏——会盖到页脚）。
+3. **示例第二卷「郊野 · 七月」**：`src/content/series/field-roll.md` + `src/content/photos/dsc0007.md(.jpg)`（img/ 原件 3599×1852 超宽，验证 contain 与末卷灰黑占位）。系列按日期降序 → 本卷排在 Nikon 卷后。
+4. 卷备忘页 `/photos/<slug>/`（§21.3 布局 + §26 backdrop 射线）不变。
