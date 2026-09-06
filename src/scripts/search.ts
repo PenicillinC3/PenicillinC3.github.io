@@ -67,7 +67,8 @@ function render(q: string): void {
     listEl.append(li);
   }
   if (countEl) countEl.textContent = q.trim() ? `共 ${hits.length} 条结果` : '';
-  if (emptyEl) emptyEl.hidden = q.trim() !== '' && hits.length > 0;
+  // 提示语仅「有查询词且零命中」时显示；空查询/有结果都隐藏
+  if (emptyEl) emptyEl.hidden = q.trim() === '' || hits.length > 0;
 }
 
 let timer: number | undefined;
