@@ -11,10 +11,17 @@ const { hover = true, class: className } = Astro.props;
 
 <style>
   .glasscard {
-    transition: transform var(--t-fast) ease-out, box-shadow var(--t-fast) ease-out, opacity 0.2s ease;
+    transition: transform var(--t-fast) ease-out, box-shadow var(--t-fast) ease-out, opacity 0.2s ease, visibility 0s 0.2s;
   }
-  /* 标签筛选淡出（spec §37）：PostList JS 加类 → 0.2s 原位透明，淡完才收合 */
-  .glasscard.is-out { opacity: 0; pointer-events: none; }
+  /* 标签筛选淡出 + 占位保留（spec §53）：is-out = opacity 0.2s 淡出、visibility
+     延迟 0.2s 再隐藏（隐藏但保留文档流占位，页面不塌缩）；移除 is-out 时本规则
+     的 transition 让 visibility 立即恢复、opacity 淡回 */
+  .glasscard.is-out {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: transform var(--t-fast) ease-out, box-shadow var(--t-fast) ease-out, opacity 0.2s ease, visibility 0s;
+  }
   .raise:hover {
     transform: translateY(var(--card-hover));
     box-shadow: var(--glass-inset), var(--glass-shadow-lg);
