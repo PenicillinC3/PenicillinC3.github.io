@@ -304,3 +304,9 @@ src/content/
 2. **PostCard（notes/musings）通栏版式**：`.ptop` 行内 标题 ↔ 日期 对顶（baseline 两端、可折行）；摘要 `.ps` 限宽 `min(100%, 76ch)` 保持阅读节奏（字号 1.02rem / 行高 1.8）；标签行在其下。卡内 padding `clamp(24px,3.4vw,38px) clamp(24px,4vw,52px)`。
 3. **LinkCard 通栏版式**：`.top` = 左（图标 48px 渐变块 + 标题/域名）↔ 右（日期「收藏」）；说明 `.ln` 同 76ch 限宽；标签行其下。padding 同档。
 4. 移动端沿用单列 + 收窄 padding；标签过滤（§20.3）、分组年份与其余不变。
+
+## 25. 滑块鼠标跟随 + 三栏目卡统一基准高（2026-09-07，用户逐点批准；冲突处以此节为准）
+
+1. **Nav 滑块改「液态跟随」**（§22.1 的落位滑动语义仍用于换页，此处改交互）：鼠标在栏目区时滑块吸附最近栏目——pointermove 每帧**现量** offsetLeft/width（实测缓存会因字体加载失效致悬停错位，勿缓存），rAF 指数阻尼驱动（τ≈90ms，≈参考 demo 的 easing.damp）；移除滑块 CSS 位移过渡与「着陆」脉冲（与阻尼互斥）。鼠标离开栏目区滑回激活栏目；点击栏目链接才跳页。首页/404 无激活栏目：悬停仍跟随、空闲隐藏。触屏与 <880px 抽屉导航不启用跟随。换页落位仍靠 document/window 双挂 astro:page-load + MutationObserver 兜底（§22.1）。
+2. **暗色页滑块辉光改暗红**：`body.page-dark .slider` 顶部高光径向渐变 `rgba(255,90,80,.17)`、描边 `rgba(255,107,107,.34)`、外层加红光 halo（`0 0 22px -4px rgba(255,70,70,.45)`）——弃白色玻璃高光。
+3. **个人迷思 / 网站参考与个人笔记卡片对齐**：PostCard 与 LinkCard 统一 `min-height: 230px`、同款内边距 `clamp(24px,3.4vw,38px) clamp(24px,4vw,52px)`、标签行 `margin-top:auto` 沉底；LinkCard 标题字号同步上调（clamp 1.2–1.4rem）。列宽结构沿用 §24 单列通栏。
