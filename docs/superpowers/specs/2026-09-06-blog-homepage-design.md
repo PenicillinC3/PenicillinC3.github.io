@@ -252,5 +252,11 @@ src/content/
 2. **透度继续上调**：`--glass-bg .38`、`--glass-blur 2px`、`--glass-sat 1.3` —— 背景（网格/内容）必须清晰透过面板（用户硬性要求）。
 3. **按钮水滴化**：`.btn` 有机形态圆角（`46% 54% 51% 49% / …`），hover 时形态流动（`border-radius` 随 `--ease-spring` 过渡）；表面左上高光点 `::before` 随 hover 位移（水珠反光）；`.btn--primary` 填充不变。
 4. 卡片/面板（`.glass`、`.btn`、`.sform`、photocard/imgshell 玻璃沿）自动继承新内外影；hover 的 box-shadow 覆盖一律为 `var(--glass-inset), var(--glass-shadow-lg)`（§16 保留）。
+
+## 18. 全透定稿 v3.1（2026-09-06，用户：「直接改为全透」「首页按钮改小圆角矩形」；冲突处以此节为准）
+
+1. `--glass-bg: rgba(255,255,255,0)` —— 面板**零填充全透**，背景内容（网格/正文/图片）直接可见；`--glass-blur: 1px`（仅保留“玻璃片”式微软化读感）、`--glass-sat: 1.25`。玻璃观感完全由内外影与描边承担。
+2. 按钮撤掉有机水滴形态与高光点：`.btn` 改**小圆角矩形**（`border-radius: var(--radius-s)` = 9px），hover 仅微浮 + 深投影 + 棱光环（§17.3 的有机圆角/::before 高光点作废）。
+3. §17 的内外影对仗（右下暗/左上白）、加重方向性外投影、hover inset 保留，全部不变。
 2. **页脚回归玻璃样式**：底部栏为 `.glass` 液态玻璃条（radius-lg、吸底 flex 结构不变），内容=许可注记 + 版权行。
 3. 欢迎页两枚入口按钮与摄影卡/详情相框（`photocard`/`imgshell` 10px 玻璃沿）随之获得同套厚度光影与透底效果；hover 棱光环（§14.3）不变。
