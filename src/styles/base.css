@@ -283,11 +283,12 @@ body.page-dark .topbar {
   border-bottom-color: rgba(255, 255, 255, 0.08);
 }
 body.page-dark .drawer { background: #0d0e13; }
-/* Nav .slider 背景为硬编码白 rgba（Nav.astro）→ 暗色覆写为深玻璃水滴 */
+/* Nav .slider 顶部高光硬编码白（Nav.astro）→ 暗色覆写为暗红辉光水滴（spec §25.2） */
 body.page-dark .slider {
-  background: radial-gradient(130% 70% at 50% 0%, rgba(255, 255, 255, 0.14), transparent 55%),
-    rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.14);
+  background: radial-gradient(130% 70% at 50% 0%, rgba(255, 90, 80, 0.17), transparent 55%),
+    rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 107, 107, 0.34);
+  box-shadow: var(--glass-shadow), 0 0 22px -4px rgba(255, 70, 70, 0.45);
 }
 
 /* —— 沉浸页（spec §21.2）：无边框全屏，隐藏页脚，容器去宽度上限 —— */

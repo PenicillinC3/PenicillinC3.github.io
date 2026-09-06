@@ -30,11 +30,14 @@ const initial = link.host.charAt(0).toUpperCase();
 </GlassCard>
 
 <style>
-  /* 单列通栏大卡（spec §24）：图标+标题居左、日期居右，说明限宽 */
+  /* 单列通栏大卡（spec §24）：图标+标题居左、日期居右，说明限宽；
+     基准高/内边距与 PostCard 完全一致（三栏目卡片对齐，spec §25.3） */
   .lcard {
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: 14px;
-    padding: clamp(22px, 3.2vw, 34px) clamp(24px, 4vw, 52px);
+    min-height: 230px;
+    padding: clamp(24px, 3.4vw, 38px) clamp(24px, 4vw, 52px);
     height: 100%;
   }
   .lcard:hover { text-decoration: none; }
@@ -54,11 +57,11 @@ const initial = link.host.charAt(0).toUpperCase();
     box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 35%, transparent);
   }
   .ids { min-width: 0; }
-  .lt { margin: 0; font-size: clamp(1.12rem, 1.4vw, 1.3rem); }
+  .lt { margin: 0; font-size: clamp(1.2rem, 1.5vw, 1.4rem); }
   .lt a { color: var(--text-1); }
   .lt a:hover { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
   .host { margin: 3px 0 0; font-size: 0.82rem; color: var(--text-3); font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .lm { margin: 6px 0 0; font-size: 0.82rem; color: var(--text-3); white-space: nowrap; }
   .ln { margin: 0; max-width: min(100%, 76ch); color: var(--text-2); font-size: 1.02rem; line-height: 1.8; }
-  .ltags { display: flex; flex-wrap: wrap; gap: 7px; }
+  .ltags { display: flex; flex-wrap: wrap; gap: 7px; margin-top: auto; }
 </style>

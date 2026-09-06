@@ -45,76 +45,162 @@ const isActive = (href: string) =>
 </header>
 
 <script>
-  // —— 水滴滑块：跨页存活 + 自查询重定位（spec §22.1）——
-  // 滑块带 transition:persist：换页时节点不重建、旧位置保留 → 量测新栏目后由
-  // CSS 过渡完成液态滑动。垂直居中在 CSS 侧 translateY(-50%)；JS 只写 --sx
-  // （历史坑：直盖 style.transform 会挤掉 -50%，滑块沿 top:50% 顶边下挂半身）。
-  // 时序要点（真实踩坑）：模块顶层抓死的节点在 View Transitions 换页后成死引用，
-  // 且页面脚本可能先于换页执行/不重跑 → 监听只绑一次到 window，回调内**自查询**
-  // 当前文档；可靠信号是 astro:page-load（换页完成后于 window 派发）。
+  // —— 水滴滑块：鼠标跟随（spec §25.1）——
+  // 滑块 = 液态水珠：指针在栏目区移动时吸附跟随最近的栏目（指数阻尼 ≈ 参考 demo
+  // 的 easing.damp，τ≈90ms），指针离开后滑回当前激活栏目；点击栏目链接才跳页。
+  // 垂直居中在 CSS 侧 translateY(-50%)；JS 每帧只写 --sx/width（历史坑：直盖
+  // style.transform 会把 -50% 居中挤掉，滑块沿 top:50% 顶边下挂半身）。
+  // 换页时序坑（实测）：页面模块脚本换页时不保证重跑、astro:* 事件实际派发在
+  // document → 状态挂 window、监听只绑一次 + MutationObserver 兜底，回调自查询
+  // 当前文档。触屏/窄屏不启用跟随（抽屉导航）。
   const W = window as unknown as {
-    __vibeSliderX?: number;
-    __vibeSliderW?: number;
+    __vibeSlider?: {
+      x: number; w: number; tx: number; tw: number;
+      restX: number; restW: number;
+      hasRest: boolean; over: boolean; init: boolean;
+      raf: number; prevT: number;
+    };
     __vibeNavBound?: boolean;
   };
+  const S = (W.__vibeSlider ??= {
+    x: 0, w: 0, tx: 0, tw: 0, restX: 0, restW: 0,
+    hasRest: false, over: false, init: false,
+    raf: 0, prevT: 0,
+  });
 
-  function placeSlider(animate: boolean, retry = 0): void {
-    const nav = document.querySelector<HTMLElement>('[data-nav]');
-    const slider = document.querySelector<HTMLElement>('[data-slider]');
-    if (!nav || !slider) return;
-    const act = nav.querySelector<HTMLElement>('[data-nav-item].is-active');
-    if (!act) {
-      slider.style.opacity = '0'; // 首页品牌/404：无栏目高亮 → 隐藏（保留旧 x 供回程滑动）
+  const els = () => ({
+    nav: document.querySelector<HTMLElement>('[data-nav]'),
+    slider: document.querySelector<HTMLElement>('[data-slider]'),
+  });
+
+  // 栏目度量：每次现量（仅 5 个节点；缓存会在字体加载后失效 → 悬停错位，
+  // 实测过：不缓存最稳）
+  function metrics(): { x: number; w: number }[] {
+    const nav = els().nav;
+    if (!nav) return [];
+    return [...nav.querySelectorAll<HTMLElement>('[data-nav-item]')]
+      .map((el) => ({ x: el.offsetLeft, w: el.offsetWidth }))
+      .filter((r) => r.w > 0);
+  }
+  function activeRect(): { x: number; w: number } | null {
+    const nav = els().nav;
+    const act = nav?.querySelector<HTMLElement>('[data-nav-item].is-active');
+    if (!act || act.offsetWidth === 0) return null;
+    return { x: act.offsetLeft, w: act.offsetWidth };
+  }
+  function paint() {
+    const { slider } = els();
+    if (!slider) return;
+    slider.style.setProperty('--sx', `${Math.round(S.x * 100) / 100}px`);
+    slider.style.width = `${Math.round(S.w * 100) / 100}px`;
+    slider.style.opacity = S.over || S.hasRest ? '1' : '0';
+  }
+  function tick(t: number) {
+    S.raf = 0;
+    if (!els().slider) return;
+    const dt = Math.min(64, S.prevT ? t - S.prevT : 16);
+    S.prevT = t;
+    const a = 1 - Math.exp(-dt / 90); // 指数阻尼（≈ easing.damp 手感）
+    S.x += (S.tx - S.x) * a;
+    S.w += (S.tw - S.w) * a;
+    if (Math.abs(S.tx - S.x) < 0.05 && Math.abs(S.tw - S.w) < 0.05) {
+      S.x = S.tx;
+      S.w = S.tw;
+      paint();
       return;
     }
-    if (act.offsetWidth === 0) {
-      // 布局未就绪（换页瞬间/移动端折叠）→ 逐帧重试（~16 帧后放弃）
-      if (retry < 16) requestAnimationFrame(() => placeSlider(animate, retry + 1));
+    paint();
+    S.raf = requestAnimationFrame(tick);
+  }
+  function kick() {
+    if (!S.raf) {
+      S.prevT = 0;
+      S.raf = requestAnimationFrame(tick);
+    }
+  }
+
+  // 刷新「落点」= 当前激活栏目；指针不在栏目区时滑回激活位，无激活则隐藏
+  function refreshRest(retry = 0): void {
+    const { nav } = els();
+    if (!nav) return;
+    const ready = [...nav.querySelectorAll<HTMLElement>('[data-nav-item]')]
+      .some((el) => el.offsetWidth > 0);
+    if (!ready) {
+      // 换页瞬间布局未就绪 → 逐帧重试（~16 帧后放弃）
+      if (retry < 16) requestAnimationFrame(() => refreshRest(retry + 1));
       return;
     }
-    const x = act.offsetLeft;
-    const w = act.offsetWidth;
-    const moving = animate && W.__vibeSliderX != null && Math.abs(W.__vibeSliderX - x) > 2;
-    if (moving || !animate) slider.style.transition = 'none';
-    if (moving) {
-      // 两段式：无过渡先落到旧位（节点重建时连宽度一起复位）→ 恢复过渡改到新位 → 弹簧滑动
-      slider.style.setProperty('--sx', `${W.__vibeSliderX}px`);
-      slider.style.width = `${W.__vibeSliderW ?? w}px`;
-      void slider.offsetWidth;
-      slider.style.transition = '';
+    const r = activeRect();
+    if (!r) {
+      S.hasRest = false;
+      if (!S.over) paint();
+      return;
     }
-    slider.style.setProperty('--sx', `${x}px`);
-    slider.style.width = `${w}px`;
-    slider.style.opacity = '1';
-    if (!animate) {
-      void slider.offsetWidth; // 强制回流后恢复过渡（防回跳）
-      slider.style.transition = '';
+    if (!S.init) {
+      // 首次落位：直接到激活栏（不播动画）
+      S.x = r.x; S.w = r.w; S.tx = r.x; S.tw = r.w;
+      S.init = true;
+      paint();
+      return;
     }
-    if (moving) {
-      slider.classList.remove('land');
-      void slider.offsetWidth;
-      slider.classList.add('land');
+    S.hasRest = true;
+    S.restX = r.x;
+    S.restW = r.w;
+    if (!S.over) {
+      S.tx = S.restX;
+      S.tw = S.restW;
+      kick();
     }
-    W.__vibeSliderX = x;
-    W.__vibeSliderW = w;
   }
 
   if (!W.__vibeNavBound) {
     W.__vibeNavBound = true;
-    // Astro 事件实际派发在 document（window 上也挂一份双保险）；换页时页面模块
-    // 脚本不保证重跑 → 再加 MutationObserver 兜底：导航高亮/布局一有变动就重定位
-    const onLoad = () => placeSlider(true);
+    // 指针跟随：鼠标在栏目区 → 吸附最近栏目；离开 → 回激活栏
+    document.addEventListener('pointermove', (e) => {
+      if (e.pointerType !== 'mouse') return;
+      const nav = els().nav;
+      if (!nav || !nav.contains(e.target as Node)) {
+        if (S.over) {
+          S.over = false;
+          if (S.hasRest) {
+            S.tx = S.restX;
+            S.tw = S.restW;
+            kick();
+          } else {
+            paint();
+          }
+        }
+        return;
+      }
+      const items = metrics();
+      if (!items.length) return;
+      const px = e.clientX - nav.getBoundingClientRect().left;
+      let best = items[0];
+      let bd = Infinity;
+      for (const it of items) {
+        const d = Math.abs(it.x + it.w / 2 - px);
+        if (d < bd) { bd = d; best = it; }
+      }
+      S.over = true;
+      S.tx = best.x;
+      S.tw = best.w;
+      kick();
+    });
+
+    // Astro 事件派发在 document（window 双挂保险）；换页后模块脚本不保证重跑 →
+    // 再以 MutationObserver 兜底：高亮/布局变动即刷新落点
+    const onLoad = () => refreshRest();
     document.addEventListener('astro:page-load', onLoad);
     window.addEventListener('astro:page-load', onLoad);
     let rsT: number | undefined;
     window.addEventListener('resize', () => {
       window.clearTimeout(rsT);
-      rsT = window.setTimeout(() => placeSlider(false), 150);
+      rsT = window.setTimeout(() => refreshRest(), 150);
     });
     let moT: number | undefined;
     const mo = new MutationObserver(() => {
       window.clearTimeout(moT);
-      moT = window.setTimeout(() => placeSlider(true), 80);
+      moT = window.setTimeout(() => refreshRest(), 80);
     });
     mo.observe(document.body, {
       subtree: true,
@@ -122,14 +208,12 @@ const isActive = (href: string) =>
       attributes: true,
       attributeFilter: ['class', 'style'],
     });
-    // 系统字体首次生效可能改动测量 → 首次布局后校正一次（此后字体已缓存，
-    // 每次都校正会把跨页滑动掐成瞬移）
-    try { document.fonts?.ready?.then(() => { if (W.__vibeSliderX == null) placeSlider(false); }); } catch { /* 忽略 */ }
+    // 系统字体首次生效可能改动测量 → 首次布局后校正一次
+    try { document.fonts?.ready?.then(() => refreshRest()); } catch { /* 忽略 */ }
   }
 
-  // 模块每次执行时：无位置记录（首次）直接落位；有记录则按旧位动画到当前栏
-  if (W.__vibeSliderX == null) placeSlider(false);
-  else placeSlider(true);
+  // 模块每次执行：刷新落点（首次含直接落位；VT 场景由上方持久监听兜底）
+  refreshRest();
 
   // —— 移动端抽屉 ——
   const menuBtn = document.querySelector<HTMLButtonElement>('[data-menu-btn]');
@@ -214,8 +298,9 @@ const isActive = (href: string) =>
   .navlink:hover { color: var(--text-1); text-decoration: none; }
   .navlink.is-active { color: var(--text-1); font-weight: 650; }
 
-  /* 水滴滑块（悬浮玻璃指示片）：垂直居中常驻 CSS（translateY(-50%)），
-     横向位移由 JS 写 --sx —— 二者合成避免 JS 覆盖挤掉居中（历史坑） */
+  /* 水滴滑块（spec §25.1）：液态跟随。垂直居中常驻 CSS translateY(-50%)，
+     横向位移由 JS 阻尼每帧写 --sx —— 勿加 CSS 位移过渡（会与阻尼打架），
+     也勿用 JS 直盖 transform（历史坑：挤掉 -50% 后滑块下挂半身） */
   .slider {
     position: absolute;
     top: 50%;
@@ -230,24 +315,8 @@ const isActive = (href: string) =>
     box-shadow: var(--glass-shadow);
     opacity: 0;
     will-change: transform, width;
-    transition: width 0.6s var(--ease-spring), transform 0.6s var(--ease-spring),
-      opacity 0.25s ease;
+    transition: opacity 0.25s ease;
     pointer-events: none;
-  }
-  .slider.land::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    background: radial-gradient(80% 60% at 32% 0%, rgba(255, 255, 255, 0.9), transparent 60%);
-    opacity: 0; /* 脉冲为瞬态增益：结束后回到隐形（防 0→1 跳变残留） */
-    animation: droplet-pulse 0.55s var(--ease-spring);
-    pointer-events: none;
-  }
-  @keyframes droplet-pulse {
-    0% { opacity: 0; transform: scale(0.86); }
-    45% { opacity: 1; transform: scale(1.06); }
-    100% { opacity: 0; transform: scale(1); }
   }
 
   .menu-btn {
