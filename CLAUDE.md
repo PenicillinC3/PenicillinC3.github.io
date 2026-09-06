@@ -23,7 +23,7 @@ npm run fonts:subset # 新增内容后重建 woff2 子集（song §28 + maple §
 - **内容层**：`src/content.config.ts` 用 zod 定义 6 个集合 —— `notes`/`musings`/`links`/`projects`/`photos`/`series`。共享字段 `title/date(YYYY-MM-DD)/summary?/draft?`；`photos` 经 `image()` 引用**同目录同名文件**（md 与其图同放 `src/content/photos/`），并带可选 `series` slug 挂靠；`series`（摄影卷）有 `cover`（卷内照片 slug，必填）。frontmatter 错误在构建期报错拦截，这是特性。
 - **查询层**：`src/lib/collections.ts` 是唯一取数入口（`listSorted`/`noteItems`/`musingItems`/`linkItems`/`projectItems`/`seriesRolls`）。`listSorted` 与搜索页曾用 `import.meta.env.DEV` 放行 draft（spec §4「dev 可见、构建排除」）；`seriesRolls` 不过滤 draft 卷、卷内无照片会 throw —— 有意为之。
 - **页面形态**：
-  - `/` 单屏欢迎页（华文中宋大字）；`.main:has(.welcome)` 特判居中；body 是 flex 纵向吸底布局，页脚短页贴底、长页随滚动。
+  - `/` 单屏欢迎页：中央华文中宋大站名 **PenicillinC3** + 右上**液态玻璃圆**（spec §33.3：.orb 124px 折射球锚定站名右上角，pointermove ±30px 阻尼跟随；锚点须换算 .stack 相对坐标）；`.main:has(.welcome)` 特判居中；**页脚仅首页渲染**（Base isHome 判断；其余页无最下方栏），版权行 `© 2026 PenicillinC3 Via Claude Code`（无回到首页链接）。body 是 flex 纵向吸底布局。
   - `/notes`、`/musings`、`/links` 列表为**单列通栏大卡**（spec §24/§25：一行一张 ~1100px；PostCard 标题↔日期对顶、摘要 76ch 限宽；三栏目卡统一 `min-height:230px` 对齐）+ `/[slug]` 详情；笔记列表有标签过滤（PostList 事件委托 + `style.display` 直控，勿改回 `hidden` 属性方案）。
   - `/photos` 是**长胶卷画廊**（spec §30，替代 §27 单帧版式）：Base 传 `dark gallery`（`body.page-gallery` = 视口锁高、页脚保留可见）；一条连续 135 底片（每卷封面 3:2 等宽等距 + 上下贯穿齿孔带，首尾纯灰占位，几何变量挂 `.arena`）；视口中心=当前卷，翻卷 = reel `translateX` 弹簧非线性平移（邻卷在左右仅露 ~100px）；**日期居中在封面上方、地点居中下方**（红光白字 overlay），dock 只剩「N 张」+提示；首尾不循环。**红光射线**（spec §26/§32 `Rays.astro`，ogl 移植去 react 壳）：全栏目统一配方 = 白红双色 `#ff0000/#ffffff` intensity1.7 spread2 falloff1.6 opacity1（overlay 叠于 arena、backdrop 沉备忘页卡后）。备忘页版面横/竖混排 + backdrop 射线。**无**单张照片页、无灯箱、无搜索。
   - **字体**（spec §28/§29/§32）：正文 = `MapleMono Web`（子集 200KB；摄影页 page-dark 覆写为华文中宋）；代码 = `JetBrains Mono Web` + **注释栈 `--font-comment` = JetBrains Italic → `MapleMono Italic Web`（217KB 子集）** —— 英文注释 JetBrains 斜体、**中文字符逐字落到斜体 Maple**（markdown 已切 prism 高亮，勿改回 shiki）。`npm run fonts:subset` 重建 song/maple/maple-italic 三件。`--font-song` 首项 Song Web。
@@ -42,7 +42,7 @@ npm run fonts:subset # 新增内容后重建 woff2 子集（song §28 + maple §
 7. **JS 别直写 `style.transform` 覆盖 CSS 组合位移** —— Nav 滑块曾因此把 `translateY(-50%)` 居中挤掉、整体下挂半身。组合位移（含 `-50%`、`--sx` 变量）写在 CSS，JS 只设变量。
 8. 依赖上限纪律：`dependencies` = `astro` + `ogl`（摄影集射线着色器用，spec §26，react 壳已去）；devDependencies = typescript + `subset-font`（华文中宋子集构建，spec §28）；不要引入 UI 框架。字体：**允许字体文件嵌入页面**（`font/STZHONGS.TTF` 原件 + 51KB woff2 子集 `public/fonts/`，用户放行；新文案后跑 `npm run fonts:subset`）。
 9. 图片管线：真实 JPEG 走构建期 sharp 自动出响应式 webp；SVG 直通不优化。`img/`（根目录原件）已 gitignore。
-10. 上线占位待替换：`astro.config.mjs` 的 `USERNAME`、`src/site.config.ts` 的站点名/简介（现 "Vibe"）、`src/content/projects/this-blog.md` 的 repo 链接。部署 = 推送 main 触发 `.github/workflows/deploy.yml`。
+10. 上线占位待替换：`astro.config.mjs` 的 `USERNAME`、`src/content/projects/this-blog.md` 的 repo 链接（站点名已定 PenicillinC3，见 site.config.ts）。部署 = 推送 main 触发 `.github/workflows/deploy.yml`。
 
 ## 目录速览（细节可自行发现处从略）
 

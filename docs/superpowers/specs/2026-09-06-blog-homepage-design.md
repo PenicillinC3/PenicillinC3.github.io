@@ -363,3 +363,9 @@ src/content/
 
 1. **SideRays 全栏目统一配方**（Rays.astro DEFAULTS，overlay 与 backdrop 同用；首页不再单独增强）：speed 2.5 · `#ff0000` / `#ffffff` · intensity 1.7 · spread 2 · top-right · tilt 0 · saturation 1.5 · blend 0.75 · falloff 1.6 · opacity 1 —— 白+红双色，右上角实测呈粉白射线（R≈178），远场因 falloff 1.6 衰减较暗属预期。微调入口：`src/components/Rays.astro` DEFAULTS（或页面 `config` 覆盖）。
 2. **中文注释 = MapleMono 斜体**：`font/MapleMono-NF-CN-MediumItalic.ttf`（21MB）→ 与常规同字形集子集 → `public/fonts/maple-mono-italic.woff2`（217KB）。`@font-face "MapleMono Italic Web"`（font-style: italic）。新 `--font-comment: "JetBrains Mono Web", "MapleMono Italic Web", ...`；`.token.comment` 等用此栈 —— 按字形逐字回退：英文注释 = JetBrains Italic，**中文字符落到斜体 Maple**（JetBrains woff2 无 CJK）。`npm run fonts:subset` 现产出 song/maple/maple-italic 三件。
+
+## 33. 首页整理 + 液态玻璃圆（2026-09-07，用户逐点指定）
+
+1. **品牌 = PenicillinC3**：`site.config.ts` title 改 PenicillinC3（导航站名/欢迎中央大字/`<title>`/页脚版权随之统一）；删除废弃字段 `intro`/`heroNote`（「写字 · 拍照 · 收藏」副标随 heroNote 一并删除）。站名属「上线占位」已完成项。
+2. **页脚仅首页**：Base 按 `Astro.url.pathname === '/'` 渲染 `<Footer/>`——除首页外**所有页面移除最下方栏**（含摄影备忘页；§27「摄影页页脚可见」随用户最新要求作废）。首页页脚删「回到首页」链接（已无他页可回），版权行 = `© {year} PenicillinC3 Via Claude Code`。
+3. **欢迎页液态玻璃圆**（参考 FluidGlass lens 的 CSS 近似）：中央站名右上角锚一枚 124px 折射球 `.orb`——radial 高光 + `backdrop-filter: blur(10px) saturate(1.8)` 玻璃折射 + 内外影 + 边缘红/青色差；**小范围跟随鼠标**：pointermove 相对锚点 ±30px 内取 `(pointer−锚)×0.05`，rAF 指数阻尼 τ≈110ms 漂移。⚠ 坐标坑：orb 定位上下文是 `.stack`（relative），锚点必须换算为 stack 相对坐标（`rect − hostRect`）——曾用视口坐标导致整球错位一个容器偏移。
