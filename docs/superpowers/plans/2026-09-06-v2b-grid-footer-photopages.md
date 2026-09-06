@@ -340,6 +340,7 @@ const facts = [
     align-items: start;
   }
   .imgshell {
+    margin: 0; /* figure UA 边距重置（评审发现：否则壳两侧内缩 40px/侧） */
     padding: 10px;
     border-radius: calc(var(--radius-m) + 6px);
     display: flex;
