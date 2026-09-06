@@ -297,3 +297,10 @@ src/content/
 
 1. `.slider` 的 `transition:persist` 依赖元素在所有页面**同序出现**（Nav 顶栏全站一致）；若未来有页面不出顶栏，滑块会退化为每页重建——届时 `astro:page-load` 分支会直接落位，功能仍可用但无滑动。
 2. `/photos` 里 `.stage` 自身**不要声明 height/position**（base.css 的 `body.page-immersive .stage` 以更高特异性置 `fixed + inset`；组件内再写 height 会参与定高计算，曾致 dvh 塌陷类问题）。改布局只动 flex 子项。
+
+## 24. 列表页单列通栏大卡（2026-09-07，用户选型；冲突处以此节为准，§21.4 桌面双栏作废）
+
+1. **个人笔记 / 个人迷思 / 网站参考列表改单列通栏大卡**：`.pcols`/`.lgrid` 弃 `repeat(auto-fill, minmax(...))`，统一 `grid-template-columns: minmax(0, 1fr)`（一行一张，卡宽 ≈ 容器 ~1100px）；卡间距 `clamp(18px,2.4vw,28px)`。
+2. **PostCard（notes/musings）通栏版式**：`.ptop` 行内 标题 ↔ 日期 对顶（baseline 两端、可折行）；摘要 `.ps` 限宽 `min(100%, 76ch)` 保持阅读节奏（字号 1.02rem / 行高 1.8）；标签行在其下。卡内 padding `clamp(24px,3.4vw,38px) clamp(24px,4vw,52px)`。
+3. **LinkCard 通栏版式**：`.top` = 左（图标 48px 渐变块 + 标题/域名）↔ 右（日期「收藏」）；说明 `.ln` 同 76ch 限宽；标签行其下。padding 同档。
+4. 移动端沿用单列 + 收窄 padding；标签过滤（§20.3）、分组年份与其余不变。

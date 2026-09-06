@@ -22,8 +22,8 @@ const items = await linkItems();
 <style>
   .lgrid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr));
-    gap: clamp(14px, 2vw, 20px);
+    grid-template-columns: minmax(0, 1fr); /* 单列通栏大卡（spec §24） */
+    gap: clamp(18px, 2.4vw, 28px);
   }
   .empty { padding: clamp(28px, 6vw, 60px); text-align: center; color: var(--text-2); }
 </style>
