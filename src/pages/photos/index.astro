@@ -285,12 +285,15 @@ const n = covers.length;
     letter-spacing: 0.22em;
     text-shadow: 0 0 6px rgba(255, 77, 77, 0.9), 0 0 18px rgba(255, 77, 77, 0.55);
   }
-  /* spec §51：地点白光 + 泛黄微光（胶片灯暖色，区别于日期的红光） */
+  /* spec §51/§52：地点白光 + 泛黄微光（胶片灯暖色；§52 加白色核心光更亮） */
   .loc {
     color: #fff;
     font-size: clamp(1rem, 2.4vw, 1.4rem);
     letter-spacing: 0.3em;
-    text-shadow: 0 0 7px rgba(255, 190, 100, 0.85), 0 0 16px rgba(255, 155, 55, 0.4);
+    text-shadow:
+      0 0 3px rgba(255, 255, 255, 0.9),
+      0 0 10px rgba(255, 198, 110, 0.95),
+      0 0 22px rgba(255, 160, 60, 0.55);
   }
 
   .stage-empty {
