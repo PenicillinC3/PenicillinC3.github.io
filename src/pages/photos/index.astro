@@ -102,8 +102,12 @@ const n = covers.length;
       // 胶片持续放大（spec §38→§41）：宽限 →62%、封顶 1180px（H 余量 196 配合字幕）
       const fw = Math.min(W * 0.62, (H - 196) * 1.5, 1180);
       const fh = fw / 1.5;
-      const peek = Math.min(160, Math.max(80, W * 0.085));
-      const step = Math.max(fw + 40, W / 2 + fw / 2 - peek); // 相邻中心距 → 邻卷只露一点
+      // 帧距改小（spec §43）：显式 gap = 侧廊 − 邻卷露出量；露出量抬到 150–220px
+      // （间距与露出的总预算 = 侧廊宽度，帧越近邻卷自然露越多）
+      const corridor = W / 2 - fw / 2;
+      const peek = Math.min(220, Math.max(150, W * 0.12));
+      const gap = Math.max(64, corridor - peek);
+      const step = fw + gap; // 相邻中心距
       const st = arena.style;
       st.setProperty('--fw', `${fw}px`);
       st.setProperty('--fh', `${fh}px`);
