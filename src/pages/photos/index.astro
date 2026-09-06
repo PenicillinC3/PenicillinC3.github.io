@@ -3,12 +3,10 @@ import { getImage } from 'astro:assets';
 import Base from '../../layouts/Base.astro';
 import SectionHeader from '../../components/SectionHeader.astro';
 import PhotoCard from '../../components/PhotoCard.astro';
-import Lightbox from '../../components/Lightbox.astro';
 import { photoEntries } from '../../lib/collections';
 
 const entries = await photoEntries();
 
-// 构建期生成缩略图(响应式 webp)与大图；SVG 占位原样直出（Global Constraints 12 条）
 const metas = await Promise.all(
   entries.map(async (p) => {
     const grid = await getImage({
@@ -17,32 +15,12 @@ const metas = await Promise.all(
       sizes: '(min-width: 1000px) 33vw, (min-width: 640px) 50vw, 100vw',
       format: 'webp',
     });
-    const big = await getImage({ src: p.data.image, width: 1800 });
-    const c = p.data.camera;
-    const camera = c
-      ? [c.body, c.lens, c.f, c.ss, c.iso].filter(Boolean).join(' · ')
-      : undefined;
-    return {
-      title: p.data.title,
-      alt: p.data.alt,
-      date: p.data.date,
-      location: p.data.location,
-      camera,
-      full: big.src,
-      src: grid.src,
-      srcset: grid.attributes.srcset ?? undefined,
-    };
+    return { src: grid.src, srcset: grid.attributes.srcset ?? undefined };
   }),
 );
-// 数组顺序即灯箱翻页顺序（与缩略图 data-index 对齐）；转义 < 防 JSON 被当 HTML 解析
-const metaJson = JSON.stringify(metas).replace(/</g, '\\u003c');
 ---
 <Base title="摄影作品集" description="摄影作品集">
-  <SectionHeader
-    title="摄影作品集"
-    count={entries.length}
-    note="点击照片查看大图与拍摄信息。"
-  />
+  <SectionHeader title="摄影作品集" count={entries.length} note="点击照片进入单张详情。" />
   {
     entries.length > 0 ? (
       <div class="pgrid">
@@ -52,8 +30,8 @@ const metaJson = JSON.stringify(metas).replace(/</g, '\\u003c');
             alt={p.data.alt}
             date={p.data.date}
             location={p.data.location}
-            img={{ src: metas[i].src, srcset: metas[i].srcset }}
-            index={i}
+            img={metas[i]}
+            href={`/photos/${p.slug}/`}
           />
         ))}
       </div>
@@ -61,13 +39,7 @@ const metaJson = JSON.stringify(metas).replace(/</g, '\\u003c');
       <div class="glass empty">相册还空着 —— 把第一张照片放进 src/content/photos/ 吧。</div>
     )
   }
-  <Lightbox />
 </Base>
-
-<script is:inline type="application/json" id="photo-collection" set:html={metaJson}></script>
-<script>
-  import '../../scripts/lightbox.ts';
-</script>
 
 <style>
   .pgrid {

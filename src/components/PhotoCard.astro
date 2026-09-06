@@ -5,52 +5,25 @@ interface Props {
   date: string;
   location?: string;
   img: { src: string; srcset?: string };
-  index?: number;
-  href?: string;
+  href: string;
 }
-const { title, alt, date, location, img, index, href } = Astro.props;
-const attrs = href
-  ? { href, ...(index !== undefined ? {} : {}) }
-  : index !== undefined
-    ? { type: 'button', 'data-photo': '', 'data-index': String(index) }
-    : {};
+const { title, alt, date, location, img, href } = Astro.props;
 ---
-{
-  href ? (
-    <a class="glass photocard prism" {href} aria-label={`查看摄影作品集：${title}`}>
-      <span class="frame">
-        <img src={img.src} srcset={img.srcset} alt={alt} loading="lazy" decoding="async" />
-        <span class="cap"><strong>{title}</strong><em>{location ?? date}</em></span>
-      </span>
-    </a>
-  ) : index !== undefined ? (
-    <button class="glass photocard prism" {...attrs} aria-label={`查看大图：${title}`}>
-      <span class="frame">
-        <img src={img.src} srcset={img.srcset} alt={alt} loading="lazy" decoding="async" />
-        <span class="cap"><strong>{title}</strong><em>{location ?? date}</em></span>
-      </span>
-    </button>
-  ) : (
-    <figure class="glass photocard prism">
-      <span class="frame">
-        <img src={img.src} srcset={img.srcset} alt={alt} loading="lazy" decoding="async" />
-        <figcaption class="cap"><strong>{title}</strong><em>{location ?? date}</em></figcaption>
-      </span>
-    </figure>
-  )
-}
+<a class="glass photocard prism" {href} aria-label={`查看摄影作品：${title}`}>
+  <span class="frame">
+    <img src={img.src} srcset={img.srcset} alt={alt} loading="lazy" decoding="async" />
+    <span class="cap"><strong>{title}</strong><em>{location ?? date}</em></span>
+  </span>
+</a>
 
 <style>
   .photocard {
     display: block;
     width: 100%;
     padding: 10px;
-    border-radius: calc(var(--glass-radius) + 6px);
+    border-radius: calc(var(--radius-m) + 6px);
     color: var(--text-1);
-    cursor: pointer;
-    transition: transform 0.18s ease-out, box-shadow 0.18s ease-out, border-color 0.18s ease-out;
-    text-align: left;
-    font: inherit;
+    transition: transform var(--t-fast) ease-out, box-shadow var(--t-fast) ease-out;
   }
   .photocard:hover {
     transform: translateY(var(--card-hover));
@@ -68,11 +41,10 @@ const attrs = href
     justify-content: space-between;
     gap: 8px;
     padding: 26px 14px 10px;
-    background: linear-gradient(180deg, transparent, rgba(8, 10, 20, 0.62));
-    color: #f4f6ff;
+    background: linear-gradient(180deg, transparent, rgba(15, 23, 42, 0.55));
+    color: #fff;
     font-size: 0.86rem;
     font-style: normal;
   }
   .cap em { font-style: normal; opacity: 0.82; font-size: 0.78rem; }
-  figure.photocard { margin: 0; }
 </style>
