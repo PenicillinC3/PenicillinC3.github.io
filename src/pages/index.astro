@@ -1,119 +1,58 @@
 ---
-import { getImage } from 'astro:assets';
 import Base from '../layouts/Base.astro';
-import Hero from '../components/Hero.astro';
-import SectionHeader from '../components/SectionHeader.astro';
-import PostCard from '../components/PostCard.astro';
-import PhotoCard from '../components/PhotoCard.astro';
-import LinkCard from '../components/LinkCard.astro';
-import ProjectCard from '../components/ProjectCard.astro';
-import {
-  noteItems, musingItems, linkItems, projectItems, photoEntries,
-} from '../lib/collections';
-
-const [notes, musings, links, projects] = await Promise.all([
-  noteItems(), musingItems(), linkItems(), projectItems(),
-]);
-const allPhotos = await photoEntries();
-const photos = allPhotos.slice(0, 3);
-const photoMetas = await Promise.all(
-  photos.map(async (p) => {
-    const g = await getImage({
-      src: p.data.image,
-      widths: [420, 800],
-      sizes: '(min-width: 760px) 30vw, 92vw',
-      format: 'webp',
-    });
-    return { src: g.src, srcset: g.attributes.srcset ?? undefined };
-  }),
-);
+import { site } from '../site.config';
 ---
 <Base>
-  <Hero />
-
-  <section class="stream">
-    <SectionHeader title="最新笔记" count={notes.length} moreHref="/notes/" />
-    {
-      notes.length > 0 ? (
-        <div class="cols">
-          {notes.slice(0, 3).map((p) => <PostCard post={p} />)}
-        </div>
-      ) : (
-        <div class="glass empty">笔记区空着 —— 期待第一篇。</div>
-      )
-    }
-  </section>
-
-  <section class="stream">
-    <SectionHeader title="摄影精选" count={allPhotos.length} moreHref="/photos/" />
-    {
-      photos.length > 0 ? (
-        <div class="cols cols-photo">
-          {photos.map((p, i) => (
-            <PhotoCard
-              title={p.data.title}
-              alt={p.data.alt}
-              date={p.data.date}
-              location={p.data.location}
-              img={photoMetas[i]}
-              href="/photos/"
-            />
-          ))}
-        </div>
-      ) : (
-        <div class="glass empty">摄影集空着 —— 等第一张照片。</div>
-      )
-    }
-  </section>
-
-  <section class="stream">
-    <SectionHeader title="最近迷思" count={musings.length} moreHref="/musings/" />
-    {
-      musings.length > 0 ? (
-        <div class="cols">
-          {musings.slice(0, 3).map((p) => <PostCard post={p} hideTags />)}
-        </div>
-      ) : (
-        <div class="glass empty">迷思区空着。</div>
-      )
-    }
-  </section>
-
-  <section class="stream">
-    <SectionHeader title="网站参考" count={links.length} moreHref="/links/" />
-    {
-      links.length > 0 ? (
-        <div class="cols">
-          {links.slice(0, 3).map((l) => <LinkCard link={l} />)}
-        </div>
-      ) : (
-        <div class="glass empty">收藏夹空着。</div>
-      )
-    }
-  </section>
-
-  <section class="stream">
-    <SectionHeader title="最近项目" count={projects.length} moreHref="/projects/" />
-    {
-      projects.length > 0 ? (
-        <div class="cols">
-          {projects.slice(0, 2).map((p) => <ProjectCard project={p} />)}
-        </div>
-      ) : (
-        <div class="glass empty">项目区空着。</div>
-      )
-    }
+  <section class="welcome">
+    <div class="stack">
+      <h1 class="name">{site.title}</h1>
+      <p class="tagline">{site.tagline}</p>
+      <p class="note" aria-hidden="true">{site.heroNote}</p>
+      <div class="acts">
+        <a class="btn prism" href="/notes/">个人笔记</a>
+        <a class="btn prism" href="/photos/">摄影作品集</a>
+      </div>
+    </div>
   </section>
 </Base>
 
 <style>
-  .stream { margin: clamp(40px, 7vw, 64px) 0 0; }
-  .stream:first-of-type { margin-top: clamp(24px, 4vw, 40px); }
-  .cols {
+  .welcome {
+    min-height: calc(100vh - var(--nav-h) - 120px);
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
-    gap: clamp(14px, 2vw, 20px);
+    place-items: center;
+    text-align: center;
+    padding-block: clamp(24px, 6vh, 72px);
   }
-  .cols-photo { grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
-  .empty { padding: clamp(24px, 4vw, 44px); text-align: center; color: var(--text-2); }
+  .stack { display: grid; justify-items: center; gap: 0; }
+  .name {
+    margin: 0;
+    font-family: var(--font-song);
+    font-size: clamp(3.2rem, 11vw, 6.4rem);
+    font-weight: 600;
+    line-height: 1.15;
+    letter-spacing: 0.08em;
+    color: var(--text-1);
+  }
+  .tagline {
+    margin: clamp(14px, 3vh, 26px) 0 0;
+    font-size: clamp(1.05rem, 2.6vw, 1.35rem);
+    font-weight: 400;
+    color: var(--text-2);
+    letter-spacing: 0.02em;
+  }
+  .note {
+    margin: 22px 0 0;
+    font-size: 0.86rem;
+    color: var(--text-3);
+    letter-spacing: 0.42em;
+    text-indent: 0.42em; /* 视觉居中补偿 */
+  }
+  .acts {
+    margin-top: clamp(28px, 5vh, 46px);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+  }
 </style>
