@@ -8,7 +8,7 @@
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
-    "fonts:subset": "node scripts/subset-song.mjs"
+    "fonts:subset": "node scripts/subset-song.mjs && node scripts/subset-maple.mjs"
   },
   "dependencies": {
     "astro": "^5.0.0",
