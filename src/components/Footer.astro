@@ -2,13 +2,15 @@
 import { site } from '../site.config';
 ---
 <footer class="foot">
-  <div class="wrap inner">
-    <p class="note">{site.footerNote}</p>
-    <p class="copy">
-      © <span data-year>2026</span> {site.title}
-      <span class="dot">·</span>
-      <a href="/">回到首页</a>
-    </p>
+  <div class="wrap">
+    <div class="glass inner">
+      <p class="note">{site.footerNote}</p>
+      <p class="copy">
+        © <span data-year>2026</span> {site.title}
+        <span class="dot">·</span>
+        <a href="/">回到首页</a>
+      </p>
+    </div>
   </div>
 </footer>
 
@@ -18,16 +20,19 @@ import { site } from '../site.config';
 </script>
 
 <style>
-  .foot { border-top: 1px solid var(--glass-border); }
+  .foot {
+    padding: 0 var(--gutter) clamp(16px, 3vw, 28px);
+  }
   .inner {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: 4px 24px;
-    padding-block: 18px;
+    padding: 14px clamp(18px, 3vw, 28px);
+    border-radius: var(--radius-lg);
   }
-  .note { margin: 0; font-size: 0.85rem; color: var(--text-3); }
+  .note { margin: 0; font-size: 0.85rem; color: var(--text-2); }
   .copy { margin: 0; font-size: 0.85rem; color: var(--text-3); }
   .copy a { color: var(--text-3); }
   .dot { padding: 0 8px; }

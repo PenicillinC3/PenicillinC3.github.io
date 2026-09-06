@@ -81,12 +81,12 @@ img { max-width: 100%; height: auto; display: block; }
   border-radius: var(--glass-radius);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
   backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
-  box-shadow: var(--glass-shadow);
+  box-shadow: var(--glass-inset), var(--glass-shadow);
 }
 
 /* 降级：无 backdrop-filter → 近实心白面板（spec §14 同款） */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .glass { background: rgba(255, 255, 255, 0.97); }
+  .glass { background: rgba(255, 255, 255, 0.92); }
 }
 
 /* —— 棱光色散环（spec §14.3）：1px 低饱和渐变描边，交互态浮现 —— */
@@ -154,7 +154,7 @@ img { max-width: 100%; height: auto; display: block; }
   font-weight: 600;
   line-height: 1.4;
   cursor: pointer;
-  box-shadow: var(--glass-shadow);
+  box-shadow: var(--glass-inset), var(--glass-shadow);
   transition: transform var(--t-fast) ease-out, box-shadow var(--t-fast) ease-out,
     color var(--t-fast) ease-out;
 }
