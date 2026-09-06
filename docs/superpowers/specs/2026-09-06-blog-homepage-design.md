@@ -494,3 +494,14 @@ setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160）
 ## §56（2026-09-07）撤销 §55 锁高 —— 回到 §54 形态
 
 用户实际查看 §55 锁高留白沉底后不满意，明确要求「回到改之前的样子」：撤销整段锁高逻辑（`PostList.astro` 移除 `locks` Map 与分组 `min-height` 锁定，代码回到 commit b3c494c 即 §54 行为）—— 筛选后页面总高随筛掉的空间**顺滑收短**（1173→900），余量不再以留白形式压在列表末尾。§55 保留为试错历史（同 §46–§49 惯例），勿再实现锁高或垫字类方案。
+
+---
+
+## §57（2026-09-07）代码内非注释中文改用正体 Maple
+
+用户要求：代码里的非注释中文（字符串/标识符中的汉字）也改用 Maple。此前只有注释走 Maple（斜体，§32 `--font-comment`），非注释代码的 `--font-mono` 链是纯 JetBrains Mono + 系统栈 —— JetBrains 无中文字形，代码中的汉字实际落到系统默认 CJK 字体（宋体/雅黑之类），与正文正体 Maple 观感割裂。
+
+- 方案 = 字链兜底（与注释同一机制）：`--font-mono` 在 JetBrains Mono 之后插入正体 `MapleMono Web`。字形级逐字解析：拉丁/符号仍全部命中 JetBrains（视觉零变化），只有 JetBrains 缺的中文字形落到正体 Maple，代码字符串中文与正文一致。
+- 消费方：`.prose pre code`（代码块）、`.prose :not(pre) > code`（行内代码）、`LinkCard .host`（域名字符串，拉丁不受影响）。
+- 注释规则不动：`.token.comment/.prolog/.doctype/.cdata` 仍 `--font-comment`（斜体 JetBrains → 斜体 Maple），注释与字符串中文由此分处正/斜两体。
+- 实现：`tokens.css` 的 `--font-mono` 链 + 注释更新；产物字体子集照旧 `npm run fonts:subset` 重建。
