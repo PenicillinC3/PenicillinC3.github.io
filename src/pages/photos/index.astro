@@ -7,14 +7,17 @@ import { seriesRolls } from '../../lib/collections';
 const rolls = await seriesRolls();
 const covers = await Promise.all(
   rolls.map(async (r) => {
-    const big = await getImage({ src: r.cover.data.image, widths: [1200, 2000], sizes: '100vw', format: 'webp', quality: 88 });
-    const small = await getImage({ src: r.cover.data.image, widths: [160, 320], sizes: '140px', format: 'webp' });
+    const big = await getImage({ src: r.cover.data.image, widths: [900, 1600, 2400], sizes: '(min-width: 900px) 62vw, 90vw', format: 'webp', quality: 88 });
+    const small = await getImage({ src: r.cover.data.image, widths: [260, 520], sizes: '180px', format: 'webp', quality: 80 });
+    const w = r.cover.data.image.width ?? 1;
+    const h = r.cover.data.image.height ?? 1;
     return {
       slug: r.entry.slug,
       title: r.entry.data.title,
       date: r.entry.data.date.replaceAll('-', '.'),
       location: r.entry.data.location ?? '',
       count: r.photos.length,
+      wide: w / h > 1.55, // 超宽幅：3:2 片窗内 contain（留左右黑边），常规 3:2 用 cover
       big: { src: big.src, srcset: big.attributes.srcset },
       small: small.src,
     };
@@ -22,45 +25,54 @@ const covers = await Promise.all(
 );
 const json = JSON.stringify(covers).replace(/</g, '\\u003c');
 const first = covers[0];
+const prev = covers[-1]; // 序列按日期降序：首位即最左（无上一卷 → 灰黑占位）
+const next = covers[1];
 ---
-<Base title="摄影作品集" description="暗房 · 摄影作品集" dark immersive>
-  <section class="stage" data-stage tabindex="0" aria-label="摄影作品暗房浏览">
-    {
-      first ? (
-        <>
-          {/* 135 底片主体：齿孔带上下夹住照片区（spec §22）——
-             首帧服务端直出：不依赖 JS 也能看到第一张照片与时间/地点 */}
-          <div class="film" data-film>
-            <div class="farea" data-farea>
-              <img class="bg" data-bg src={first.big.src} srcset={first.big.srcset ?? undefined}
+<!-- 胶片画廊（spec §27）：非沉浸、保留页脚；3:2 胶片居中 + 两侧半露邻卷，
+     首尾以灰黑渐变底片占位（不成环）。dark + gallery 由 Base 挂 body 类 -->
+<Base title="摄影作品集" description="暗房 · 摄影作品集" dark gallery>
+  <section class="gallery" data-gallery>
+    <div class="arena" data-arena tabindex="0" aria-label="摄影作品浏览">
+      <Rays variant="overlay" />
+
+      {
+        first ? (
+          <>
+            {/* 主体胶片：固定 3:2 片窗，SSR 首帧直出 */}
+            <button class="film" data-film type="button" aria-label={`进入《${first.title}》备忘录`}>
+              <img class:list={['bg', first.wide && 'bg--wide']} data-bg
+                   src={first.big.src} srcset={first.big.srcset ?? undefined}
                    alt={first.title} draggable="false" style="opacity: 1" />
-              <div class="vignette" aria-hidden="true"></div>
-              <div class="redlamp" aria-hidden="true"></div>
-            </div>
-            <div class="band top" aria-hidden="true"></div>
-            <div class="band bot" aria-hidden="true"></div>
+              <i class="edge" aria-hidden="true"></i>
+            </button>
 
-            <button class="strip prev prism" data-prev aria-label="上一卷" hidden><img data-prev-img alt="" loading="lazy" /></button>
-            <button class="strip next prism" data-next aria-label="下一卷" hidden><img data-next-img alt="" loading="lazy" /></button>
-          </div>
+            {/* 左右槽位各自常驻「半露按钮 + 灰黑占位」二者其一（SSR/JS 以 hidden 切换，
+                保证翻到首/末卷时占位能顶上 —— 只渲染存在者的旧版会留下死按钮） */}
+            <button class="peek prev" data-prev type="button" aria-label={`上一卷：${prev ? prev.title : '（无）'}`} hidden={!prev}>
+              <img data-prev-img alt="" loading="lazy" draggable="false" />
+            </button>
+            <div class="ghost prev" data-prev-ghost aria-hidden="true" hidden={!!prev}><i></i></div>
 
-          {/* 红色射线氛围（spec §26）：滤色叠光于照片/齿孔带之上，信息栏 z 抬升不被遮挡 */}
-          <Rays variant="overlay" />
+            <button class="peek next" data-next type="button" aria-label={`下一卷：${next ? next.title : '（无）'}`} hidden={!next}>
+              <img data-next-img alt="" loading="lazy" draggable="false" />
+            </button>
+            <div class="ghost next" data-next-ghost aria-hidden="true" hidden={!!next}><i></i></div>
+          </>
+        ) : (
+          <p class="stage-empty">还没有胶卷 —— 在 src/content/series/ 放第一卷吧。</p>
+        )
+      }
+    </div>
 
-          {/* 底部信息栏（贴于底片下方，齿孔带不遮挡） */}
-          <div class="dock">
-            <p class="meta" data-meta>
-              <span class="ts" data-ts>{first.date}</span>
-              <span class="loc" data-loc style={`opacity:${first.location ? 1 : 0.35}`}>{first.location || '未标注地点'}</span>
-            </p>
-            <p class="hint">点击画面进入备忘录 · 两侧底片切换 · ←/→ 键</p>
-            <p class="count" data-count>{first.count} 张</p>
-          </div>
-        </>
-      ) : (
-        <p class="stage-empty">还没有胶卷 —— 在 src/content/series/ 放第一卷吧。</p>
-      )
-    }
+    {/* 底部信息栏（胶片下方、页脚上方） */}
+    <div class="dock">
+      <p class="meta">
+        <span class="ts" data-ts>{first ? first.date : ''}</span>
+        <span class="loc" data-loc style={`opacity:${first && first.location ? 1 : 0.35}`}>{first ? (first.location || '未标注地点') : ''}</span>
+      </p>
+      <p class="hint">点击胶片进入备忘录 · 两侧半露翻卷 · ←/→ 键</p>
+      <p class="count" data-count>{first ? `${first.count} 张` : ''}</p>
+    </div>
   </section>
 </Base>
 
@@ -69,26 +81,61 @@ const first = covers[0];
 <script is:inline type="application/json" id="roll-data" set:html={json}></script>
 <script>
   const covers = JSON.parse(document.getElementById('roll-data')!.textContent ?? '[]') as {
-    slug: string; title: string; date: string; location: string; count: number;
+    slug: string; title: string; date: string; location: string; count: number; wide: boolean;
     big: { src: string; srcset?: string }; small: string;
   }[];
-  const stage = document.querySelector<HTMLElement>('[data-stage]');
-  if (stage && covers.length > 0) {
-    const bg = stage.querySelector<HTMLImageElement>('[data-bg]')!;
-    const ts = stage.querySelector<HTMLElement>('[data-ts]')!;
-    const loc = stage.querySelector<HTMLElement>('[data-loc]')!;
-    const cnt = stage.querySelector<HTMLElement>('[data-count]')!;
-    const prevBtn = stage.querySelector<HTMLButtonElement>('[data-prev]')!;
-    const nextBtn = stage.querySelector<HTMLButtonElement>('[data-next]')!;
-    const prevImg = stage.querySelector<HTMLImageElement>('[data-prev-img]')!;
-    const nextImg = stage.querySelector<HTMLImageElement>('[data-next-img]')!;
+  const arena = document.querySelector<HTMLElement>('[data-arena]');
+  if (arena && covers.length > 0) {
+    const film = arena.querySelector<HTMLButtonElement>('[data-film]')!;
+    const bg = arena.querySelector<HTMLImageElement>('[data-bg]')!;
+    const ts = document.querySelector<HTMLElement>('[data-ts]')!;
+    const loc = document.querySelector<HTMLElement>('[data-loc]')!;
+    const cnt = document.querySelector<HTMLElement>('[data-count]')!;
+    const prevBtn = arena.querySelector<HTMLButtonElement>('[data-prev]')!;
+    const nextBtn = arena.querySelector<HTMLButtonElement>('[data-next]')!;
+    const prevGhost = arena.querySelector<HTMLElement>('[data-prev-ghost]')!;
+    const nextGhost = arena.querySelector<HTMLElement>('[data-next-ghost]')!;
+    const prevImg = arena.querySelector<HTMLImageElement>('[data-prev-img]')!;
+    const nextImg = arena.querySelector<HTMLImageElement>('[data-next-img]')!;
     let i = 0;
     // 请求令牌：render 每次自增，过期 Image onload 不再覆盖 bg（快速切换竞态）
     let req = 0;
-    // 进出场定时器：连续按键时取消未完成的换片阶段，避免旧图动画覆盖新图
+    // 进出场定时器：连续按键时取消未完成的换片阶段
     let job: number | undefined;
-    const OUT = 140;   // 旧图线性滑出时长
-    const IN = 480;    // 新图线性滑入时长
+    const OUT = 140;
+    const IN = 460;
+
+    // 胶片随舞台自适应：宽取 arena 的 62%（两侧留半露邻卷位），按 3:2 高受限
+    const fit = () => {
+      const w = arena.clientWidth;
+      const h = arena.clientHeight;
+      const fw = Math.min(w * 0.62, h * 1.5 * 0.92, 1000);
+      film.style.width = `${Math.max(fw, 240)}px`;
+    };
+    let rsT: number | undefined;
+    const onResize = () => {
+      window.clearTimeout(rsT);
+      rsT = window.setTimeout(fit, 120);
+    };
+    window.addEventListener('resize', onResize);
+    fit();
+
+    const applyPeek = (
+      btn: HTMLButtonElement,
+      ghost: HTMLElement,
+      img: HTMLImageElement,
+      c: (typeof covers)[number] | undefined,
+    ) => {
+      if (c) {
+        btn.hidden = false;
+        ghost.hidden = true;
+        img.classList.toggle('bg--wide', c.wide);
+        img.src = c.small;
+      } else {
+        btn.hidden = true;
+        ghost.hidden = false;
+      }
+    };
 
     const render = (d: number) => {
       const c = covers[i];
@@ -99,47 +146,42 @@ const first = covers[0];
       loc.textContent = c.location || '未标注地点';
       loc.style.opacity = c.location ? '1' : '0.35';
       cnt.textContent = `${c.count} 张`;
-      const p = covers[i - 1];
-      const n = covers[i + 1];
-      prevBtn.hidden = !p;
-      nextBtn.hidden = !n;
-      if (p) prevImg.src = p.small;
-      if (n) nextImg.src = n.small;
+      film.setAttribute('aria-label', `进入《${c.title}》备忘录`);
+      applyPeek(prevBtn, prevGhost, prevImg, covers[i - 1]);
+      applyPeek(nextBtn, nextGhost, nextImg, covers[i + 1]);
 
-      const same = bg.getAttribute('src') === c.big.src; // 与 SSR 首帧同图：不动画防闪烁
+      const same = bg.getAttribute('src') === c.big.src; // SSR 首帧同图：不动画防闪烁
       if (same) {
-        bg.classList.remove('in-l', 'in-r');
         bg.style.opacity = '1';
         bg.style.transform = '';
-        bg.style.transition = '';
+        bg.classList.remove('in-l', 'in-r');
         return;
       }
-      // 线性换卷（spec §22）：两段式——旧图先沿前进方向滑出；
-      // 清掉上一轮入场残留（类在动画中会盖过内联透明度），从整图开始出片
+      // 两段式线性换卷（spec §22）：清入场残留 → 旧图滑出 → 预载完成新图自对侧滑入
       bg.classList.remove('in-l', 'in-r');
       bg.style.transition = 'none';
       bg.style.opacity = '1';
       bg.style.transform = '';
       void bg.offsetWidth;
       bg.style.transition = `opacity ${OUT}ms linear, transform ${OUT}ms linear`;
-      bg.style.transform = d > 0 ? 'translateX(-26px)' : 'translateX(26px)';
+      bg.style.transform = d > 0 ? 'translateX(-22px)' : 'translateX(22px)';
       bg.style.opacity = '0';
       const t0 = performance.now();
 
       const img = new Image();
       img.onload = () => {
-        if (my !== req) return; // 已被更新的 render 覆盖 → 丢弃过期加载
-        // 缓存命中时也等旧图滑满 OUT 再换源，保证先后次序
+        if (my !== req) return;
         const wait = Math.max(0, OUT - (performance.now() - t0));
         job = window.setTimeout(() => {
           if (my !== req) return;
+          bg.classList.toggle('bg--wide', c.wide);
           bg.style.transition = 'none';
           bg.style.opacity = '0';
-          bg.style.transform = d > 0 ? 'translateX(26px)' : 'translateX(-26px)';
+          bg.style.transform = d > 0 ? 'translateX(22px)' : 'translateX(-22px)';
           bg.src = img.src;
           if (c.big.srcset) bg.setAttribute('srcset', c.big.srcset);
           else bg.removeAttribute('srcset');
-          void bg.offsetWidth; // 强制回流：确保从新起点开始 keyframes
+          void bg.offsetWidth;
           bg.classList.add(d > 0 ? 'in-r' : 'in-l');
           job = window.setTimeout(() => {
             if (my !== req) return;
@@ -154,114 +196,169 @@ const first = covers[0];
     };
 
     const go = (d: number) => {
-      const ni = (i + d + covers.length) % covers.length;
+      const ni = i + d;
+      if (ni < 0 || ni >= covers.length) return; // 首尾不成环：占位灰黑底片不可翻
       i = ni;
       render(d);
     };
     const enter = () => { window.location.href = `/photos/${covers[i].slug}/`; };
 
-    prevBtn.addEventListener('click', (e) => { e.stopPropagation(); go(-1); stage.focus({ preventScroll: true }); });
-    nextBtn.addEventListener('click', (e) => { e.stopPropagation(); go(1); stage.focus({ preventScroll: true }); });
-    stage.addEventListener('click', enter);
-    stage.addEventListener('keydown', (e) => {
-      // 仅 stage 自身聚焦时处理按键；strip 按钮的 Enter/Space 由原生 click 触发，
-      // 不再冒泡到此误导航
-      if (e.target !== stage) return;
+    film.addEventListener('click', enter);
+    prevBtn?.addEventListener('click', (e) => { e.stopPropagation(); go(-1); arena.focus({ preventScroll: true }); });
+    nextBtn?.addEventListener('click', (e) => { e.stopPropagation(); go(1); arena.focus({ preventScroll: true }); });
+    arena.addEventListener('keydown', (e) => {
+      if (e.target !== arena) return;
       if (e.key === 'ArrowLeft') go(-1);
       else if (e.key === 'ArrowRight') go(1);
       else if (e.key === 'Enter') enter();
     });
-    render(0); // 首帧同步元数据/侧条（与 SSR 同图 → same 分支，仅刷新文案）
+    render(0);
   }
 </script>
 
 <style>
-  /* 沉浸舞台（spec §21.2/§22）：base.css 已置 fixed + inset: var(--nav-h) 0 0 0
-     （dvh 塌陷历史坑：勿改回 height 计算）。这里只补内部布局：
-     列布局：上=135 底片主体（flex 撑满），下=信息栏（齿孔带不遮挡二者） */
-  .stage {
+  /* 画廊主体（spec §27）：arena 弹性占满 dock 之上的空间 */
+  .gallery {
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    height: 100%;
+    min-height: 0;
+    background:
+      radial-gradient(120% 100% at 50% 30%, #0a0b10, #05060a 70%);
+  }
+  .arena {
+    position: relative;
+    flex: 1 1 0;
+    min-height: 0;
+    display: grid;
+    place-items: center;
     outline: none;
-    background: #05060a;
   }
 
-  /* —— 135 底片主体（spec §22.1）：横铺全宽，上/下齿孔带，黑胶卷底，红光泛光 —— */
+  /* —— 主体胶片：固定 3:2 片窗（宽由 JS fit() 按 arena 尺寸定，CSS 保比例） —— */
   .film {
-    --perf: 30px; /* 齿孔带高（farea 的上/下内缩与之联动） */
     position: relative;
-    flex: 1 1 auto;
-    min-height: 0;
-    background: #0b0c11;
-    box-shadow:
-      0 0 70px -18px rgba(255, 64, 64, 0.32),
-      0 0 160px -32px rgba(255, 64, 64, 0.3); /* 周围泛光 */
-    z-index: 1;
-  }
-  /* 照片区：被上下齿孔带夹在中间，横向铺满 */
-  .farea {
-    position: absolute;
-    inset: var(--perf) 0;
+    display: block;
+    width: min(62vw, 900px);
+    aspect-ratio: 3 / 2;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    border-radius: 10px;
     overflow: hidden;
-    background: #05060a;
+    background: #0c0d11;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow:
+      0 24px 60px -18px rgba(0, 0, 0, 0.75),
+      0 0 90px -24px rgba(255, 64, 64, 0.4); /* 底片周围泛红光 */
+    z-index: 10;
+  }
+  .film::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(140% 90% at 50% 42%, transparent 62%, rgba(0, 0, 0, 0.4) 100%);
+    pointer-events: none;
   }
   .bg {
     position: absolute;
     inset: 0;
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: cover; /* 常规 3:2 片源铺满片窗 */
     opacity: 0;
     will-change: transform, opacity;
   }
-  /* 线性换卷：新图自前进方向滑入（配合 JS 两段式，不透明度亦为线性） */
+  .bg--wide { object-fit: contain; } /* 超宽幅：整幅可见，片窗内留黑边 */
+  /* 线性换卷：新图自前进方向滑入 */
   .bg.in-l, .bg.in-r {
-    animation-duration: 480ms;
+    animation-duration: 460ms;
     animation-timing-function: linear;
     animation-fill-mode: both;
   }
   .bg.in-r { animation-name: film-in-r; }
   .bg.in-l { animation-name: film-in-l; }
-  @keyframes film-in-r { from { opacity: 0; transform: translateX(26px); } to { opacity: 1; transform: none; } }
-  @keyframes film-in-l { from { opacity: 0; transform: translateX(-26px); } to { opacity: 1; transform: none; } }
-
-  /* 黑场压暗 + 红光氛围（照片区内） */
-  .vignette {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background:
-      radial-gradient(120% 90% at 50% 40%, transparent 58%, rgba(0, 0, 0, 0.5) 100%);
-  }
-  .redlamp {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background: radial-gradient(90% 60% at 85% 100%, rgba(255, 70, 70, 0.15), transparent 60%);
-  }
-
-  /* —— 齿孔带（spec §22.2）：黑色胶卷边，孔洞比胶卷底更黑，露出负片感 —— */
-  .band {
+  @keyframes film-in-r { from { opacity: 0; transform: translateX(22px); } to { opacity: 1; transform: none; } }
+  @keyframes film-in-l { from { opacity: 0; transform: translateX(-22px); } to { opacity: 1; transform: none; } }
+  /* 齿孔带暗示：片窗上下缘发丝纹理（简化版，保 3:2 画幅不被侵占） */
+  .edge::before, .edge::after {
+    content: "";
     position: absolute;
     left: 0;
     right: 0;
-    height: var(--perf, 30px);
-    background: #14151b;
-    border-top: 1px solid rgba(255, 255, 255, 0.07);
-    border-bottom: 1px solid rgba(0, 0, 0, 0.8);
-    z-index: 4;
+    height: 7px;
+    z-index: 2;
+    pointer-events: none;
   }
-  .band.top { top: 0; }
-  .band.bot { bottom: 0; }
-  .band::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='34' height='30'%3E%3Crect x='11' y='7' width='12' height='16' rx='4' fill='%23030408'/%3E%3C/svg%3E");
+  .edge::before {
+    top: 0;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent);
+  }
+  .edge::after {
+    bottom: 0;
+    background: linear-gradient(0deg, rgba(255, 255, 255, 0.05), transparent);
   }
 
-  /* —— 底部信息栏（spec §22.3）：独立于底片之下，不遮挡任何内容 —— */
+  /* —— 两侧半露邻卷（非首尾时） —— */
+  .peek {
+    position: absolute;
+    top: 50%;
+    width: 190px;
+    aspect-ratio: 3 / 2;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 8px;
+    padding: 0;
+    overflow: hidden;
+    background: #0e0f14;
+    cursor: pointer;
+    z-index: 12;
+    opacity: 0.95;
+    transform: translateY(-50%);
+    transition: transform 0.32s var(--ease-spring), opacity 0.3s ease-out, box-shadow 0.3s ease-out;
+  }
+  .peek img { width: 100%; height: 100%; object-fit: cover; }
+  .peek img.bg--wide { object-fit: contain; }
+  .peek.prev { left: 0; transform: translate(-58%, -50%); }
+  .peek.next { right: 0; transform: translate(58%, -50%); }
+  .peek.prev:hover, .peek.next:hover { transform: translate(0, -50%); opacity: 1; }
+  .peek[hidden], .ghost[hidden] { display: none; }
+
+  /* 灰黑渐变底片占位（首卷左侧 / 末卷右侧） */
+  .ghost {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 190px;
+    aspect-ratio: 3 / 2;
+    border-radius: 8px;
+    overflow: hidden;
+    background: linear-gradient(150deg, #191a20 0%, #0b0c10 55%, #15161c 100%);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    box-shadow: inset 0 0 30px rgba(255, 255, 255, 0.03);
+    z-index: 11;
+    pointer-events: none;
+  }
+  .ghost.prev { left: 0; transform: translate(-58%, -50%); }
+  .ghost.next { right: 0; transform: translate(58%, -50%); }
+  .ghost i {
+    position: absolute;
+    inset: 0;
+    opacity: 0.16;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='8'%3E%3Crect x='9' y='1' width='8' height='6' rx='2' fill='%23ffffff'/%3E%3C/svg%3E"); /* 齿孔暗示 */
+  }
+
+  .stage-empty {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    margin: 0;
+    color: rgba(255, 255, 255, 0.5);
+    z-index: 25;
+  }
+
+  /* —— 底部信息栏（dock）：dock 之下即是页脚（page-gallery 保留页脚） —— */
   .dock {
     flex: 0 0 auto;
     display: grid;
@@ -271,7 +368,7 @@ const first = covers[0];
     padding: 10px clamp(18px, 4vw, 44px) 12px;
     background: linear-gradient(180deg, #07080d, #05060a);
     border-top: 1px solid rgba(255, 255, 255, 0.05);
-    z-index: 59; /* 高于射线叠光层(58)：信息栏文字不被红光干扰 */
+    z-index: 2;
   }
   .meta {
     margin: 0;
@@ -314,44 +411,11 @@ const first = covers[0];
     white-space: nowrap;
   }
 
-  .stage-empty {
-    position: absolute;
-    inset: 0;
-    display: grid;
-    place-items: center;
-    margin: 0;
-    color: rgba(255, 255, 255, 0.5);
-    z-index: 59; /* 空态文字位于射线叠光层之上 */
-  }
-  /* 两侧底片条：半伸出、hover 展开（位于底片主体的垂直中线；在 .film 内 →
-     top:50% 即照片区中线，不含底部信息栏） */
-  .strip {
-    position: absolute;
-    top: 50%;
-    width: 148px;
-    aspect-ratio: 3 / 2;
-    border: 1px solid rgba(255, 255, 255, 0.22);
-    border-radius: 6px;
-    padding: 0;
-    overflow: hidden;
-    background: #111;
-    cursor: pointer;
-    z-index: 6;
-    opacity: 0.85;
-    transition: transform 0.3s var(--ease-spring), opacity 0.3s ease-out;
-  }
-  .strip img { width: 100%; height: 100%; object-fit: cover; }
-  .strip.prev { left: 0; transform: translate(-78%, -50%); }
-  .strip.next { right: 0; transform: translate(78%, -50%); }
-  .strip.prev:hover, .strip.next:hover { transform: translate(0, -50%); opacity: 1; }
-  .strip[hidden] { display: none; }
   @media (max-width: 760px) {
-    .film { --perf: 22px; }
-    .band::before { background-size: auto 100%; } /* 齿孔图随带高等比缩放 */
-    .strip { width: 96px; }
-    .strip.prev { transform: translate(-64%, -50%); }
-    .strip.next { transform: translate(64%, -50%); }
-    .strip.prev:hover, .strip.next:hover { transform: translate(0, -50%); }
+    .peek, .ghost { width: 130px; }
+    .peek.prev, .ghost.prev { transform: translate(-66%, -50%); }
+    .peek.next, .ghost.next { transform: translate(66%, -50%); }
+    .peek.prev:hover, .peek.next:hover { transform: translate(0, -50%); }
     .hint { display: none; }
     .dock { grid-template-columns: 1fr auto; }
   }

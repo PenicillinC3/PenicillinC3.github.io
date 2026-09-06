@@ -300,3 +300,20 @@ body.page-immersive .stage {
   position: fixed;
   inset: var(--nav-h) 0 0 0;
 }
+
+/* —— 画廊页（spec §27.1）：视口锁高、无滚动，保留页脚；
+     main 弹性占满顶栏与页脚之间 → 胶片画廊在其中自适应 —— */
+html:has(body.page-gallery) { height: 100%; }
+body.page-gallery {
+  height: 100%;
+  overflow: hidden;
+}
+body.page-gallery .main {
+  flex: 1 1 0;
+  min-height: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100%; /* wrap 身兼 main：显式占满整宽（曾测到非 100% 收缩宽度） */
+}
+body.page-gallery .wrap { max-width: none; height: 100%; }

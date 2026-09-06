@@ -172,7 +172,7 @@ void main() {
 </script>
 
 <style>
-  /* 容器即画布视口：overlay 盖在舞台内容上（滤色叠光），backdrop 沉在正文后 */
+  /* 容器即画布视口：overlay 叠在所在容器之上（滤色叠光），backdrop 沉在正文后 */
   .rays {
     position: fixed;
     inset: 0;
@@ -187,6 +187,10 @@ void main() {
     height: 100% !important;
     display: block;
   }
-  /* overlay（/photos 首页）：顶栏(z 60)之下、舞台内容之上 */
-  .rays--overlay { z-index: 58; }
+  /* overlay（胶片画廊 arena 内）：absolute 填满相对定位的舞台容器，盖在胶片上 */
+  .rays--overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+  }
 </style>
