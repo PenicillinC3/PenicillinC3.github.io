@@ -1,6 +1,5 @@
 ---
 import Base from '../layouts/Base.astro';
-import SearchBox from '../components/SearchBox.astro';
 ---
 <Base title="页面不存在" description="404 · 页面走丢了" noindex>
   <section class="glass nf">
@@ -9,9 +8,8 @@ import SearchBox from '../components/SearchBox.astro';
     <p class="msg">这块玻璃后面没有路 —— 也许内容被搬走了。</p>
     <div class="acts">
       <a class="btn btn--primary prism" href="/">回到首页</a>
-      <a class="btn prism" href="/search/">试试搜索</a>
+      <a class="btn prism" href="/photos/">回到摄影作品集</a>
     </div>
-    <div class="searchrow"><SearchBox /></div>
   </section>
 </Base>
 
@@ -29,5 +27,4 @@ import SearchBox from '../components/SearchBox.astro';
   }
   .msg { color: var(--text-2); margin-bottom: 26px; }
   .acts { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
-  .searchrow { max-width: 440px; margin: 0 auto; margin-top: 22px; }
 </style>

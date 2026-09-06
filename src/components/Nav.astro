@@ -1,5 +1,4 @@
 ---
-import SearchBox from './SearchBox.astro';
 import { site } from '../site.config';
 
 const path = Astro.url.pathname;
@@ -25,14 +24,9 @@ const isActive = (href: string) =>
       }
     </nav>
 
-    <div class="tools">
-      <div class="navsearch">
-        <SearchBox id="nav-q" compact />
-      </div>
-      <button class="menu-btn" type="button" data-menu-btn aria-expanded="false" aria-label="展开菜单">
-        <span></span><span></span><span></span>
-      </button>
-    </div>
+    <button class="menu-btn" type="button" data-menu-btn aria-expanded="false" aria-label="展开菜单">
+      <span></span><span></span><span></span>
+    </button>
   </div>
 
   <div class="drawer" data-menu hidden>
@@ -47,9 +41,6 @@ const isActive = (href: string) =>
         ))
       }
     </nav>
-    <div class="drawer-search">
-      <SearchBox id="drawer-q" compact />
-    </div>
   </div>
 </header>
 
@@ -211,10 +202,6 @@ const isActive = (href: string) =>
     100% { opacity: 0; transform: scale(1); }
   }
 
-  .tools { margin-left: auto; display: flex; align-items: center; gap: 8px; }
-  .navsearch { width: 190px; transition: width 0.35s var(--ease-spring); }
-  .navsearch:focus-within { width: 290px; }
-
   .menu-btn {
     display: none;
     width: 38px;
@@ -254,9 +241,8 @@ const isActive = (href: string) =>
   }
 
   @media (max-width: 880px) {
-    .links, .navsearch { display: none; }
+    .links { display: none; }
     .menu-btn { display: block; margin-left: auto; }
-    .tools { margin-left: 0; }
   }
   @media (min-width: 881px) {
     .drawer { display: none; }
