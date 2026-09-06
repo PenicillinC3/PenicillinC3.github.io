@@ -10,7 +10,8 @@
     "astro": "astro"
   },
   "dependencies": {
-    "astro": "^5.0.0"
+    "astro": "^5.0.0",
+    "fuse.js": "^7.5.0"
   },
   "devDependencies": {
     "typescript": "^5.6.0"

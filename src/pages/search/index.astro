@@ -1,0 +1,79 @@
+---
+import { getCollection } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+import SearchBox from '../../components/SearchBox.astro';
+import { stripMarkdown } from '../../lib/text';
+
+// —— 构建期：把笔记+迷思压成纯文本索引，内嵌进页面 HTML（spec §7）——
+const [allNotes, allMusings] = await Promise.all([
+  getCollection('notes'),
+  getCollection('musings'),
+]);
+const docs = [
+  ...allNotes
+    .filter((e) => !e.data.draft)
+    .map((e) => ({
+      t: e.data.title,
+      s: e.data.summary ?? stripMarkdown(e.body ?? '').slice(0, 160),
+      b: stripMarkdown(e.body ?? ''),
+      u: `/notes/${e.slug}`,
+      c: 'notes',
+    })),
+  ...allMusings
+    .filter((e) => !e.data.draft)
+    .map((e) => ({
+      t: e.data.title,
+      s: e.data.summary ?? stripMarkdown(e.body ?? '').slice(0, 160),
+      b: stripMarkdown(e.body ?? ''),
+      u: `/musings/${e.slug}`,
+      c: 'musings',
+    })),
+];
+const indexJson = JSON.stringify(docs).replace(/</g, '\\u003c');
+---
+<Base title="站内搜索" description="搜索笔记与迷思" noindex>
+  <section class="glass head">
+    <h1 class="page-title">站内搜索</h1>
+    <p class="sub">覆盖范围：个人笔记与个人迷思的标题、摘要和正文。</p>
+    <SearchBox />
+    <p class="count" data-search-count aria-live="polite"></p>
+  </section>
+
+  <ol class="results" data-search-results></ol>
+
+  <p class="hint" data-search-empty hidden>
+    换个关键词试试？搜索支持模糊匹配，中文按词组切分。
+  </p>
+</Base>
+
+{/* 实测(Task 6): is:inline script 内容不插值表达式，须 set:html；页面在 src/pages/search/ 下，import 需两级上溯 */}
+<script is:inline type="application/json" id="search-index" set:html={indexJson}></script>
+<script>
+  import '../../scripts/search.ts';
+</script>
+
+<style>
+  .head { padding: clamp(24px, 4vw, 40px) clamp(18px, 4vw, 40px); margin-bottom: clamp(20px, 3vw, 28px); }
+  .sub { margin: 0 0 20px; color: var(--text-2); font-size: 0.92rem; }
+  .count { margin: 12px 0 0; font-size: 0.88rem; color: var(--text-3); }
+  .results { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+  .results:empty { display: none; }
+  .res {
+    display: block;
+    padding: 14px 20px;
+    border-radius: var(--radius-s);
+    border: 1px solid var(--glass-border);
+    background: linear-gradient(180deg, var(--glass-hl), transparent 34%), var(--glass-bg);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+    box-shadow: var(--glass-shadow);
+    transition: transform 0.15s ease-out, border-color 0.15s ease-out;
+  }
+  .res:hover { transform: translateY(-2px); border-color: var(--accent); text-decoration: none; }
+  .res .rt { display: flex; align-items: baseline; gap: 10px; color: var(--text-1); font-size: 1.05rem; font-weight: 700; margin: 0 0 4px; }
+  .res .rt .cc { font-size: 0.72rem; font-weight: 600; color: var(--accent); letter-spacing: 0.06em; flex: none; }
+  .res .rs { margin: 0; color: var(--text-2); font-size: 0.9rem; line-height: 1.6; }
+  mark.hit { background: color-mix(in srgb, var(--accent) 26%, transparent); color: var(--text-1); border-radius: 3px; padding: 0 1px; }
+  .hint { margin-top: 18px; color: var(--text-3); font-size: 0.9rem; }
+  .hint[hidden] { display: none; }
+</style>
