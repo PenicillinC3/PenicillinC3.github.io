@@ -3,164 +3,104 @@ import { getImage } from 'astro:assets';
 import { render } from 'astro:content';
 import type { CollectionEntry } from 'astro:content';
 import Base from '../../layouts/Base.astro';
-import { photoEntries } from '../../lib/collections';
+import { seriesRolls } from '../../lib/collections';
 import { formatDate } from '../../lib/date';
 
 export async function getStaticPaths() {
-  const photos = await photoEntries();
-  return photos.map((e) => ({ params: { slug: e.slug }, props: { e, photos } }));
+  const rolls = await seriesRolls();
+  return rolls.map((r) => ({ params: { slug: r.entry.slug }, props: { roll: r } }));
 }
 
 interface Props {
-  e: CollectionEntry<'photos'>;
-  photos: CollectionEntry<'photos'>[];
+  roll: { entry: CollectionEntry<'series'>; photos: CollectionEntry<'photos'>[]; cover: CollectionEntry<'photos'> };
 }
-const { e, photos } = Astro.props;
-const { Content } = await render(e);
+const { roll } = Astro.props;
+const { entry: s, photos } = roll;
+const { Content } = await render(s);
 
-const idx = photos.findIndex((p) => p.id === e.id);
-const older = idx >= 0 ? photos[idx + 1] : undefined; // date 倒序：后一位 = 较旧
-const newer = idx > 0 ? photos[idx - 1] : undefined;
-
-const img = await getImage({
-  src: e.data.image,
-  widths: [900, 1600, 2400],
-  sizes: '(min-width: 900px) min(88vw, 1280px), 100vw',
-  format: 'webp',
-  quality: 86,
-});
-
-// 方向：构建期按图片元数据判定（spec §15.3）——横图图上文下、竖图图左文右
-const w = e.data.image.width ?? 0;
-const h = e.data.image.height ?? 0;
-const isPortrait = h > w;
-
-const c = e.data.camera;
-const cameraLine = [c?.body, c?.lens, c?.f, c?.ss, c?.iso].filter(Boolean).join(' · ');
-const facts = [
-  formatDate(e.data.date),
-  e.data.location ? `地点 · ${e.data.location}` : null,
-  e.data.album ? `相册 · ${e.data.album}` : null,
-  cameraLine ? `相机 · ${cameraLine}` : null,
-].filter((x): x is string => !!x);
+// 每张照片的展示图（卷备忘页内最大宽度）
+const imgs = await Promise.all(
+  photos.map(async (p) => {
+    const g = await getImage({
+      src: p.data.image,
+      widths: [900, 1600, 2400],
+      sizes: '(min-width: 900px) min(88vw, 1200px), 100vw',
+      format: 'webp',
+      quality: 86,
+    });
+    const isPortrait = (p.data.image.height ?? 0) > (p.data.image.width ?? 0);
+    return { p, src: g.src, srcset: g.attributes.srcset, isPortrait };
+  }),
+);
 ---
-<Base title={e.data.title} description={e.data.summary ?? `摄影作品：${e.data.title}`}>
-  <article class="detail">
+<Base title={s.data.title} description={s.data.summary ?? `摄影备忘录：${s.data.title}`}>
+  <article class="memo">
     <p class="crumb"><a href="/photos/">← 摄影作品集</a></p>
-
-    <div class:list={['pane', isPortrait && 'portrait']}>
-      <figure class="glass imgshell">
-        <img
-          src={img.src}
-          srcset={img.attributes.srcset}
-          sizes="(min-width: 900px) min(88vw, 1280px), 100vw"
-          alt={e.data.alt}
-          decoding="async"
-        />
-      </figure>
-
-      <div class="txt">
-        <h1 class="page-title">{e.data.title}</h1>
-        {facts.length > 0 && (
-          <ul class="facts">
-            {facts.map((f) => <li>{f}</li>)}
-          </ul>
-        )}
-        {e.body && e.body.trim() !== '' && (
-          <div class="prose"><Content /></div>
-        )}
-      </div>
+    <header class="glass memohead">
+      <h1 class="page-title">{s.data.title}</h1>
+      <p class="meta">
+        {formatDate(s.data.date)}
+        {s.data.location && <span class="sep">·</span>}
+        {s.data.location}
+        <span class="sep">·</span>共 {photos.length} 张
+      </p>
+    </header>
+    {s.body && s.body.trim() !== '' && (
+      <div class="prose memobody"><Content /></div>
+    )}
+    <div class="photos">
+      {imgs.map(({ p, src, srcset, isPortrait }) => (
+        <figure class:list={['glass shot', isPortrait && 'portrait']}>
+          <img src={src} srcset={srcset} alt={p.data.alt} loading="lazy" decoding="async"
+               sizes="(min-width: 900px) min(88vw, 1200px), 100vw" />
+          <figcaption>
+            <h2 class="shot-title">{p.data.title}</h2>
+            {p.body && p.body.trim() !== '' && <div class="prose shot-body"><p>{p.body}</p></div>}
+          </figcaption>
+        </figure>
+      ))}
     </div>
-
-    <nav class="pager" aria-label="照片前后篇">
-      {
-        newer && (
-          <a class="pager-link" href={`/photos/${newer.slug}/`}>
-            <span class="dir">较新一篇</span>
-            <span class="t">{newer.data.title}</span>
-          </a>
-        )
-      }
-      {
-        older && (
-          <a class="pager-link next" href={`/photos/${older.slug}/`}>
-            <span class="dir">较旧一篇</span>
-            <span class="t">{older.data.title}</span>
-          </a>
-        )
-      }
-    </nav>
   </article>
 </Base>
 
 <style>
-  .detail { display: grid; gap: 20px; }
+  .memo { display: grid; gap: clamp(22px, 3vw, 30px); }
   .crumb { margin: 0; font-size: 0.88rem; }
   .crumb a { color: var(--text-2); }
   .crumb a:hover { color: var(--accent); }
+  .memohead { padding: clamp(20px, 3.6vw, 34px) clamp(18px, 3.6vw, 36px); }
+  .meta { margin: 6px 0 0; color: var(--text-3); font-size: 0.92rem; }
+  .sep { padding: 0 6px; opacity: 0.6; }
+  .memobody { margin-top: 2px; }
+  .photos { display: grid; gap: clamp(26px, 5vw, 44px); }
 
-  .pane { display: grid; gap: clamp(20px, 3vw, 32px); }
-  .portrait {
-    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
-    align-items: start;
-  }
-  .imgshell {
-    margin: 0; /* figure UA 边距重置 */
+  /* 横版：照片独占一行，正文在下方 */
+  .shot {
+    margin: 0;
     padding: 10px;
     border-radius: calc(var(--radius-m) + 6px);
-    display: flex;
-    justify-content: center;
-    background: var(--glass-bg);
+    display: grid;
+    gap: 14px;
   }
-  .imgshell img {
-    display: block;
+  .shot img {
     width: 100%;
     height: auto;
     max-height: 76vh;
     object-fit: contain;
     border-radius: calc(var(--radius-m) - 4px);
   }
-  .txt { min-width: 0; }
-  .facts { list-style: none; margin: 0 0 18px; padding: 0; display: grid; gap: 6px; }
-  .facts li {
-    color: var(--text-2);
-    font-size: 0.9rem;
-    padding: 7px 14px;
-    border: 1px solid var(--glass-border);
-    border-radius: var(--radius-s);
-    background: color-mix(in srgb, var(--text-1) 3%, transparent);
-    width: fit-content;
-  }
-  .prose { margin-top: 6px; }
+  .shot figcaption { padding: 0 6px 4px; }
+  .shot-title { margin: 0 0 8px; font-size: 1.15rem; }
+  .shot-body { color: var(--text-2); }
 
-  .pager {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    margin-top: 10px;
-    flex-wrap: wrap;
+  /* 竖版：左图右文 */
+  .shot.portrait {
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    align-items: start;
   }
-  .pager-link {
-    display: grid;
-    gap: 2px;
-    padding: 12px 18px;
-    min-width: min(100%, 260px);
-    border: 1px solid var(--glass-border);
-    border-radius: var(--radius-m);
-    background: var(--glass-bg);
-    box-shadow: var(--glass-shadow);
-    transition: transform var(--t-fast) ease-out, box-shadow var(--t-fast) ease-out;
-  }
-  .pager-link:hover {
-    transform: translateY(var(--card-hover));
-    box-shadow: var(--glass-shadow-lg);
-    text-decoration: none;
-  }
-  .pager-link.next { margin-left: auto; text-align: right; }
-  .dir { font-size: 0.78rem; color: var(--text-3); }
-  .t { color: var(--text-1); font-weight: 600; }
+  .shot.portrait figcaption { padding-top: 6px; }
 
   @media (max-width: 879px) {
-    .portrait { grid-template-columns: 1fr; }
+    .shot.portrait { grid-template-columns: 1fr; }
   }
 </style>
