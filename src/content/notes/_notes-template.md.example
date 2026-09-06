@@ -1,9 +1,49 @@
 ---
-title: 文章标题（必填）
-date: 2026-09-06
-summary: 列表卡片上的一句话摘要（可留空，留空自动取正文开头）
-tags: [标签一, 标签二]
-draft: true
+# —— 上方 frontmatter（YAML）：两个 --- 之间的才是元信息，正文在下面 ——
+# 必填 · 标题：列表卡片与详情页显示
+title: 一篇示例笔记
+# 必填 · 日期 YYYY-MM-DD（列表按此倒序、按年分组；裸日期即可，勿加引号）
+date: 2026-09-07
+# 可选 · 摘要：不填则自动取正文开头 150 字上卡片
+summary: 列表卡片上的一句话摘要。
+# 可选 · 标签（中文无需引号，逗号分隔）：显示在卡片上，并参与笔记页顶部标签过滤
+tags: [示例, CSS]
+# 可选 · 草稿：写完后删掉本行或改为 false 才会在正式构建出现；
+#       本地 npm run dev 预览时 draft 内容仍可见（构建期自动排除）
+draft: false
 ---
-文件名 = URL slug，用英文 kebab-case、不要带日期（如 my-first-post.md）。
-正文用 Markdown 书写。写完把 draft 改为 false（或删掉该行）才会出现在站点上。
+
+# 正文从这里开始（Markdown，写你真正的内容）
+
+> 把本文件复制到 `src/content/notes/` 下，文件名改为英文 kebab-case
+> （如 `my-first-note.md`）即可 —— 文件名 = 页面网址 `/notes/my-first-note/`，
+> 不要带日期、不要用中文、不要留空格。写完打开 `npm run dev` 预览，
+> 满意后 push 即自动部署（frontmatter 写错会在构建时报错，属正常拦截）。
+
+## 常用排版
+
+普通段落、**加粗**、*斜体*、~~删除线~~、`行内代码`、[链接](https://example.com)。
+
+- 无序列表项
+1. 有序列表项
+
+| 表头 | 表头 |
+| ---- | ---- |
+| 单元格 | 单元格 |
+
+## 代码块（prism 高亮，注释自动斜体）
+
+```ts
+// 英文注释走 JetBrains 斜体；中文注释逐字回退斜体 Maple（勿改回 shiki）
+const greeting = '你好，PenicillinC3';
+```
+
+## 插图
+
+图片放与本文同目录（`src/content/notes/`），正文用相对路径引用，
+构建期会自动转响应式格式；SVG 直发不优化：
+
+![图片说明](./img-name.png)
+
+> 若想引用某篇 `photos` 的照片或站点根资源，用 `/fonts/...` 这类
+> `public/` 绝对路径（详见 README 内容维护指南）。
