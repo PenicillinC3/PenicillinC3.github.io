@@ -230,11 +230,11 @@ const n = covers.length;
   }
   .bg--wide { object-fit: contain; }
   .frame:hover .bg { filter: brightness(1.06); }
-  /* 纯灰占位（无作品的一侧）：不透明深灰（spec §44 加深），无点击 */
+  /* 纯灰占位（无作品的一侧）：不透明深灰（spec §44→§45 两度加深），无点击 */
   .frame--ghost {
     pointer-events: none;
     cursor: default;
-    background: #72777f;
+    background: #4f545c;
     border-color: rgba(255, 255, 255, 0.06);
     box-shadow: none;
   }
