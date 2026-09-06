@@ -17,21 +17,21 @@ const attrs = href
 ---
 {
   href ? (
-    <a class="glass photocard" {href} aria-label={`查看摄影作品集：${title}`}>
+    <a class="glass photocard prism" {href} aria-label={`查看摄影作品集：${title}`}>
       <span class="frame">
         <img src={img.src} srcset={img.srcset} alt={alt} loading="lazy" decoding="async" />
         <span class="cap"><strong>{title}</strong><em>{location ?? date}</em></span>
       </span>
     </a>
   ) : index !== undefined ? (
-    <button class="glass photocard" {...attrs} aria-label={`查看大图：${title}`}>
+    <button class="glass photocard prism" {...attrs} aria-label={`查看大图：${title}`}>
       <span class="frame">
         <img src={img.src} srcset={img.srcset} alt={alt} loading="lazy" decoding="async" />
         <span class="cap"><strong>{title}</strong><em>{location ?? date}</em></span>
       </span>
     </button>
   ) : (
-    <figure class="glass photocard">
+    <figure class="glass photocard prism">
       <span class="frame">
         <img src={img.src} srcset={img.srcset} alt={alt} loading="lazy" decoding="async" />
         <figcaption class="cap"><strong>{title}</strong><em>{location ?? date}</em></figcaption>
