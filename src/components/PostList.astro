@@ -103,8 +103,8 @@ const groups = groupByYear
   .yr { font-size: 1rem; color: var(--text-3); font-weight: 600; margin: 0 0 12px; }
   .pcols {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); /* 与摄影网格同宽基线 */
-    gap: clamp(14px, 2vw, 20px);
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 460px), 1fr)); /* 桌面双栏大卡（用户：电脑屏太窄） */
+    gap: clamp(16px, 2.4vw, 26px);
   }
   .empty { padding: clamp(28px, 6vw, 60px); text-align: center; color: var(--text-2); }
 </style>
