@@ -10,7 +10,7 @@ const isActive = (href: string) =>
     <a class="brand" href="/" data-nav-item-home>{site.title}</a>
 
     <nav class="links" data-nav aria-label="主导航">
-      <span class="slider" data-slider aria-hidden="true"></span>
+      <span class="slider" data-slider aria-hidden="true" transition:persist></span>
       {
         site.nav.map((n) => (
           <a
@@ -45,44 +45,62 @@ const isActive = (href: string) =>
 </header>
 
 <script>
-  // —— 水滴滑块：量测当前栏目并弹性定位（View Transitions 保留旧 inline 值 →
-  //    页面切换后更新 left/width 即产生弹性滑动，见 spec §14.4/14.7） ——
+  // —— 水滴滑块：跨页存活 + 弹性位移（spec §14.4）——
+  // 滑块带 transition:persist：View Transitions 换页时节点不重建、保留当前位置与
+  // 宽度 → 量测新栏目后由 CSS 过渡完成真正的液态滑动（此前重建节点只做「着陆」）。
+  // 垂直居中在 CSS 侧 translateY(-50%)；JS 只写 --sx（历史坑：直接盖 style.transform
+  // 会挤掉 -50%，滑块沿 top:50% 顶边下挂半身）。
   const nav = document.querySelector<HTMLElement>('[data-nav]');
   const slider = document.querySelector<HTMLElement>('[data-slider]');
 
-  function posSlider(animate: boolean): void {
+  function placeSlider(animate: boolean, retry = 0): void {
     if (!nav || !slider) return;
     const act = nav.querySelector<HTMLElement>('[data-nav-item].is-active');
     if (!act) {
-      slider.style.opacity = '0';
+      slider.style.opacity = '0'; // 首页品牌/404：无栏目高亮 → 隐藏
       return;
     }
-    const w = act.offsetWidth;
-    const l = act.offsetLeft;
-    if (!animate) {
-      slider.style.transition = 'none';
-      slider.style.width = `${w}px`;
-      slider.style.transform = `translateX(${l}px)`;
-      // 强制回流后恢复过渡
-      void slider.offsetWidth;
-      slider.style.transition = '';
-    } else {
-      slider.style.width = `${w}px`;
-      slider.style.transform = `translateX(${l}px)`;
+    if (act.offsetWidth === 0) {
+      // 换页瞬间布局未就绪 → 逐帧重试（最多 ~12 帧 ≈ 200ms）
+      if (retry < 12) requestAnimationFrame(() => placeSlider(animate, retry + 1));
+      return;
     }
+    const x = act.offsetLeft;
+    const w = act.offsetWidth;
+    const raw = slider.style.getPropertyValue('--sx').trim();
+    const fromX = raw ? parseFloat(raw) || 0 : 0;
+    const sliding = Math.abs(x - fromX) > 2; // 真跨栏位移才触发着陆脉冲
+    if (!animate) slider.style.transition = 'none';
+    slider.style.setProperty('--sx', `${x}px`);
+    slider.style.width = `${w}px`;
     slider.style.opacity = '1';
-    slider.classList.remove('land');
-    void slider.offsetWidth;
-    slider.classList.add('land');
+    if (!animate) {
+      void slider.offsetWidth; // 强制回流后恢复过渡（防回跳）
+      slider.style.transition = '';
+    }
+    if (animate && sliding) {
+      slider.classList.remove('land');
+      void slider.offsetWidth;
+      slider.classList.add('land');
+    }
   }
 
-  window.addEventListener('astro:page-load', () => posSlider(true));
-  let t: number | undefined;
+  // 首次落位（无动画）。仅当滑块没有内联 --sx（全新加载）才执行：
+  // 换页时 persist 保留了旧位置，由随后的 astro:page-load 从旧位弹簧滑到新栏，
+  // 若这里落位会把滑动掐成瞬移。
+  if (slider?.style.getPropertyValue('--sx').trim() === '') placeSlider(false);
+  window.addEventListener('astro:page-load', () => placeSlider(true));
+  let rsT: number | undefined;
   window.addEventListener('resize', () => {
-    window.clearTimeout(t);
-    t = window.setTimeout(() => posSlider(false), 150);
+    window.clearTimeout(rsT);
+    rsT = window.setTimeout(() => placeSlider(false), 150);
   });
-  try { document.fonts?.ready?.then(() => posSlider(false)); } catch { /* 忽略 */ }
+  // 系统字体首次生效可能改动测量 → 仅在会话首次布局时做一次校正（后续字体已缓存，
+  // 每次导航都校正会把跨页滑动掐成瞬移）
+  if (!window.__vibeNavInit) {
+    window.__vibeNavInit = true;
+    try { document.fonts?.ready?.then(() => placeSlider(false)); } catch { /* 忽略 */ }
+  }
 
   // —— 移动端抽屉 ——
   const menuBtn = document.querySelector<HTMLButtonElement>('[data-menu-btn]');
@@ -167,13 +185,14 @@ const isActive = (href: string) =>
   .navlink:hover { color: var(--text-1); text-decoration: none; }
   .navlink.is-active { color: var(--text-1); font-weight: 650; }
 
-  /* 水滴滑块（悬浮玻璃指示片） */
+  /* 水滴滑块（悬浮玻璃指示片）：垂直居中常驻 CSS（translateY(-50%)），
+     横向位移由 JS 写 --sx —— 二者合成避免 JS 覆盖挤掉居中（历史坑） */
   .slider {
     position: absolute;
     top: 50%;
     left: 0;
     height: 34px;
-    transform: translateY(-50%);
+    transform: translate(var(--sx, 0px), -50%);
     border-radius: var(--radius-pill);
     background:
       radial-gradient(130% 70% at 50% 0%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0) 55%),
