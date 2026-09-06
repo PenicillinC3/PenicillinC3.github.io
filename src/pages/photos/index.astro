@@ -27,21 +27,31 @@ const first = covers[0];
     {
       first ? (
         <>
-          {/* 首帧服务端直出：不依赖 JS 也能看到第一张照片与时间/地点 */}
-          <img class="bg" data-bg src={first.big.src} srcset={first.big.srcset ?? undefined}
-               alt={first.title} draggable="false" style="opacity: 1" />
-          <div class="vignette" aria-hidden="true"></div>
-          <div class="redlamp" aria-hidden="true"></div>
+          {/* 135 底片主体：齿孔带上下夹住照片区（spec §22）——
+             首帧服务端直出：不依赖 JS 也能看到第一张照片与时间/地点 */}
+          <div class="film" data-film>
+            <div class="farea" data-farea>
+              <img class="bg" data-bg src={first.big.src} srcset={first.big.srcset ?? undefined}
+                   alt={first.title} draggable="false" style="opacity: 1" />
+              <div class="vignette" aria-hidden="true"></div>
+              <div class="redlamp" aria-hidden="true"></div>
+            </div>
+            <div class="band top" aria-hidden="true"></div>
+            <div class="band bot" aria-hidden="true"></div>
 
-          <p class="meta" data-meta>
-            <span class="ts" data-ts>{first.date}</span>
-            <span class="loc" data-loc style={`opacity:${first.location ? 1 : 0.35}`}>{first.location || '未标注地点'}</span>
-          </p>
-          <p class="count" data-count>{first.count} 张</p>
-          <p class="hint">点击画面进入备忘录 · 左右两侧底片切换 · ←/→ 键</p>
+            <button class="strip prev prism" data-prev aria-label="上一卷" hidden><img data-prev-img alt="" loading="lazy" /></button>
+            <button class="strip next prism" data-next aria-label="下一卷" hidden><img data-next-img alt="" loading="lazy" /></button>
+          </div>
 
-          <button class="strip prev prism" data-prev aria-label="上一卷" hidden><img data-prev-img alt="" loading="lazy" /></button>
-          <button class="strip next prism" data-next aria-label="下一卷" hidden><img data-next-img alt="" loading="lazy" /></button>
+          {/* 底部信息栏（贴于底片下方，齿孔带不遮挡） */}
+          <div class="dock">
+            <p class="meta" data-meta>
+              <span class="ts" data-ts>{first.date}</span>
+              <span class="loc" data-loc style={`opacity:${first.location ? 1 : 0.35}`}>{first.location || '未标注地点'}</span>
+            </p>
+            <p class="hint">点击画面进入备忘录 · 两侧底片切换 · ←/→ 键</p>
+            <p class="count" data-count>{first.count} 张</p>
+          </div>
         </>
       ) : (
         <p class="stage-empty">还没有胶卷 —— 在 src/content/series/ 放第一卷吧。</p>
@@ -71,22 +81,16 @@ const first = covers[0];
     let i = 0;
     // 请求令牌：render 每次自增，过期 Image onload 不再覆盖 bg（快速切换竞态）
     let req = 0;
+    // 进出场定时器：连续按键时取消未完成的换片阶段，避免旧图动画覆盖新图
+    let job: number | undefined;
+    const OUT = 140;   // 旧图线性滑出时长
+    const IN = 480;    // 新图线性滑入时长
 
-    const render = () => {
+    const render = (d: number) => {
       const c = covers[i];
       const my = ++req;
-      bg.alt = c.title;
-      const same = bg.getAttribute('src') === c.big.src; // 与 SSR 首帧同图：不淡出避免闪烁
-      if (!same) bg.style.opacity = '0';
-      // 预加载完成后淡入（同图时跳过淡出/onload 仍更新元数据以外无副作用）
-      const img = new Image();
-      img.onload = () => {
-        if (my !== req) return; // 已被更新的 render 覆盖 → 丢弃过期加载
-        bg.src = img.src;
-        bg.srcset = c.big.srcset ?? '';
-        bg.style.opacity = '1';
-      };
-      img.src = c.big.src;
+      window.clearTimeout(job);
+
       ts.textContent = c.date;
       loc.textContent = c.location || '未标注地点';
       loc.style.opacity = c.location ? '1' : '0.35';
@@ -97,9 +101,59 @@ const first = covers[0];
       nextBtn.hidden = !n;
       if (p) prevImg.src = p.small;
       if (n) nextImg.src = n.small;
+
+      const same = bg.getAttribute('src') === c.big.src; // 与 SSR 首帧同图：不动画防闪烁
+      if (same) {
+        bg.classList.remove('in-l', 'in-r');
+        bg.style.opacity = '1';
+        bg.style.transform = '';
+        bg.style.transition = '';
+        return;
+      }
+      // 线性换卷（spec §22）：两段式——旧图先沿前进方向滑出；
+      // 清掉上一轮入场残留（类在动画中会盖过内联透明度），从整图开始出片
+      bg.classList.remove('in-l', 'in-r');
+      bg.style.transition = 'none';
+      bg.style.opacity = '1';
+      bg.style.transform = '';
+      void bg.offsetWidth;
+      bg.style.transition = `opacity ${OUT}ms linear, transform ${OUT}ms linear`;
+      bg.style.transform = d > 0 ? 'translateX(-26px)' : 'translateX(26px)';
+      bg.style.opacity = '0';
+      const t0 = performance.now();
+
+      const img = new Image();
+      img.onload = () => {
+        if (my !== req) return; // 已被更新的 render 覆盖 → 丢弃过期加载
+        // 缓存命中时也等旧图滑满 OUT 再换源，保证先后次序
+        const wait = Math.max(0, OUT - (performance.now() - t0));
+        job = window.setTimeout(() => {
+          if (my !== req) return;
+          bg.style.transition = 'none';
+          bg.style.opacity = '0';
+          bg.style.transform = d > 0 ? 'translateX(26px)' : 'translateX(-26px)';
+          bg.src = img.src;
+          if (c.big.srcset) bg.setAttribute('srcset', c.big.srcset);
+          else bg.removeAttribute('srcset');
+          void bg.offsetWidth; // 强制回流：确保从新起点开始 keyframes
+          bg.classList.add(d > 0 ? 'in-r' : 'in-l');
+          job = window.setTimeout(() => {
+            if (my !== req) return;
+            bg.classList.remove('in-l', 'in-r');
+            bg.style.opacity = '1';
+            bg.style.transform = '';
+            bg.style.transition = '';
+          }, IN + 60);
+        }, wait);
+      };
+      img.src = c.big.src;
     };
 
-    const go = (d: number) => { i = (i + d + covers.length) % covers.length; render(); };
+    const go = (d: number) => {
+      const ni = (i + d + covers.length) % covers.length;
+      i = ni;
+      render(d);
+    };
     const enter = () => { window.location.href = `/photos/${covers[i].slug}/`; };
 
     prevBtn.addEventListener('click', (e) => { e.stopPropagation(); go(-1); stage.focus({ preventScroll: true }); });
@@ -113,16 +167,39 @@ const first = covers[0];
       else if (e.key === 'ArrowRight') go(1);
       else if (e.key === 'Enter') enter();
     });
-    render();
+    render(0); // 首帧同步元数据/侧条（与 SSR 同图 → same 分支，仅刷新文案）
   }
 </script>
 
 <style>
+  /* 沉浸舞台（spec §21.2/§22）：base.css 已置 fixed + inset: var(--nav-h) 0 0 0
+     （dvh 塌陷历史坑：勿改回 height 计算）。这里只补内部布局：
+     列布局：上=135 底片主体（flex 撑满），下=信息栏（齿孔带不遮挡二者） */
   .stage {
-    position: relative;
-    height: calc(100dvh - var(--nav-h));
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
     outline: none;
+    background: #05060a;
+  }
+
+  /* —— 135 底片主体（spec §22.1）：横铺全宽，上/下齿孔带，黑胶卷底，红光泛光 —— */
+  .film {
+    --perf: 30px; /* 齿孔带高（farea 的上/下内缩与之联动） */
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    background: #0b0c11;
+    box-shadow:
+      0 0 70px -18px rgba(255, 64, 64, 0.32),
+      0 0 160px -32px rgba(255, 64, 64, 0.3); /* 周围泛光 */
+    z-index: 1;
+  }
+  /* 照片区：被上下齿孔带夹在中间，横向铺满 */
+  .farea {
+    position: absolute;
+    inset: var(--perf) 0;
+    overflow: hidden;
     background: #05060a;
   }
   .bg {
@@ -132,65 +209,107 @@ const first = covers[0];
     height: 100%;
     object-fit: cover;
     opacity: 0;
-    transition: opacity 0.35s ease-out;
+    will-change: transform, opacity;
   }
+  /* 线性换卷：新图自前进方向滑入（配合 JS 两段式，不透明度亦为线性） */
+  .bg.in-l, .bg.in-r {
+    animation-duration: 480ms;
+    animation-timing-function: linear;
+    animation-fill-mode: both;
+  }
+  .bg.in-r { animation-name: film-in-r; }
+  .bg.in-l { animation-name: film-in-l; }
+  @keyframes film-in-r { from { opacity: 0; transform: translateX(26px); } to { opacity: 1; transform: none; } }
+  @keyframes film-in-l { from { opacity: 0; transform: translateX(-26px); } to { opacity: 1; transform: none; } }
+
+  /* 黑场压暗 + 红光氛围（照片区内） */
   .vignette {
     position: absolute;
     inset: 0;
     pointer-events: none;
     background:
-      radial-gradient(120% 90% at 50% 40%, transparent 55%, rgba(0, 0, 0, 0.55) 100%);
+      radial-gradient(120% 90% at 50% 40%, transparent 58%, rgba(0, 0, 0, 0.5) 100%);
   }
   .redlamp {
     position: absolute;
     inset: 0;
     pointer-events: none;
-    background: radial-gradient(90% 60% at 80% 100%, rgba(255, 70, 70, 0.16), transparent 60%);
+    background: radial-gradient(90% 60% at 85% 100%, rgba(255, 70, 70, 0.15), transparent 60%);
+  }
+
+  /* —— 齿孔带（spec §22.2）：黑色胶卷边，孔洞比胶卷底更黑，露出负片感 —— */
+  .band {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: var(--perf, 30px);
+    background: #14151b;
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.8);
+    z-index: 4;
+  }
+  .band.top { top: 0; }
+  .band.bot { bottom: 0; }
+  .band::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='34' height='30'%3E%3Crect x='11' y='7' width='12' height='16' rx='4' fill='%23030408'/%3E%3C/svg%3E");
+  }
+
+  /* —— 底部信息栏（spec §22.3）：独立于底片之下，不遮挡任何内容 —— */
+  .dock {
+    flex: 0 0 auto;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 10px;
+    padding: 10px clamp(18px, 4vw, 44px) 12px;
+    background: linear-gradient(180deg, #07080d, #05060a);
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    z-index: 2;
   }
   .meta {
-    position: absolute;
-    left: clamp(18px, 4vw, 44px);
-    bottom: clamp(20px, 5vh, 52px);
     margin: 0;
-    display: grid;
-    gap: 6px;
-    z-index: 2;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 14px;
+    justify-self: start;
+    min-width: 0;
   }
   .ts {
     color: #fff;
-    font-size: clamp(1.2rem, 3vw, 2rem);
+    font-size: clamp(0.95rem, 1.8vw, 1.25rem);
     font-weight: 700;
     letter-spacing: 0.14em;
     text-shadow: 0 0 6px rgba(255, 77, 77, 0.9), 0 0 18px rgba(255, 77, 77, 0.55);
+    white-space: nowrap;
   }
   .loc {
     color: #fff;
-    font-size: clamp(0.9rem, 1.8vw, 1.15rem);
+    font-size: clamp(0.8rem, 1.4vw, 1rem);
     letter-spacing: 0.22em;
     text-shadow: 0 0 6px rgba(255, 77, 77, 0.75), 0 0 14px rgba(255, 77, 77, 0.4);
+    white-space: nowrap;
   }
   .count {
-    position: absolute;
-    right: clamp(18px, 4vw, 44px);
-    bottom: clamp(20px, 5vh, 52px);
     margin: 0;
+    justify-self: end;
     color: rgba(255, 255, 255, 0.55);
     font-size: 0.85rem;
     letter-spacing: 0.3em;
-    z-index: 2;
+    white-space: nowrap;
   }
   .hint {
-    position: absolute;
-    left: 50%;
-    bottom: 14px;
-    transform: translateX(-50%);
     margin: 0;
+    justify-self: center;
     color: rgba(255, 255, 255, 0.32);
     font-size: 0.78rem;
     letter-spacing: 0.08em;
     white-space: nowrap;
-    z-index: 2;
   }
+
   .stage-empty {
     position: absolute;
     inset: 0;
@@ -199,11 +318,11 @@ const first = covers[0];
     margin: 0;
     color: rgba(255, 255, 255, 0.5);
   }
-  /* 两侧底片条：半伸出、hover 展开 */
+  /* 两侧底片条：半伸出、hover 展开（位于底片主体的垂直中线；在 .film 内 →
+     top:50% 即照片区中线，不含底部信息栏） */
   .strip {
     position: absolute;
     top: 50%;
-    transform: translateY(-50%);
     width: 148px;
     aspect-ratio: 3 / 2;
     border: 1px solid rgba(255, 255, 255, 0.22);
@@ -212,7 +331,7 @@ const first = covers[0];
     overflow: hidden;
     background: #111;
     cursor: pointer;
-    z-index: 3;
+    z-index: 6;
     opacity: 0.85;
     transition: transform 0.3s var(--ease-spring), opacity 0.3s ease-out;
   }
@@ -222,10 +341,13 @@ const first = covers[0];
   .strip.prev:hover, .strip.next:hover { transform: translate(0, -50%); opacity: 1; }
   .strip[hidden] { display: none; }
   @media (max-width: 760px) {
-    .strip { width: 96px; transform: translate(-64%, -50%); }
+    .film { --perf: 22px; }
+    .band::before { background-size: auto 100%; } /* 齿孔图随带高等比缩放 */
+    .strip { width: 96px; }
+    .strip.prev { transform: translate(-64%, -50%); }
     .strip.next { transform: translate(64%, -50%); }
-    .strip.prev:hover { transform: translate(0, -50%); }
-    .strip.next:hover { transform: translate(0, -50%); }
+    .strip.prev:hover, .strip.next:hover { transform: translate(0, -50%); }
     .hint { display: none; }
+    .dock { grid-template-columns: 1fr auto; }
   }
 </style>
