@@ -41,11 +41,7 @@ npm run preview # 本地预览构建产物
 
 ## 部署（GitHub Pages）
 
-1. 在 GitHub 建**同名主页仓库** `<用户名>.github.io`（要部署成该域名，仓库名必须等于用户名）；
-2. 把仓库地址替换到 `astro.config.mjs`：`site: 'https://USERNAME.github.io'`（把 `USERNAME` 换掉，并同步替换 `src/content/projects/this-blog.md` 里的示例 repo 链接）；
-3. `git remote add origin https://github.com/<用户名>/<用户名>.github.io.git && git push -u origin main`；
-4. 仓库 Settings → Pages → **Source 选 “GitHub Actions”**（首次部署后生效）；
-5. 以后每次推送 `main`，Actions 自动 `astro build` 并发布，无需任何手动步骤。
+已上线：仓库 `PenicillinC3/PenicillinC3.github.io`。每次推送 `main`，Actions（`.github/workflows/deploy.yml`）自动 `astro build` 并发布到 Pages，无需任何手动步骤。
 
 ## 目录速览
 
