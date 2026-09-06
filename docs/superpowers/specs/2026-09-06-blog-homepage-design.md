@@ -369,3 +369,10 @@ src/content/
 1. **品牌 = PenicillinC3**：`site.config.ts` title 改 PenicillinC3（导航站名/欢迎中央大字/`<title>`/页脚版权随之统一）；删除废弃字段 `intro`/`heroNote`（「写字 · 拍照 · 收藏」副标随 heroNote 一并删除）。站名属「上线占位」已完成项。
 2. **页脚仅首页**：Base 按 `Astro.url.pathname === '/'` 渲染 `<Footer/>`——除首页外**所有页面移除最下方栏**（含摄影备忘页；§27「摄影页页脚可见」随用户最新要求作废）。首页页脚删「回到首页」链接（已无他页可回），版权行 = `© {year} PenicillinC3 Via Claude Code`。
 3. **欢迎页液态玻璃圆**（参考 FluidGlass lens 的 CSS 近似）：中央站名右上角锚一枚 124px 折射球 `.orb`——radial 高光 + `backdrop-filter: blur(10px) saturate(1.8)` 玻璃折射 + 内外影 + 边缘红/青色差；**小范围跟随鼠标**：pointermove 相对锚点 ±30px 内取 `(pointer−锚)×0.05`，rAF 指数阻尼 τ≈110ms 漂移。⚠ 坐标坑：orb 定位上下文是 `.stack`（relative），锚点必须换算为 stack 相对坐标（`rect − hostRect`）——曾用视口坐标导致整球错位一个容器偏移。
+
+## 34. 首页液态玻璃镜头（2026-09-07，用户选定全真移植；§33.3 的 CSS orb 作废删除）
+
+1. **栈与依赖**：@astrojs/react 3.6 + react 18.3 + three 0.169 + @react-three/fiber 8.17 + @react-three/drei 9.114 + maath 0.10（`--legacy-peer-deps` 安装：drei 的 react-native optional peer 会拉扯 @types/react@19 冲突）。全站唯一框架岛，仅首页加载（独立 chunk，构建期 chunk 体积警告属预期）。
+2. **组件 `src/components/LensGlass.tsx`**：FluidGlass（react-bits）思路的独立实现——`MeshTransmissionMaterial`（ior 1.15 / thickness 3.5 / chromaticAberration 0.1 / anisotropy 0.02 / distortion 0.15 / temporalDistortion 0.08）椭球镜头（sphere 压扁 z0.5 → 双凸折射）+ **画布内自绘背景**（浅底平面 + XZ gridHelper 正对相机 + 三枚低饱和色斑）供折射采样。⚠ 镜头折射的是 WebGL 场景内容，**不传输页面 DOM**（与参考 demo 一致）。
+3. **跟随**：窗口级 pointermove → 容器相对坐标（clamp ±1.4 × 0.9 系数），`easing.damp3` 位置 τ0.18 / `dampE` 微旋 τ0.22；呼吸微缩放 ±1.2%；镜头直径 = min(视口宽,高)×0.55（前端 z 压扁 0.5）。
+4. **DOM**：`.lens-slot` absolute 于 `.stack` 右上（top -11vh / right -6vw，min 46vh/60vw×34vh 封顶 560×420），pointer-events none（不拦页面交互），<900px 隐藏；`client:visible` 水合、data-ready 后淡入 0.7s。调参入口：槽位 CSS、`Lens` 内 s 与 damp、页面传入 ior/thickness/chromaticAberration/follow。
