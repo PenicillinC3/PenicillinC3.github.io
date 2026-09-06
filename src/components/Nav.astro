@@ -109,6 +109,16 @@ const isActive = (href: string) =>
       menuBtn?.focus();
     }
   });
+  // 跨断点：抽屉打开时窗口拉宽过 880px → 关闭抽屉并释放滚动锁
+  const mq = matchMedia('(min-width: 881px)');
+  const onWide = () => {
+    if (drawer && !drawer.hidden && mq.matches) {
+      drawer.hidden = true;
+      menuBtn?.setAttribute('aria-expanded', 'false');
+      document.body.style.overflow = '';
+    }
+  };
+  mq.addEventListener('change', onWide);
 </script>
 
 <style>
@@ -191,6 +201,7 @@ const isActive = (href: string) =>
     inset: 0;
     border-radius: inherit;
     background: radial-gradient(80% 60% at 32% 0%, rgba(255, 255, 255, 0.9), transparent 60%);
+    opacity: 0; /* 脉冲为瞬态增益：结束后回到隐形（防 0→1 跳变残留） */
     animation: droplet-pulse 0.55s var(--ease-spring);
     pointer-events: none;
   }
