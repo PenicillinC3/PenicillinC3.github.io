@@ -99,8 +99,9 @@ const n = covers.length;
       const W = arena.clientWidth;
       const H = arena.clientHeight;
       const bh = 22;
-      // 胶片持续放大（spec §38→§41）：宽限 →62%、封顶 1180px（H 余量 196 配合字幕）
-      const fw = Math.min(W * 0.62, (H - 196) * 1.5, 1180);
+      // 胶片再扩一档（spec §50）：宽限 →66%、封顶 1300px；H 余量 196→176
+      // （帧上下留白 = 余量/2：176 → 字幕上缘距 arena 顶 ~12px，属最小安全余量）
+      const fw = Math.min(W * 0.66, (H - 176) * 1.5, 1300);
       const fh = fw / 1.5;
       // 帧距改小（spec §43）：显式 gap = 侧廊 − 邻卷露出量；露出量抬到 150–220px
       // （间距与露出的总预算 = 侧廊宽度，帧越近邻卷自然露越多）
@@ -230,14 +231,17 @@ const n = covers.length;
   }
   .bg--wide { object-fit: contain; }
   .frame:hover .bg { filter: brightness(1.06); }
-  /* 纯灰占位（无作品的一侧）：不透明深灰（spec §44→§45 两度加深；§46–§48
-     玻璃样式试错后 §49 回退至此），无点击 */
+  /* 通透玻璃占位（无作品的一侧，spec §50，恢复 §47/§48 配方）：无模糊、
+     高透 —— 极淡白渐变勾勒面板，黑底/红光直接透出；亮描边定轮廓，不响应点击 */
   .frame--ghost {
     pointer-events: none;
     cursor: default;
-    background: #4f545c;
-    border-color: rgba(255, 255, 255, 0.06);
-    box-shadow: none;
+    background: linear-gradient(165deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.015) 50%, rgba(255, 255, 255, 0.035) 100%);
+    border-color: rgba(255, 255, 255, 0.3);
+    box-shadow:
+      inset 1px 1px 0 rgba(255, 255, 255, 0.24),
+      inset -1px -1px 0 rgba(0, 0, 0, 0.2),
+      0 0 24px -10px rgba(255, 70, 70, 0.22); /* 红光泛在玻璃面上 */
   }
 
   /* 齿孔带：贯穿整条胶卷上/下缘 */
