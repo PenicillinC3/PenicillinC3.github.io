@@ -1,0 +1,55 @@
+---
+import GlassCard from './GlassCard.astro';
+import Pill from './Pill.astro';
+import { formatDate } from '../lib/date';
+import type { LinkItem } from '../lib/collections';
+
+interface Props { link: LinkItem }
+const { link } = Astro.props;
+const initial = link.host.charAt(0).toUpperCase();
+---
+<GlassCard hover>
+  <article class="lcard">
+    <div class="row">
+      <span class="fav" aria-hidden="true">{initial}</span>
+      <div class="ids">
+        <h3 class="lt"><a href={link.url} target="_blank" rel="noopener noreferrer">{link.title}</a></h3>
+        <p class="host">{link.host}</p>
+      </div>
+    </div>
+    {link.note && <p class="ln">{link.note}</p>}
+    <p class="lm">{formatDate(link.date)} · 收藏</p>
+    {link.tags.length > 0 && (
+      <div class="ltags">
+        {link.tags.map((t) => <Pill text={t} />)}
+      </div>
+    )}
+  </article>
+</GlassCard>
+
+<style>
+  .lcard { padding: clamp(16px, 2.4vw, 22px) clamp(16px, 2.6vw, 24px); height: 100%; }
+  .lcard:hover { text-decoration: none; }
+  .row { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
+  .fav {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    font-weight: 800;
+    font-size: 1.1rem;
+    color: #fff;
+    background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 45%, #b26be0));
+    box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 35%, transparent);
+  }
+  .ids { min-width: 0; }
+  .lt { margin: 0; font-size: 1.06rem; }
+  .lt a { color: var(--text-1); }
+  .lt a:hover { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+  .host { margin: 2px 0 0; font-size: 0.8rem; color: var(--text-3); font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ln { margin: 0 0 12px; color: var(--text-2); font-size: 0.94rem; line-height: 1.6; }
+  .lm { margin: 0 0 10px; font-size: 0.8rem; color: var(--text-3); }
+  .ltags { display: flex; flex-wrap: wrap; gap: 6px; }
+</style>

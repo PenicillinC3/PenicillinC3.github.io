@@ -1,0 +1,29 @@
+---
+import Base from '../../layouts/Base.astro';
+import SectionHeader from '../../components/SectionHeader.astro';
+import LinkCard from '../../components/LinkCard.astro';
+import { linkItems } from '../../lib/collections';
+
+const items = await linkItems();
+---
+<Base title="网站参考" description="有用的网站与工具收藏">
+  <SectionHeader title="有用的网站参考" count={items.length} note="值得反复回访的网站，附一句收藏理由。" />
+  {
+    items.length > 0 ? (
+      <div class="lgrid">
+        {items.map((l) => <LinkCard link={l} />)}
+      </div>
+    ) : (
+      <div class="glass empty">收藏夹还空着 —— 在 src/content/links/ 放一条吧。</div>
+    )
+  }
+</Base>
+
+<style>
+  .lgrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr));
+    gap: clamp(14px, 2vw, 20px);
+  }
+  .empty { padding: clamp(28px, 6vw, 60px); text-align: center; color: var(--text-2); }
+</style>
