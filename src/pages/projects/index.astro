@@ -1,0 +1,29 @@
+---
+import Base from '../../layouts/Base.astro';
+import SectionHeader from '../../components/SectionHeader.astro';
+import ProjectCard from '../../components/ProjectCard.astro';
+import { projectItems } from '../../lib/collections';
+
+const items = await projectItems();
+---
+<Base title="项目集" description="做过的项目与作品">
+  <SectionHeader title="项目集" count={items.length} note="做过的东西，以及正在做的。" />
+  {
+    items.length > 0 ? (
+      <div class="xgrid">
+        {items.map((p) => <ProjectCard project={p} />)}
+      </div>
+    ) : (
+      <div class="glass empty">还没有项目 —— 在 src/content/projects/ 放第一个吧。</div>
+    )
+  }
+</Base>
+
+<style>
+  .xgrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+    gap: clamp(14px, 2vw, 20px);
+  }
+  .empty { padding: clamp(28px, 6vw, 60px); text-align: center; color: var(--text-2); }
+</style>

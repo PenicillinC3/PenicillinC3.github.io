@@ -1,0 +1,53 @@
+---
+import GlassCard from './GlassCard.astro';
+import Pill from './Pill.astro';
+import type { ProjectItem } from '../lib/collections';
+
+interface Props { project: ProjectItem }
+const { project } = Astro.props;
+---
+{/* 约定：样式类放本组件自渲染元素上，不传给 GlassCard 根（根元素持 GlassCard 自身 scope，
+    调用方 class 上的 scoped 样式会失效 —— PostCard/LinkCard 已两次验证并修复，见 02e2e7a/feadf4e） */}
+<GlassCard hover>
+  <article class="prjcard">
+    <h3 class="pt"><a href={project.url ?? project.repo ?? '#'}>{project.title}</a></h3>
+    <p class="ps">{project.summary}</p>
+    <div class="tech">
+      {project.tech.map((t) => <Pill text={t} />)}
+    </div>
+    <div class="acts">
+      {project.url && (
+        <a class="act" href={project.url} target="_blank" rel="noopener noreferrer">
+          在线演示 <span aria-hidden="true">↗</span>
+        </a>
+      )}
+      {project.repo && (
+        <a class="act" href={project.repo} target="_blank" rel="noopener noreferrer">
+          源代码 <span aria-hidden="true">↗</span>
+        </a>
+      )}
+    </div>
+  </article>
+</GlassCard>
+
+<style>
+  .prjcard { padding: clamp(18px, 2.6vw, 26px); height: 100%; }
+  .prjcard:hover { text-decoration: none; }
+  .pt { margin: 0 0 10px; font-size: 1.16rem; }
+  .pt a { color: var(--text-1); }
+  .pt a:hover { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+  .ps { margin: 0 0 14px; color: var(--text-2); font-size: 0.94rem; line-height: 1.65; }
+  .tech { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+  .acts { display: flex; flex-wrap: wrap; gap: 8px; }
+  .act {
+    font-size: 0.86rem;
+    font-weight: 600;
+    padding: 0.42em 1.05em;
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--glass-border);
+    background: color-mix(in srgb, var(--text-1) 6%, transparent);
+    color: var(--text-2);
+    transition: color 0.15s ease-out, border-color 0.15s ease-out;
+  }
+  .act:hover { color: var(--text-1); border-color: var(--accent); text-decoration: none; }
+</style>
