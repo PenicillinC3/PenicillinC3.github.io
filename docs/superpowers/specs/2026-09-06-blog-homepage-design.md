@@ -392,3 +392,10 @@ src/content/
 
 1. **两段式显隐**：PostList 过滤 = 不匹配卡片先加 `.glasscard.is-out` 原位淡出 0.2s（GlassCard.astro 提供 `opacity .2s` 过渡与 `.is-out{opacity:0; pointer-events:none}`），淡出完成整批 `display:none` 收合、空年份组随之下沉隐藏；恢复匹配的卡片先回文档流、从透明淡入。每次操作递增世代号作废未到期的折叠定时器——快速连点不互相踩踏。仍事件委托 + style.display 直控（勿回归 hidden 属性方案）。实测依据：旧即时折叠在滚动位置 300 处点 chip，页面总高 1173→~900，滚动被钳回 0 造成跳页。
 2. **列宽锁定**：base.css `html { scrollbar-gutter: stable }` —— 长短页/筛选切换时右侧滚动条出现/消失不再改变内容宽度（Windows 经典滚动条下卡片宽度随滚动条切换抖动 ≈ 17px）；`html:has(body.page-gallery) { scrollbar-gutter: auto }`（画廊锁死不滚动，预留槽无意义）。
+
+## 38. 摄影卷版面调整（2026-09-07，用户指定；冲突处以此节为准）
+
+1. **导航字体全栏目一致**：Nav `.topbar` 显式 `font-family: var(--font-sans)`（Maple）——`body.page-dark` 只把正文切为华文中宋，导航站名/栏目/抽屉不再随页面字体变化。摄影页内正文（标题/时间戳/地点/dock）仍华文中宋（§28 不变）。
+2. **胶片尺寸再放大**：setGeom 宽限 `W*0.46 → W*0.54`、封顶 `900 → 980`，高余量 `(H−160) → (H−196)`（196 的空间被下方拉远的字幕占用，保证字幕不挤）；帧 3:2 不变，邻卷露出量公式（peek）不变。
+3. **日期/地点离胶片更远**：`.cap--top` 距封面上缘 52→76px、`.cap--bottom` 距下缘 26→44px（避开齿孔带、留白呼吸）。
+4. **去弹簧动效**：reel 平移过渡 `0.62s cubic-bezier(.22,1.18,.32,1)`（§30.2 有轻微过冲）→ `0.56s cubic-bezier(.22,1,.36,1)` 纯缓出无过冲——「非线性平移」保留，只去掉回弹段。
