@@ -31,14 +31,26 @@ const { project } = Astro.props;
 </GlassCard>
 
 <style>
-  .prjcard { padding: clamp(18px, 2.6vw, 26px); height: 100%; }
+  .prjcard {
+    position: relative; /* 整卡可点：标题链接 ::after 拉伸铺满全卡 */
+    padding: clamp(18px, 2.6vw, 26px);
+    height: 100%;
+    cursor: pointer;
+  }
   .prjcard:hover { text-decoration: none; }
   .pt { margin: 0 0 10px; font-size: 1.16rem; }
   .pt a { color: var(--text-1); }
-  .pt a:hover { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+  /* 标题悬停：只变色、不下划线 */
+  .pt a:hover { color: var(--accent); text-decoration: none; }
+  .pt a::after {
+    content: "";
+    position: absolute;
+    inset: 0; /* 铺满 .prjcard → 点卡上任意处 = 点标题链接 */
+  }
   .ps { margin: 0 0 14px; color: var(--text-2); font-size: 0.94rem; line-height: 1.65; }
   .tech { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
-  .acts { display: flex; flex-wrap: wrap; gap: 8px; }
+  /* 两枚动作按钮压在整卡拉伸层之上，保持独立可点 */
+  .acts { display: flex; flex-wrap: wrap; gap: 8px; position: relative; z-index: 1; }
   .act {
     font-size: 0.86rem;
     font-weight: 600;
