@@ -290,6 +290,7 @@ body.page-dark .slider {
   border-color: rgba(255, 255, 255, 0.14);
 }
 
-/* —— 沉浸页（spec §21.2）：无边框全屏，隐藏页脚 —— */
+/* —— 沉浸页（spec §21.2）：无边框全屏，隐藏页脚，容器去宽度上限 —— */
 body.page-immersive .foot { display: none; }
 body.page-immersive .main { padding: 0; }
+body.page-immersive .wrap { max-width: none; }
