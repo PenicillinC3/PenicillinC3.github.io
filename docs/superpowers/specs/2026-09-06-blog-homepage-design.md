@@ -273,5 +273,12 @@ src/content/
 2. **笔记/迷思主页宽度与摄影对齐**：列表卡网格 min 300px（与摄影同基线）。
 3. **标签筛选修复**：PostList 过滤改为事件委托 + `style.display` 直控（弃 `hidden` 属性方案），chip 带 `aria-pressed`；空组标题随过滤隐藏。
 4. 页脚版权栏无搜索相关内容。
+
+## 21. 摄影集暗房化 v3（2026-09-06，用户逐点批准；冲突处以此节为准，§19 胶片主页 2/3/4 条作废）
+
+1. **暗色页机制**：Base 增 props `dark?: boolean`（body 加 `page-dark`）与 `immersive?: boolean`（body 加 `page-immersive`：隐藏页脚、`main` padding 归零）。`body.page-dark` 在 base.css 全局覆写 token：`--canvas #0b0c10`、`--grid-line rgba(255,255,255,.035)`、`--text-1/2/3` 亮阶、`--accent #ff6b6b`（暗房红）、`--glass-border rgba(255,255,255,.12)`、`--glass-bg rgba(12,13,18,.4)`（面板深色玻璃）、inset 换黑底版；并覆写 `.topbar/.drawer` 为深色玻璃。prism/降级规则不变。
+2. **/photos 主页 = 无边框全屏暗房（immersive + dark）**：整屏被当前卷封面完全覆盖（object-fit: cover，`calc(100dvh - var(--nav-h))` 高、无边框无胶片壳）；**一卷一屏**，中央（两侧边条区之外）点击进入该卷备忘页；**左右两侧各露出一条相邻卷封面缩略（半伸出，hover 展开）点击即切换**；键盘 ←/→ 同切换；切换时 0.35s 淡入。底部左侧：时间戳与地点——**白色字 + 红色微光 text-shadow**；中央底部一行淡提示「点击画面进入备忘录 · 两侧底片切换」。单卷时隐藏侧条。
+3. **卷备忘页 = dark（非 immersive，保留顶栏/页脚）**：页头/正文/照片区沿用 v2d 备忘结构，dark token 自动生效；页头下加一条红光发丝线（`1px rgba(255,107,107,.45)`）作暗房点缀；照片玻璃相框由 dark `--glass-bg/inset` 呈现。
+4. 个人笔记/个人迷思列表卡改桌面双栏大卡（`minmax(min(100%,460px),1fr)`，解决电脑屏过窄；§20.2 的 300px 作废）。
 2. **页脚回归玻璃样式**：底部栏为 `.glass` 液态玻璃条（radius-lg、吸底 flex 结构不变），内容=许可注记 + 版权行。
 3. 欢迎页两枚入口按钮与摄影卡/详情相框（`photocard`/`imgshell` 10px 玻璃沿）随之获得同套厚度光影与透底效果；hover 棱光环（§14.3）不变。
