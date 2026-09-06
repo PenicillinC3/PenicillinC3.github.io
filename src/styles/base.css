@@ -1,0 +1,217 @@
+/* 全局基础 + 玻璃工具类 + 文章排版（spec §5） */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--canvas);
+  color: var(--text-1);
+  font-family: var(--font-sans);
+  font-size: 17px;
+  line-height: 1.75;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4 {
+  line-height: 1.25;
+  font-weight: 700;
+  color: var(--text-1);
+  margin: 0 0 0.5em;
+}
+p { margin: 0 0 1em; }
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+  border-radius: 4px;
+}
+a:hover { text-decoration: underline; text-decoration-color: var(--link-underline); }
+a:not(:hover) { text-decoration: none; }
+
+img { max-width: 100%; height: auto; display: block; }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.wrap {
+  max-width: var(--maxw);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+.main {
+  padding: clamp(20px, 4vw, 44px) 0 clamp(60px, 10vw, 110px);
+  min-height: 62vh;
+}
+
+/* —— 玻璃面板（液态玻璃核心：半透明 + backdrop 模糊提饱和 + 高光描边） —— */
+.glass {
+  background:
+    linear-gradient(180deg, var(--glass-hl), transparent 34%) var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  box-shadow: var(--glass-shadow);
+}
+
+/* 降级：不支持 backdrop-filter → 高不透明度实心面板（spec §5.6） */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root { --glass-bg: rgba(255, 255, 255, 0.94); }
+  [data-theme='dark'] { --glass-bg: rgba(15, 17, 26, 0.94); }
+  .glass {
+    background: linear-gradient(180deg, var(--glass-hl), transparent 22%),
+      var(--glass-bg);
+  }
+}
+
+/* —— 按钮 —— */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.55em 1.35em;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--glass-border);
+  background: linear-gradient(180deg, var(--glass-hl), transparent 40%),
+    var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  color: var(--text-1);
+  font-size: 0.98rem;
+  font-weight: 600;
+  line-height: 1.4;
+  cursor: pointer;
+  box-shadow: var(--glass-shadow);
+  transition: transform 0.18s ease-out, box-shadow 0.18s ease-out,
+    filter 0.18s ease-out;
+}
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--glass-shadow-lg);
+  text-decoration: none;
+}
+.btn--primary {
+  background: var(--accent);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.btn--primary:hover { filter: brightness(1.07); }
+
+/* —— 胶囊 —— */
+.pill {
+  display: inline-block;
+  padding: 0.12em 0.7em;
+  border-radius: var(--radius-pill);
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1.7;
+  color: var(--text-2);
+  background: color-mix(in srgb, var(--text-1) 7%, transparent);
+  border: 1px solid var(--glass-border);
+  white-space: nowrap;
+}
+
+/* —— 页面标题 —— */
+.page-title {
+  font-size: clamp(1.7rem, 4.2vw, 2.6rem);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin: 0 0 0.2em;
+  color: var(--text-1);
+}
+
+/* —— 文章阅读排版（详情页 .prose 容器） —— */
+.prose {
+  max-width: 68ch;
+  margin-inline: auto;
+}
+.prose h2 { font-size: 1.5rem; margin-top: 2em; }
+.prose h3 { font-size: 1.2rem; margin-top: 1.6em; }
+.prose pre {
+  margin: 1.3em 0;
+  padding: 1em 1.2em;
+  overflow-x: auto;
+  border-radius: var(--radius-s);
+  background: rgba(9, 11, 20, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: var(--glass-shadow);
+  color: #e8eaf2;
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+  line-height: 1.65;
+}
+.prose :not(pre) > code {
+  padding: 0.14em 0.45em;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--text-1) 9%, transparent);
+  border: 1px solid var(--glass-border);
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+}
+.prose blockquote {
+  margin: 1.4em 0;
+  padding: 0.2em 0 0.2em 1.2em;
+  border-left: 3px solid var(--accent);
+  color: var(--text-2);
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--accent) 8%, transparent), transparent);
+}
+.prose ul, .prose ol { padding-left: 1.4em; }
+.prose a {
+  text-decoration: underline;
+  text-decoration-color: var(--link-underline);
+  text-underline-offset: 3px;
+}
+.prose a:hover { text-decoration-thickness: 2px; }
+.prose img {
+  border-radius: var(--radius-s);
+  box-shadow: var(--glass-shadow);
+  margin: 1.4em 0;
+}
+.prose hr {
+  border: 0;
+  height: 1px;
+  margin: 2.4em 0;
+  background: linear-gradient(90deg, transparent, var(--text-3), transparent);
+}
+.prose table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1.4em 0;
+  font-size: 0.92rem;
+}
+.prose th, .prose td {
+  border: 1px solid color-mix(in srgb, var(--text-3) 40%, transparent);
+  padding: 0.5em 0.8em;
+  text-align: left;
+}
+.prose th { background: color-mix(in srgb, var(--text-1) 6%, transparent); }
+
+/* —— 减少动效 —— */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

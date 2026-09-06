@@ -1,0 +1,65 @@
+/* 设计 token —— 全站配色/圆角/阴影/动效唯一来源（spec §5.1）。
+   亮色为 :root 默认；暗色在 [data-theme='dark'] 覆盖。组件不得按主题分支。 */
+:root {
+  color-scheme: light;
+  --canvas: #eef1f8;
+  --canvas-2: #e3e8f4;
+
+  --text-1: #1b1e27;
+  --text-2: #4a5164;
+  --text-3: #78809a;
+  --accent: #4f6bff;
+  --link-underline: rgba(79, 107, 255, 0.35);
+
+  --glass-bg: rgba(255, 255, 255, 0.55);
+  --glass-bg-strong: rgba(255, 255, 255, 0.82);
+  --glass-border: rgba(255, 255, 255, 0.72);
+  --glass-hl: rgba(255, 255, 255, 0.95);
+  --glass-blur: 20px;
+  --glass-sat: 1.8;
+  --glass-radius: 22px;
+  --radius-s: 14px;
+  --radius-pill: 999px;
+  --glass-shadow: 0 8px 32px rgba(31, 38, 68, 0.12);
+  --glass-shadow-lg: 0 18px 48px rgba(31, 38, 68, 0.18);
+  --card-hover: -4px;
+
+  --blob-a: rgba(93, 129, 255, 0.5);
+  --blob-b: rgba(190, 140, 255, 0.45);
+  --blob-c: rgba(255, 178, 130, 0.4);
+  --blob-d: rgba(96, 220, 190, 0.38);
+
+  --font-sans: -apple-system, "SF Pro Text", "PingFang SC", "HarmonyOS Sans SC",
+    "Microsoft YaHei", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Consolas, "Cascadia Mono", monospace;
+
+  --nav-h: 64px;
+  --maxw: 1160px;
+  --gutter: clamp(18px, 4vw, 28px);
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+  --canvas: #0c0e16;
+  --canvas-2: #12141f;
+
+  --text-1: #eef0f6;
+  --text-2: #b3b9cd;
+  --text-3: #7a8299;
+  --accent: #93aaff;
+  --link-underline: rgba(147, 170, 255, 0.4);
+
+  --glass-bg: rgba(255, 255, 255, 0.07);
+  --glass-bg-strong: rgba(22, 25, 38, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.16);
+  --glass-hl: rgba(255, 255, 255, 0.24);
+  --glass-blur: 24px;
+  --glass-sat: 1.6;
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  --glass-shadow-lg: 0 18px 48px rgba(0, 0, 0, 0.6);
+
+  --blob-a: rgba(63, 88, 214, 0.42);
+  --blob-b: rgba(122, 63, 208, 0.36);
+  --blob-c: rgba(176, 106, 46, 0.28);
+  --blob-d: rgba(43, 127, 116, 0.34);
+}
