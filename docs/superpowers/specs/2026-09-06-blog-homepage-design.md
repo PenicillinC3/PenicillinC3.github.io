@@ -460,3 +460,7 @@ setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160）
 ## 52. 地点字幕加亮（2026-09-07，用户指定）
 
 `.loc` text-shadow 追加白色核心光 `0 0 3px rgba(255,255,255,.9)`，暖黄双晕增强（10px @ .95 / 22px @ .55）—— 字心更亮、灯晕仍暖。
+
+## 53. 标签筛选占位保留（2026-09-07，用户指定「还是缩小，解决」；§37 的收合方案作废）
+
+§37 选型（淡出后收合、页面变短）不满足需求，改**占位保留**：不匹配卡片加 `.glasscard.is-out` —— `opacity` 0.2s 淡出、`visibility` 延迟 0.2s 转 hidden，但**始终留在文档流占位**；年份组永不折叠、页面高度/卡片位置/滚动条全程不变（实测点 Git：scrollH 恒 1173、卡片 top 267/527/787 不变，被滤卡片 opacity 0 + visibility hidden 原位留空）。移除 is-out 时 `visibility` 立即恢复、`opacity` 淡回（GlassCard 两侧 transition 分别处理延迟方向）。JS 简化为事件委托 + `classList.toggle`，不再有定时器/世代号/display 操作。
