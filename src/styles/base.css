@@ -16,11 +16,20 @@
   font-weight: 100 900;
 }
 
-/* MapleMono（spec §29.1）：20.5MB TTF → 全站用字 199KB woff2，正文默认字体 */
+/* MapleMono（spec §29.1）：20.5MB TTF → 全站用字 200KB woff2，正文默认字体 */
 @font-face {
   font-family: "MapleMono Web";
   src: url("/fonts/maple-mono.woff2") format("woff2");
   font-display: swap;
+  font-weight: 100 900;
+}
+/* MapleMono 斜体（spec §32）：代码注释栈的第二顺位 —— JetBrains 缺中文字形时
+   中文注释逐字落到斜体 Maple，英文注释仍 JetBrains Italic */
+@font-face {
+  font-family: "MapleMono Italic Web";
+  src: url("/fonts/maple-mono-italic.woff2") format("woff2");
+  font-display: swap;
+  font-style: italic;
   font-weight: 100 900;
 }
 
@@ -251,13 +260,14 @@ img { max-width: 100%; height: auto; display: block; }
   font-size: 0.88rem;
   line-height: 1.65;
 }
-/* prism 高亮（spec §29.2）：注释 = JetBrains Mono 斜体面，其余 token 轻配色 */
+/* prism 高亮（spec §29.2/§32）：注释 = JetBrains 斜体，中文逐字回退斜体 Maple；
+   其余 token 轻配色 */
 .prose pre code { font-family: var(--font-mono); } /* 直击 code 元素（UA 默认 monospace 会压过继承） */
 .token.comment,
 .token.prolog,
 .token.doctype,
 .token.cdata {
-  font-family: var(--font-mono);
+  font-family: var(--font-comment);
   font-style: italic;
   color: #98a2b3;
 }

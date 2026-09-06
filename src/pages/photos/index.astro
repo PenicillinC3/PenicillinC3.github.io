@@ -31,9 +31,8 @@ const n = covers.length;
 <Base title="摄影作品集" description="暗房 · 摄影作品集" dark gallery>
   <section class="gallery" data-gallery>
     <div class="arena" data-arena tabindex="0" aria-label="摄影作品浏览">
-      {/* 射线叠光：主页增强配方（全景黑场大 + 光源在右上角外，低强度衰减后
-          近乎不可见 → intensity 拉高/falloff 降低；备忘页仍用默认弱配方） */}
-      <Rays variant="overlay" config={{ intensity: 4.5, opacity: 1, falloff: 0.95 }} />
+      {/* 射线叠光：统一使用默认配方（spec §32.1 用户选定） */}
+      <Rays variant="overlay" />
 
       <!-- 封面日期：居中于当前封面上方 -->
       <p class="cap cap--top" data-cap-top aria-hidden="true"><span class="ts" data-ts>{n ? covers[0].date : ''}</span></p>
