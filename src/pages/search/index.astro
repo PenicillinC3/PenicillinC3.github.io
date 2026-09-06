@@ -11,7 +11,8 @@ const [allNotes, allMusings] = await Promise.all([
 ]);
 const docs = [
   ...allNotes
-    .filter((e) => !e.data.draft)
+    // spec §4: draft 内容 dev(import.meta.env.DEV)下可见以便预览，正式构建排除
+    .filter((e) => import.meta.env.DEV || !e.data.draft)
     .map((e) => ({
       t: e.data.title,
       s: e.data.summary ?? stripMarkdown(e.body ?? '').slice(0, 160),
@@ -20,7 +21,8 @@ const docs = [
       c: 'notes',
     })),
   ...allMusings
-    .filter((e) => !e.data.draft)
+    // spec §4: draft 内容 dev(import.meta.env.DEV)下可见以便预览，正式构建排除
+    .filter((e) => import.meta.env.DEV || !e.data.draft)
     .map((e) => ({
       t: e.data.title,
       s: e.data.summary ?? stripMarkdown(e.body ?? '').slice(0, 160),

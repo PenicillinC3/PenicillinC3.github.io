@@ -6,8 +6,9 @@ export async function listSorted<C extends 'notes' | 'musings' | 'links' | 'proj
   coll: C,
 ): Promise<CollectionEntry<C>[]> {
   const all = await getCollection(coll);
+  // spec §4: draft 内容 dev(import.meta.env.DEV)下可见以便预览，正式构建排除
   return all
-    .filter((e) => !e.data.draft)
+    .filter((e) => import.meta.env.DEV || !e.data.draft)
     .sort((a, b) => b.data.date.localeCompare(a.data.date));
 }
 
