@@ -5,4 +5,7 @@ import { defineConfig } from 'astro/config';
 export default defineConfig({
   site: 'https://USERNAME.github.io',
   base: '/',
+  devToolbar: {
+    enabled: false, // 隐藏底部 Astro 开发工具栏（仅影响本地 dev）
+  },
 });
