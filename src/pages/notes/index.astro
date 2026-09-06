@@ -1,0 +1,12 @@
+---
+import Base from '../../layouts/Base.astro';
+import SectionHeader from '../../components/SectionHeader.astro';
+import PostList from '../../components/PostList.astro';
+import { noteItems } from '../../lib/collections';
+
+const items = await noteItems();
+---
+<Base title="个人笔记" description="个人笔记与学习记录">
+  <SectionHeader title="个人笔记" count={items.length} note="记录学习与实践中的想法，可按标签过滤。" />
+  <PostList items={items} groupByYear filterable />
+</Base>

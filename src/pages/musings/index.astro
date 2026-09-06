@@ -1,0 +1,12 @@
+---
+import Base from '../../layouts/Base.astro';
+import SectionHeader from '../../components/SectionHeader.astro';
+import PostList from '../../components/PostList.astro';
+import { musingItems } from '../../lib/collections';
+
+const items = await musingItems();
+---
+<Base title="个人迷思" description="个人迷思与随笔">
+  <SectionHeader title="个人迷思" count={items.length} note="没有体系的碎碎念，按时间倒序。" />
+  <PostList items={items} />
+</Base>

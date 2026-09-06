@@ -1,0 +1,36 @@
+---
+import GlassCard from './GlassCard.astro';
+import Pill from './Pill.astro';
+import { formatDate } from '../lib/date';
+import type { PostItem } from '../lib/collections';
+
+interface Props {
+  post: PostItem;
+  hideTags?: boolean;
+}
+const { post, hideTags = false } = Astro.props;
+const year = post.date.slice(0, 4);
+---
+<GlassCard class="pcard" hover>
+  <article data-tags={post.tags.join(' ')}>
+    <h3 class="pt"><a href={post.url}>{post.title}</a></h3>
+    <p class="pm">{year} · {formatDate(post.date)}</p>
+    {post.summary && <p class="ps">{post.summary}</p>}
+    {!hideTags && post.tags.length > 0 && (
+      <div class="ptags">
+        {post.tags.map((t) => <Pill text={t} />)}
+      </div>
+    )}
+  </article>
+</GlassCard>
+
+<style>
+  .pcard { display: block; padding: clamp(16px, 2.4vw, 22px) clamp(16px, 2.6vw, 24px); }
+  .pcard:hover { text-decoration: none; }
+  .pt { margin: 0 0 6px; font-size: 1.12rem; }
+  .pt a { color: var(--text-1); }
+  .pt a:hover { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+  .pm { margin: 0 0 8px; font-size: 0.82rem; color: var(--text-3); }
+  .ps { margin: 0 0 12px; color: var(--text-2); font-size: 0.94rem; line-height: 1.6; }
+  .ptags { display: flex; flex-wrap: wrap; gap: 6px; }
+</style>

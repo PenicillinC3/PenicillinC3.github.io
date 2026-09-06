@@ -1,0 +1,94 @@
+---
+import PostCard from './PostCard.astro';
+import type { PostItem } from '../lib/collections';
+
+interface Props {
+  items: PostItem[];
+  title?: string;
+  groupByYear?: boolean;
+  filterable?: boolean; // 笔记页标签过滤
+}
+const { items, groupByYear = false, filterable = false } = Astro.props;
+const tags = filterable ? [...new Set(items.flatMap((p) => p.tags))].sort() : [];
+
+const groups = groupByYear
+  ? [...new Set(items.map((p) => p.date.slice(0, 4)))].map((y) => ({
+      year: y,
+      posts: items.filter((p) => p.date.slice(0, 4) === y),
+    }))
+  : [{ year: '', posts: items }];
+---
+{
+  filterable && tags.length > 1 && (
+    <div class="chips" role="group" aria-label="按标签过滤">
+      {tags.map((t) => (
+        <button type="button" class="chip" data-tag-chip data-tag={t}>{t}</button>
+      ))}
+    </div>
+  )
+}
+{
+  groups.map((g) => (
+    <section class="ygroup">
+      {groupByYear && <h2 class="yr">{g.year}</h2>}
+      <div class="pcols">
+        {g.posts.map((p) => <PostCard post={p} />)}
+      </div>
+    </section>
+  ))
+}
+{
+  items.length === 0 && (
+    <div class="glass empty">这里还空着 —— 第一篇内容正在路上。</div>
+  )
+}
+
+<script>
+  // 标签过滤：点选高亮、卡片显隐；再点一次取消
+  const chips = [...document.querySelectorAll<HTMLButtonElement>('[data-tag-chip]')];
+  const cards = [...document.querySelectorAll<HTMLElement>('[data-tags]')];
+  let active: string | null = null;
+  const apply = () => {
+    cards.forEach((c) => {
+      const own = (c.dataset.tags ?? '').split(' ').filter(Boolean);
+      c.closest('.glasscard')!.hidden = !!active && !own.includes(active);
+    });
+    chips.forEach((ch) => ch.classList.toggle('on', ch.dataset.tag === active));
+  };
+  chips.forEach((ch) =>
+    ch.addEventListener('click', () => {
+      const t = ch.dataset.tag ?? null;
+      active = active === t ? null : t;
+      apply();
+    }),
+  );
+</script>
+
+<style>
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 22px; }
+  .chip {
+    border: 1px solid var(--glass-border);
+    background: linear-gradient(180deg, var(--glass-hl), transparent 40%), var(--glass-bg);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+    color: var(--text-2);
+    border-radius: var(--radius-pill);
+    padding: 0.32em 1em;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: color 0.15s ease-out, box-shadow 0.15s ease-out;
+  }
+  .chip:hover { color: var(--text-1); }
+  .chip.on {
+    color: var(--text-1);
+    box-shadow: inset 0 0 0 1.5px var(--accent);
+  }
+  .ygroup { margin-bottom: clamp(28px, 5vw, 44px); }
+  .yr { font-size: 1rem; color: var(--text-3); font-weight: 600; margin: 0 0 12px; }
+  .pcols {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+    gap: clamp(14px, 2vw, 20px);
+  }
+  .empty { padding: clamp(28px, 6vw, 60px); text-align: center; color: var(--text-2); }
+</style>

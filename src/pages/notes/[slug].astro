@@ -1,0 +1,25 @@
+---
+import { render } from 'astro:content';
+import Post from '../../layouts/Post.astro';
+import { listSorted } from '../../lib/collections';
+import { excerpt } from '../../lib/text';
+
+export async function getStaticPaths() {
+  const posts = await listSorted('notes');
+  return posts.map((e) => ({ params: { slug: e.slug }, props: { e } }));
+}
+
+const { e } = Astro.props;
+const { Content } = await render(e);
+const summary = e.data.summary ?? excerpt(e.body ?? '', 150);
+---
+<Post
+  label="个人笔记"
+  backHref="/notes"
+  title={e.data.title}
+  date={e.data.date}
+  tags={e.data.tags ?? []}
+  summary={summary}
+>
+  <Content />
+</Post>
