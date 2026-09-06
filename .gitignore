@@ -14,3 +14,6 @@ Thumbs.db
 
 # SDD 进度 scratch（git 忽略）
 .superpowers/
+
+# 原始照片原件（示例已复制进 src/content/photos）
+/img/
