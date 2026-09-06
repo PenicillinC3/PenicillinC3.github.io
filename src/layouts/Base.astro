@@ -20,6 +20,8 @@ interface Props {
 }
 const { title, description = site.tagline, noindex, dark = false, immersive = false, gallery = false } = Astro.props;
 const headTitle = title ? `${title} · ${site.title}` : `${site.title} — ${site.tagline}`;
+// spec §33：页脚仅首页显示（其余页面移除最下方栏）
+const isHome = Astro.url.pathname === '/';
 ---
 <!doctype html>
 <html lang="zh-CN">
@@ -35,6 +37,6 @@ const headTitle = title ? `${title} · ${site.title}` : `${site.title} — ${sit
   <body class:list={['base-body', dark && 'page-dark', immersive && 'page-immersive', gallery && 'page-gallery']}>
     <Nav />
     <main class="wrap main"><slot /></main>
-    <Footer />
+    {isHome && <Footer />}
   </body>
 </html>

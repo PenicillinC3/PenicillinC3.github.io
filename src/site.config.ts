@@ -1,8 +1,6 @@
 export const site = {
-  title: 'Vibe',
+  title: 'PenicillinC3',
   tagline: '记录 · 拍摄 · 思考',
-  intro: '你好，我是 Vibe。这里存放个人笔记、摄影作品、生活迷思，以及值得收藏的网站。',
-  heroNote: '写字 · 拍照 · 收藏',
   footerNote: '本博客内容遵循 CC BY-NC 4.0 许可。',
   nav: [
     { label: '个人笔记', href: '/notes' },

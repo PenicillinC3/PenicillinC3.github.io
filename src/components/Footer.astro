@@ -1,15 +1,12 @@
 ---
 import { site } from '../site.config';
 ---
+<!-- spec §33：页脚仅首页渲染（Base 按路径裁剪），右侧回到首页已删 -->
 <footer class="foot">
   <div class="wrap">
     <div class="glass inner">
       <p class="note">{site.footerNote}</p>
-      <p class="copy">
-        © <span data-year>2026</span> {site.title}
-        <span class="dot">·</span>
-        <a href="/">回到首页</a>
-      </p>
+      <p class="copy">© <span data-year>2026</span> {site.title} Via Claude Code</p>
     </div>
   </div>
 </footer>
@@ -33,7 +30,5 @@ import { site } from '../site.config';
     border-radius: var(--radius-lg);
   }
   .note { margin: 0; font-size: 0.85rem; color: var(--text-2); }
-  .copy { margin: 0; font-size: 0.85rem; color: var(--text-3); }
-  .copy a { color: var(--text-3); }
-  .dot { padding: 0 8px; }
+  .copy { margin: 0; font-size: 0.85rem; color: var(--text-3); white-space: nowrap; }
 </style>
