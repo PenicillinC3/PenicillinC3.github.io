@@ -13,8 +13,10 @@ const year = post.date.slice(0, 4);
 ---
 <GlassCard hover>
   <article class="pcard" data-tags={post.tags.join(' ')}>
-    <h3 class="pt"><a href={post.url}>{post.title}</a></h3>
-    <p class="pm">{year} · {formatDate(post.date)}</p>
+    <div class="ptop">
+      <h3 class="pt"><a href={post.url}>{post.title}</a></h3>
+      <p class="pm">{year} · {formatDate(post.date)}</p>
+    </div>
     {post.summary && <p class="ps">{post.summary}</p>}
     {!hideTags && post.tags.length > 0 && (
       <div class="ptags">
@@ -25,12 +27,18 @@ const year = post.date.slice(0, 4);
 </GlassCard>
 
 <style>
-  .pcard { display: block; padding: clamp(16px, 2.4vw, 22px) clamp(16px, 2.6vw, 24px); }
+  /* 单列通栏大卡（spec §24）：标题↔日期对顶，摘要限宽保持阅读节奏 */
+  .pcard {
+    display: grid;
+    gap: 14px;
+    padding: clamp(24px, 3.4vw, 38px) clamp(24px, 4vw, 52px);
+  }
   .pcard:hover { text-decoration: none; }
-  .pt { margin: 0 0 6px; font-size: 1.12rem; }
+  .ptop { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 22px; }
+  .pt { margin: 0; font-size: clamp(1.2rem, 1.7vw, 1.5rem); letter-spacing: -0.01em; }
   .pt a { color: var(--text-1); }
   .pt a:hover { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
-  .pm { margin: 0 0 8px; font-size: 0.82rem; color: var(--text-3); }
-  .ps { margin: 0 0 12px; color: var(--text-2); font-size: 0.94rem; line-height: 1.6; }
-  .ptags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .pm { margin: 0; font-size: 0.84rem; color: var(--text-3); white-space: nowrap; }
+  .ps { margin: 0; max-width: min(100%, 76ch); color: var(--text-2); font-size: 1.02rem; line-height: 1.8; }
+  .ptags { display: flex; flex-wrap: wrap; gap: 7px; }
 </style>
