@@ -310,3 +310,13 @@ src/content/
 1. **Nav 滑块改「液态跟随」**（§22.1 的落位滑动语义仍用于换页，此处改交互）：鼠标在栏目区时滑块吸附最近栏目——pointermove 每帧**现量** offsetLeft/width（实测缓存会因字体加载失效致悬停错位，勿缓存），rAF 指数阻尼驱动（τ≈90ms，≈参考 demo 的 easing.damp）；移除滑块 CSS 位移过渡与「着陆」脉冲（与阻尼互斥）。鼠标离开栏目区滑回激活栏目；点击栏目链接才跳页。首页/404 无激活栏目：悬停仍跟随、空闲隐藏。触屏与 <880px 抽屉导航不启用跟随。换页落位仍靠 document/window 双挂 astro:page-load + MutationObserver 兜底（§22.1）。
 2. **暗色页滑块辉光改暗红**：`body.page-dark .slider` 顶部高光径向渐变 `rgba(255,90,80,.17)`、描边 `rgba(255,107,107,.34)`、外层加红光 halo（`0 0 22px -4px rgba(255,70,70,.45)`）——弃白色玻璃高光。
 3. **个人迷思 / 网站参考与个人笔记卡片对齐**：PostCard 与 LinkCard 统一 `min-height: 230px`、同款内边距 `clamp(24px,3.4vw,38px) clamp(24px,4vw,52px)`、标签行 `margin-top:auto` 沉底；LinkCard 标题字号同步上调（clamp 1.2–1.4rem）。列宽结构沿用 §24 单列通栏。
+
+## 26. 摄影栏目红色射线氛围（2026-09-07，用户提供参考配方并选择放置层）
+
+1. **背景源**：SideRays（react-bits · DavidHDev/react-bits，MIT）——ogl（轻量 WebGL）全屏三角形 + 片段着色器（volumetric rays 双色/转速/散度/滤色/衰减）。**弃 react 壳**：本站零框架纪律，移植为 `src/components/Rays.astro`（纯 Astro + ogl，着色器逐行保留原作；依赖仅新增 `ogl`）。
+2. **配置**：`src/lib/rays-config.ts` 类型 + 组件默认值 = 用户所选配方（speed 2.5 · #f71313 / #b04848 · intensity 2 · spread 3 · origin top-right · tilt 0 · saturation 1.5 · blend 0.75 · falloff 1.3 · opacity 0.95）。页面可通过 `<Rays config={{...}}>` 覆盖。
+3. **放置（用户选择：首页叠光 + 备忘页同款）**：
+   - `variant="overlay"` —— /photos 首页：`position:fixed; inset:0; z-index:58; mix-blend-mode:screen`（顶栏 60 之下、舞台内容之上）：照片与上/下齿孔带、黑场同时泛红光；底部信息栏 `.dock` 抬 `z-index:59`（文字不被红光干扰）、空态文字同 59。
+   - `variant="backdrop"` —— 卷备忘页 `/photos/<slug>/`：`fixed; z-index:-1`，玻璃卡后/正文下透出红光（负 z 子元素位于根背景之上、内容之下；勿置于有 transform/堆叠上下文的祖先内）。
+4. **生命周期**：rAF 循环内 `gl.canvas.isConnected` 守卫（VT 换页后旧画布脱离文档即停）；`devicePixelRatio` 上限 2；resize 重设大小与 iResolution；无 IntersectionObserver（摄影页常驻，简化）。
+5. 摄影暗房其余设计（§22/§25.2）不变；`redlamp`/film 泛光等 CSS 氛围与射线并存。

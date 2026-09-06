@@ -24,7 +24,7 @@ npm run preview      # 本地预览构建产物（旧 dev/preview 进程会占�
 - **页面形态**：
   - `/` 单屏欢迎页（华文中宋大字）；`.main:has(.welcome)` 特判居中；body 是 flex 纵向吸底布局，页脚短页贴底、长页随滚动。
   - `/notes`、`/musings`、`/links` 列表为**单列通栏大卡**（spec §24/§25：一行一张 ~1100px；PostCard 标题↔日期对顶、摘要 76ch 限宽；三栏目卡统一 `min-height:230px` 对齐）+ `/[slug]` 详情；笔记列表有标签过滤（PostList 事件委托 + `style.display` 直控，勿改回 `hidden` 属性方案）。
-  - `/photos` 是**沉浸暗房 135 底片屏**（spec §22.2）：Base 传 `dark immersive`（`body.page-dark` / `page-immersive`）；舞台内部 = flex 列：底片主体 `.film`（上下黑色齿孔带夹照片区，照片横铺 cover、不再盖满整屏；SSR 首帧直出、红光泛光）+ 底部信息栏 `.dock`（时间/地点/张数/提示，齿孔带不遮挡）；两侧底片缩略切换（换卷 = 两段式线性滑出/滑入动画）、中央点击进卷备忘页 `/photos/<series-slug>/`（卷文 + 照片混排：横版整行图文上下、竖版 1.5fr/1fr 左图右文，<880px 单列）。**无**单张照片页、无灯箱、无搜索。
+  - `/photos` 是**沉浸暗房 135 底片屏**（spec §22.2/§26）：Base 传 `dark immersive`（`body.page-dark` / `page-immersive`）；舞台内部 = flex 列：底片主体 `.film`（上下黑色齿孔带夹照片区，照片横铺 cover、不再盖满整屏；SSR 首帧直出、红光泛光）+ 底部信息栏 `.dock`（时间/地点/张数/提示，齿孔带不遮挡）；两侧底片缩略切换（换卷 = 两段式线性滑出/滑入动画）、中央点击进卷备忘页 `/photos/<series-slug>/`（卷文 + 照片混排：横版整行图文上下、竖版 1.5fr/1fr 左图右文，<880px 单列）。**红光射线氛围**（spec §26）：`Rays.astro`（ogl 移植 SideRays，去 react 壳）overlay 滤色叠于首页照片/齿孔带上（z58，dock z59 抬升）、backdrop 沉于备忘页玻璃卡后（z-1）。**无**单张照片页、无灯箱、无搜索。
   - 404 页有搜索框？没有 —— 搜索已全链路删除（fuse.js、SearchBox、/search 均不存在）。
 - **视觉系统**：token 全在 `src/styles/tokens.css`（单一 `:root` 亮色；`body.page-dark` 在 base.css 覆写为暗房 token：`--accent #ff6b6b` 红光）。玻璃配方 v3.1：**面板全透**（`--glass-bg: rgba(255,255,255,0)`）+ `--glass-inset` 内外影对仗 + 右下重投阴影；`--glass-blur: 1px`。`--grid-line/--grid-size` 是方格背景。`base.css` 提供 `.glass/.btn(12px 圆角)/.pill/.prism/.prose`。
 - **交互脚本**（均无框架）：Nav 水滴滑块 = **鼠标跟随液态吸附**（spec §25：pointermove 现量 + rAF 指数阻尼 τ90ms，离开回激活栏，点击跳页；落位刷新 = document/window 双挂 astro:page-load + MutationObserver 兜底；垂直居中 `translateY(-50%)` 常驻 CSS、JS 只写 `--sx`/width；暗色页覆写为暗红辉光）；PostList 过滤；photos stage 切换（请求令牌 + 两段式线性换卷动画 + 定时器清理防竞态）。
@@ -38,7 +38,7 @@ npm run preview      # 本地预览构建产物（旧 dev/preview 进程会占�
 5. **Astro 内容集合完全忽略 `_` 前缀文件**（包括带 `_` 的 .md.example 也不会被收集；模板靠 `.example` 后缀排除，别改）。调试时建临时条目别用 `_` 开头，会静默消失。
 6. **沉浸页舞台必须用 `position: fixed; inset:` 铺满** —— 曾有浏览器对 `100dvh` calc 解析塌陷成 0 导致全黑（见 base.css `body.page-immersive .stage`）。photos 组件内**勿再给 `.stage` 写 height/position**（base 以更高特异性生效；加了 height 会参与定高、把 dock 挤出屏）。
 7. **JS 别直写 `style.transform` 覆盖 CSS 组合位移** —— Nav 滑块曾因此把 `translateY(-50%)` 居中挤掉、整体下挂半身。组合位移（含 `-50%`、`--sx` 变量）写在 CSS，JS 只设变量。
-8. 依赖上限纪律：`dependencies` 仅 `astro`（devDependencies 仅 typescript）；不要引入 UI 框架/字体下载。
+8. 依赖上限纪律：`dependencies` = `astro` + `ogl`（摄影集射线着色器用，spec §26，react 壳已去）；devDependencies 仅 typescript；不要引入 UI 框架/字体下载。
 9. 图片管线：真实 JPEG 走构建期 sharp 自动出响应式 webp；SVG 直通不优化。`img/`（根目录原件）已 gitignore。
 10. 上线占位待替换：`astro.config.mjs` 的 `USERNAME`、`src/site.config.ts` 的站点名/简介（现 "Vibe"）、`src/content/projects/this-blog.md` 的 repo 链接。部署 = 推送 main 触发 `.github/workflows/deploy.yml`。
 
