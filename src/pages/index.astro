@@ -1,85 +1,25 @@
 ---
 import Base from '../layouts/Base.astro';
+import LensGlass from '../components/LensGlass';
 import { site } from '../site.config';
 ---
 <Base>
   <section class="welcome">
     <div class="stack">
-      <h1 class="name" data-name>{site.title}</h1>
+      <h1 class="name">{site.title}</h1>
       <p class="tagline">{site.tagline}</p>
       <div class="acts">
         <a class="btn prism" href="/notes/">个人笔记</a>
         <a class="btn prism" href="/photos/">摄影作品集</a>
       </div>
-      <!-- 液态玻璃圆（spec §33.2）：位于站名右上角，小范围阻尼跟随鼠标 -->
-      <div class="orb" data-orb aria-hidden="true"></div>
+      <!-- 液态玻璃镜头（spec §34）：React+Three 全真折射，位于站名右上，
+           小范围阻尼跟随鼠标；折射画布内自绘背景（非页面 DOM） -->
+      <div class="lens-slot" aria-hidden="true">
+        <LensGlass client:visible follow={1.1} ior={1.15} thickness={3.5} chromaticAberration={0.1} anisotropy={0.02} />
+      </div>
     </div>
   </section>
 </Base>
-
-<script>
-  // —— 液态玻璃圆跟随：锚定站名右上角，鼠标移动时在 ±30px 内指数阻尼漂移 ——
-  const orb = document.querySelector<HTMLElement>('[data-orb]');
-  const name = document.querySelector<HTMLElement>('[data-name]');
-  const host = document.querySelector<HTMLElement>('.stack');
-  if (orb && name && host) {
-    const SIZE = 124;
-    const MAX = 30;
-    let bx = 0; // 锚点（orb 中心 = 站名右上角外扩；坐标系 = .stack 相对坐标）
-    let by = 0;
-    let dx = 0; // 当前漂移
-    let dy = 0;
-    let tx = 0;
-    let ty = 0;
-    let raf = 0;
-    let prev = 0;
-    let shown = false;
-
-    const place = () => {
-      const r = name.getBoundingClientRect();
-      const h = host.getBoundingClientRect();
-      bx = r.right - h.left + 26;
-      by = r.top - h.top - 30;
-      if (!shown) {
-        dx = 0; dy = 0; tx = 0; ty = 0;
-        orb.style.opacity = '1';
-        shown = true;
-      }
-      apply();
-    };
-    const apply = () => {
-      orb.style.left = `${bx + dx - SIZE / 2}px`;
-      orb.style.top = `${by + dy - SIZE / 2}px`;
-    };
-    const tick = (t: number) => {
-      raf = 0;
-      const dt = Math.min(64, prev ? t - prev : 16);
-      prev = t;
-      const a = 1 - Math.exp(-dt / 110); // 液态阻尼（滞后感）
-      dx += (tx - dx) * a;
-      dy += (ty - dy) * a;
-      if (Math.abs(tx - dx) < 0.05 && Math.abs(ty - dy) < 0.05) {
-        dx = tx; dy = ty;
-        apply();
-        return;
-      }
-      apply();
-      raf = requestAnimationFrame(tick);
-    };
-    const kick = () => { if (!raf) { prev = 0; raf = requestAnimationFrame(tick); } };
-
-    document.addEventListener('pointermove', (e) => {
-      if (e.pointerType !== 'mouse') return;
-      // 相对锚点的小范围漂移（越小越轻微）
-      tx = Math.max(-MAX, Math.min(MAX, (e.clientX - bx) * 0.05));
-      ty = Math.max(-MAX, Math.min(MAX, (e.clientY - by) * 0.05));
-      kick();
-    }, { passive: true });
-    window.addEventListener('resize', place);
-    try { document.fonts?.ready?.then(place); } catch { /* 忽略 */ }
-    place();
-  }
-</script>
 
 <style>
   .welcome {
@@ -91,7 +31,7 @@ import { site } from '../site.config';
     padding-block: clamp(24px, 6vh, 72px);
   }
   .stack {
-    position: relative; /* orb 定位上下文 */
+    position: relative; /* lens-slot 定位上下文 */
     display: grid;
     justify-items: center;
   }
@@ -119,42 +59,17 @@ import { site } from '../site.config';
     gap: 12px;
   }
 
-  /* —— 液态玻璃圆（spec §33.2）：折射球，锚定站名右上角 —— */
-  .orb {
+  /* —— 液态玻璃镜头槽（spec §34）：覆盖站名右上区域 —— */
+  .lens-slot {
     position: absolute;
-    width: 124px;
-    height: 124px;
-    border-radius: 50%;
-    opacity: 0;
-    pointer-events: none;
-    z-index: 5;
-    background:
-      radial-gradient(118% 118% at 30% 20%,
-        rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.2) 30%,
-        rgba(255, 255, 255, 0.04) 46%, rgba(150, 170, 210, 0.05) 78%,
-        rgba(255, 255, 255, 0.14) 100%);
-    -webkit-backdrop-filter: blur(10px) saturate(1.8);
-    backdrop-filter: blur(10px) saturate(1.8);
-    border: 1px solid rgba(255, 255, 255, 0.5);
-    box-shadow:
-      inset 2px 4px 8px rgba(255, 255, 255, 0.55),
-      inset -6px -8px 14px rgba(15, 23, 42, 0.12),
-      0 20px 40px -16px rgba(16, 24, 40, 0.3),
-      -2px 0 2px -1px rgba(255, 74, 74, 0.16),
-      2px 0 2px -1px rgba(96, 178, 255, 0.16); /* 边缘色差 */
-    transition: opacity 0.5s ease;
-    will-change: left, top;
+    top: -11vh;
+    right: -6vw;
+    width: min(46vh, 60vw, 560px);
+    height: min(34vh, 46vw, 420px);
+    pointer-events: none; /* 镜头不拦交互（内部跟随走窗口事件） */
+    z-index: 6;
   }
-  .orb::before {
-    /* 球顶高光点 */
-    content: "";
-    position: absolute;
-    left: 17%;
-    top: 12%;
-    width: 34%;
-    height: 18%;
-    border-radius: 50%;
-    background: radial-gradient(closest-side, rgba(255, 255, 255, 0.95), transparent);
-    transform: rotate(-16deg);
+  @media (max-width: 900px) {
+    .lens-slot { display: none; } /* 窄屏省算力，镜头仅桌面 */
   }
 </style>
