@@ -53,6 +53,11 @@ const groups = groupByYear
       const own = (c.dataset.tags ?? '').split(' ').filter(Boolean);
       c.closest('.glasscard')!.hidden = !!active && !own.includes(active);
     });
+    const groups = [...document.querySelectorAll<HTMLElement>('.ygroup')];
+    groups.forEach((g) => {
+      const visible = [...g.querySelectorAll('.glasscard')].some((c) => !c.hidden);
+      g.hidden = !visible;
+    });
     chips.forEach((ch) => ch.classList.toggle('on', ch.dataset.tag === active));
   };
   chips.forEach((ch) =>

@@ -34,7 +34,16 @@ export const collections = {
       ...base,
       tech: z.array(z.string()),
       url: z.string().url().optional(),
-      repo: z.string().optional(),
+      // 允许 https(s):// 或 git@host:path 形式的仓库引用（防 javascript: 等进 href）
+      repo: z
+        .string()
+        .refine((v) => /^https?:\/\//i.test(v) || /^git@[^:]+:.+/.test(v) || /^ssh:\/\//.test(v),
+          'repo 需为 http(s)://、ssh:// 或 git@host:path 形式')
+        .optional(),
+    }).superRefine((p, ctx) => {
+      if (!p.url && !p.repo) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'projects 的 url 与 repo 至少提供一个' });
+      }
     }),
   }),
   photos: defineCollection({

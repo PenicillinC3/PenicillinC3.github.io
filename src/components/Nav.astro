@@ -10,18 +10,22 @@ const isActive = (href: string) =>
   <div class="glass navbar">
     <a class="brand" href="/">{site.title}</a>
 
-    <button class="burger" type="button" data-nav-btn aria-expanded="false" aria-label="展开菜单">
+    <button class="burger" type="button" data-nav-btn aria-controls="nav-panel" aria-expanded="false" aria-label="展开菜单">
       <span></span><span></span><span></span>
     </button>
 
-    <nav class="links" data-nav-panel aria-label="主导航">
+    <nav class="links" data-nav-panel id="nav-panel" aria-label="主导航">
       {
-        site.nav.map((n) => (
-          <a
-            class:list={['link', isActive(n.href) && 'is-active']}
-            href={n.href}
-          >{n.label}</a>
-        ))
+        site.nav.map((n) => {
+          const active = isActive(n.href);
+          return (
+            <a
+              class:list={['link', active && 'is-active']}
+              href={n.href}
+              aria-current={active ? 'page' : undefined}
+            >{n.label}</a>
+          );
+        })
       }
     </nav>
 
@@ -49,6 +53,7 @@ const isActive = (href: string) =>
     if (e.key === 'Escape') {
       panel?.classList.remove('open');
       btn?.setAttribute('aria-expanded', 'false');
+      btn?.focus();
     }
   });
 </script>

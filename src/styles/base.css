@@ -72,8 +72,8 @@ img { max-width: 100%; height: auto; display: block; }
 
 /* 降级：不支持 backdrop-filter → 高不透明度实心面板（spec §5.6） */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  :root { --glass-bg: rgba(255, 255, 255, 0.94); }
-  [data-theme='dark'] { --glass-bg: rgba(15, 17, 26, 0.94); }
+  :root { --glass-bg: rgba(255, 255, 255, 0.94); --glass-bg-strong: rgba(255, 255, 255, 0.96); }
+  [data-theme='dark'] { --glass-bg: rgba(15, 17, 26, 0.94); --glass-bg-strong: rgba(15, 17, 26, 0.96); }
   .glass {
     background: linear-gradient(180deg, var(--glass-hl), transparent 22%),
       var(--glass-bg);
