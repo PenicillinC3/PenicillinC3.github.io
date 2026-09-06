@@ -11,15 +11,21 @@ html {
 
 body {
   margin: 0;
-  min-height: 100vh;
-  padding-top: var(--nav-h); /* fixed 顶栏占位 */
-  background: var(--canvas);
+  min-height: 100dvh;
+  display: flex; /* 页脚吸底：纵向弹性布局（spec §15.2） */
+  flex-direction: column;
+  background-color: var(--canvas);
+  background-image:
+    linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+  background-size: var(--grid-size) var(--grid-size);
   color: var(--text-1);
   font-family: var(--font-sans);
   font-size: 17px;
   line-height: 1.75;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  padding-top: var(--nav-h); /* fixed 顶栏占位 */
 }
 
 h1, h2, h3, h4 {
@@ -56,8 +62,16 @@ img { max-width: 100%; height: auto; display: block; }
 }
 
 .main {
+  flex: 1 0 auto; /* 吸底：短内容时吞掉剩余高度 */
   padding: clamp(20px, 4vw, 44px) 0 clamp(60px, 10vw, 110px);
   min-height: 62vh;
+}
+
+/* 欢迎页：单屏居中区 = 视口剩余空间，页脚贴折叠线（spec §15.2） */
+.main:has(.welcome) {
+  display: flex;
+  flex-direction: column;
+  padding-block: 0;
 }
 
 /* —— 玻璃 v2（LGGC 配方白底化：极淡填充 + 发丝描边 + 灰阶轻投影） —— */

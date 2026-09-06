@@ -4,6 +4,8 @@
   color-scheme: light;
 
   --canvas: #ffffff;
+  --grid-line: rgba(15, 23, 42, 0.05); /* v2.1 方格背景线（spec §15.1） */
+  --grid-size: 22px;
 
   --text-1: #17191f;
   --text-2: #565d6e;
