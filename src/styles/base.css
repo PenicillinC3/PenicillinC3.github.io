@@ -13,7 +13,32 @@
   src: local("华文中宋"), local("STZhongsong"),
     url("/fonts/stzhongsong.woff2") format("woff2");
   font-display: swap;
-  font-weight: 400 900;
+  font-weight: 100 900;
+}
+
+/* MapleMono（spec §29.1）：20.5MB TTF → 全站用字 199KB woff2，正文默认字体 */
+@font-face {
+  font-family: "MapleMono Web";
+  src: url("/fonts/maple-mono.woff2") format("woff2");
+  font-display: swap;
+  font-weight: 100 900;
+}
+
+/* JetBrains Mono（spec §29.2）：代码正体 + 注释斜体（同一 family 两个 face，
+   注释 token 设 font-style: italic 即命中斜体面） */
+@font-face {
+  font-family: "JetBrains Mono Web";
+  src: url("/fonts/JetBrainsMono-Medium.woff2") format("woff2");
+  font-display: swap;
+  font-weight: 100 900;
+  font-style: normal;
+}
+@font-face {
+  font-family: "JetBrains Mono Web";
+  src: url("/fonts/JetBrainsMono-MediumItalic.woff2") format("woff2");
+  font-display: swap;
+  font-weight: 100 900;
+  font-style: italic;
 }
 
 html {
@@ -92,7 +117,11 @@ img { max-width: 100%; height: auto; display: block; }
   border-radius: var(--glass-radius);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
   backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
-  box-shadow: var(--glass-inset), var(--glass-shadow);
+  /* spec §31：接触边缘色差 —— 左缘微红/右缘微青发散线（两 1px 外投） */
+  box-shadow:
+    var(--glass-inset), var(--glass-shadow),
+    -1px 0 1px -0.5px rgba(255, 74, 74, 0.13),
+    1px 0 1px -0.5px rgba(96, 178, 255, 0.13);
 }
 
 /* 降级：无 backdrop-filter → 近实心白面板（spec §14 同款） */
@@ -222,6 +251,22 @@ img { max-width: 100%; height: auto; display: block; }
   font-size: 0.88rem;
   line-height: 1.65;
 }
+/* prism 高亮（spec §29.2）：注释 = JetBrains Mono 斜体面，其余 token 轻配色 */
+.prose pre code { font-family: var(--font-mono); } /* 直击 code 元素（UA 默认 monospace 会压过继承） */
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+  font-family: var(--font-mono);
+  font-style: italic;
+  color: #98a2b3;
+}
+.token.keyword { color: #f47067; }
+.token.string, .token.char, .token.attr-value { color: #a5d6a5; }
+.token.number, .token.constant, .token.boolean { color: #ffc98a; }
+.token.function, .token.method { color: #d2a8ff; }
+.token.class-name, .token.builtin { color: #79c0ff; }
+.token.operator, .token.punctuation { color: #9aa4b2; }
 .prose :not(pre) > code {
   padding: 0.14em 0.45em;
   border-radius: 6px;

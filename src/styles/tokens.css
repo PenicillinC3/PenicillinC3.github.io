@@ -50,10 +50,11 @@
   --prism-d: rgba(120, 224, 190, 0.45);
   --prism-dur: 6s;
 
-  /* 字体 */
-  --font-sans: -apple-system, "SF Pro Text", "PingFang SC", "HarmonyOS Sans SC",
+  /* 字体（spec §29）：MapleMono = 全站正文（摄影页 page-dark 覆写为华文中宋）；
+     JetBrains Mono = 代码（注释走斜体面） */
+  --font-sans: "MapleMono Web", "Maple Mono NF CN", "PingFang SC", "HarmonyOS Sans SC",
     "Microsoft YaHei", system-ui, sans-serif;
-  --font-mono: ui-monospace, "SF Mono", Consolas, "Cascadia Mono", monospace;
+  --font-mono: "JetBrains Mono Web", ui-monospace, "SF Mono", Consolas, "Cascadia Mono", monospace;
   --font-song: "Song Web", "华文中宋", "STZhongsong", "Songti SC", "SimSun", serif; /* 展示用（spec §28） */
 
   /* 动效 */

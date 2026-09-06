@@ -337,3 +337,24 @@ src/content/
 1. **子集管线**：`font/STZHONGS.TTF`（12MB 原件）→ `scripts/subset-song.mjs`（subset-font，harfbuzz wasm）按「摄影首页及其分页实际用字」抽字形 → `public/fonts/stzhongsong.woff2`（当前 51KB，0.4%）。新增照片/卷文案后执行 `npm run fonts:subset` 重新生成并提交。devDependencies 增 `subset-font`（构建期工具，例外同 §26 ogl）。
 2. **@font-face「Song Web」**（base.css）：src 顺序 local 华文中宋 → local STZhongsong → woff2 —— 系统已装则零下载；未装则拉 51KB 子集；子集外字形沿 `--font-song` 栈逐字回退系统宋体。`font-display: swap`。
 3. **应用范围**：`--font-song` 首项改为 "Song Web"（欢迎页站名等既有宋体处自动受益）；`body.page-dark { font-family: var(--font-song) }` —— 摄影作品集首页（画廊）及其分页（卷备忘页）正文/时间戳/标题统一华文中宋书卷感。数字/域名等 mono 覆写不受影响。
+
+## 29. 全站字体切换（2026-09-07，用户提供字体文件；冲突处以此节为准）
+
+1. **正文 = MapleMono（除摄影栏目）**：`font/MapleMono-NF-CN-Medium.ttf`（20.5MB）→ `scripts/subset-maple.mjs` 全站内容字形子集 → `public/fonts/maple-mono.woff2`（199KB）。`@font-face "MapleMono Web"`；`--font-sans` 首项 = "MapleMono Web"。摄影页及其子页除外（`body.page-dark` 已覆写为华文中宋 §28）。
+2. **代码 = JetBrains Mono**：用户已转 `JetBrainsMono-Medium.woff2` / `-MediumItalic.woff2`（font/ 原件入仓、public/fonts 直发），同一 family "JetBrains Mono Web" 两个 face（normal/italic）。
+3. **注释斜体**：astro.config 切 `markdown.syntaxHighlight: 'prism'`（token 类名稳定），`.token.comment/.prolog/.doctype/.cdata { font-style: italic }` 命中斜体面；`.prose pre code` 必须直击设置 family（UA 对 code 的默认 monospace 会压过继承值——实测注释曾落回 monospace）。附轻量 token 配色。
+4. 重新生成命令：`npm run fonts:subset`（song + maple 链式）。
+
+## 30. /photos 长胶卷画廊（2026-09-07，用户逐点批准；冲突处以此节为准，§27 的单帧+半露按钮+渐变占位+ dock 内嵌 meta 作废）
+
+1. **页面 = 一条连续 135 长胶卷**：所有卷封面 3:2 等宽（`--fw`）+ 等间距（`--gap`，帧中心距 = `--step`）排成一条 reel（flex，左=纯灰占位、中间每卷一帧、右=纯灰占位）；**上/下齿孔带贯穿整条**（reel padding-block = `--bh`，绝对定位 band，SVG 孔 tile）。几何变量全挂 `.arena`（reel 与 caption 共同继承；SSR/JS 首帧直落再启用过渡）。
+2. **平移翻卷**：视口中心 = 当前卷；`translateX(--tx)`（target = 视口中心 − 当前帧中心），CSS 弹簧过渡 0.62s `cubic-bezier(.22,1.18,.32,1)` —— 非线性平移（实测有轻微过冲）；帧尺寸/画幅全程不变，邻卷仅在左右露出 ~85–160px（peek 由 step 公式控制：step = max(fw+40, W/2+fw/2−peek)）。
+3. **元信息上移**：日期居中于当前封面上方、地点居中下方（红光白字，.cap overlay 于 arena，z30 > 射线 20），dock 只剩「N 张」与提示，页脚仍在最下。
+4. **首尾占位 = 纯灰色底片**（`.frame--ghost`，solid #adb1b8，不透明、不可点）；翻卷越界即停（不成环）。点击非当前帧 → 平移至它；点击当前帧 → 进备忘页；←/→/Enter 同语义。
+5. **射线修复**：Rays overlay 一直渲染但黑色大画布 + 右上光源在画布外、低强度衰减后近乎不可见 → 首页 overlay 单独增强配方 `{intensity:4.5, opacity:1, falloff:0.95}`（实测右上黑场 R~207）；备忘页 backdrop 保持默认弱配方。
+
+## 31. 液态玻璃边缘色差（2026-09-07，参考 FluidGlass 的 chromaticAberration；CSS 近似）
+
+真实折射色差需 WebGL（react-three MeshTransmissionMaterial），纯 CSS 以两层近似：
+1. **Nav 水滴滑块**：`.slider::before` 两段 7% 边缘渐变（左 `rgba(255,72,72,.22)` 红 / 右 `rgba(96,176,255,.22)` 青，`mix-blend:screen`）→ 接触栏目文字时呈现折射色散；同时滑块加 `backdrop-filter: blur(2px) saturate(1.35)` 玻璃折射感、底色透降至 .62。
+2. **.glass 面板**：box-shadow 追加 ±1px 红/青发散线（`rgba(255,74,74,.13)` / `rgba(96,178,255,.13)`），全程贴边（接触网格/内容的色差）。hover 覆写 shadow 的规则不追加（hover 已有棱光环 §14.3）。

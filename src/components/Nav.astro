@@ -298,9 +298,10 @@ const isActive = (href: string) =>
   .navlink:hover { color: var(--text-1); text-decoration: none; }
   .navlink.is-active { color: var(--text-1); font-weight: 650; }
 
-  /* 水滴滑块（spec §25.1）：液态跟随。垂直居中常驻 CSS translateY(-50%)，
+  /* 水滴滑块（spec §25.1/§31）：液态跟随。垂直居中常驻 CSS translateY(-50%)，
      横向位移由 JS 阻尼每帧写 --sx —— 勿加 CSS 位移过渡（会与阻尼打架），
-     也勿用 JS 直盖 transform（历史坑：挤掉 -50% 后滑块下挂半身） */
+     也勿用 JS 直盖 transform（历史坑：挤掉 -50% 后滑块下挂半身）。
+     折射近似：backdrop 微模糊 + 左红/右青色散边缘（接触文字时的色差感） */
   .slider {
     position: absolute;
     top: 50%;
@@ -310,13 +311,27 @@ const isActive = (href: string) =>
     border-radius: var(--radius-pill);
     background:
       radial-gradient(130% 70% at 50% 0%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0) 55%),
-      rgba(255, 255, 255, 0.78);
+      rgba(255, 255, 255, 0.62);
     border: 1px solid rgba(15, 23, 42, 0.08);
     box-shadow: var(--glass-shadow);
+    -webkit-backdrop-filter: blur(2px) saturate(1.35);
+    backdrop-filter: blur(2px) saturate(1.35);
     opacity: 0;
     will-change: transform, width;
     transition: opacity 0.25s ease;
     pointer-events: none;
+  }
+  /* 色散边缘（spec §31）：接触处模拟折射色差 —— 左缘微红、右缘微青，滤色合成 */
+  .slider::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    pointer-events: none;
+    background:
+      linear-gradient(90deg, rgba(255, 72, 72, 0.22), transparent 7%),
+      linear-gradient(270deg, rgba(96, 176, 255, 0.22), transparent 7%);
+    mix-blend-mode: screen;
   }
 
   .menu-btn {

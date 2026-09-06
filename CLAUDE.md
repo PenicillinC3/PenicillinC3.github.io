@@ -13,7 +13,7 @@ npm install          # 首次
 npm run dev          # 开发服务器（:4321，热更新；dev 工具栏已在 astro.config 关闭）
 npm run build        # 产物到 dist/（验收标准：0 error / 0 warning，当前 14 页）
 npm run preview      # 本地预览构建产物（旧 dev/preview 进程会占端口，先 taskkill node）
-npm run fonts:subset # 新增照片/卷文案后重新生成 public/fonts/stzhongsong.woff2（spec §28）
+npm run fonts:subset # 新增内容后重建 woff2 子集（song §28 + maple §29）
 ```
 
 **无单元测试**。验收 = `npm run build` 零警告 + `npm run preview` 后对路由 curl 状态码（全 200、`/nope-xyz` 404）+ 浏览器人工走查（视觉项）。每次改动后必须 build 通过再提交；git 提交身份已配置（PenicillinC3），逐任务小步提交。
@@ -25,10 +25,11 @@ npm run fonts:subset # 新增照片/卷文案后重新生成 public/fonts/stzhon
 - **页面形态**：
   - `/` 单屏欢迎页（华文中宋大字）；`.main:has(.welcome)` 特判居中；body 是 flex 纵向吸底布局，页脚短页贴底、长页随滚动。
   - `/notes`、`/musings`、`/links` 列表为**单列通栏大卡**（spec §24/§25：一行一张 ~1100px；PostCard 标题↔日期对顶、摘要 76ch 限宽；三栏目卡统一 `min-height:230px` 对齐）+ `/[slug]` 详情；笔记列表有标签过滤（PostList 事件委托 + `style.display` 直控，勿改回 `hidden` 属性方案）。
-  - `/photos` 是**胶片画廊**（spec §27，替代 §21.2/§22.2 全屏/通栏底片版式）：Base 传 `dark gallery`（`body.page-dark` / `body.page-gallery` = 视口锁高无滚动、**页脚保留可见**）；`.gallery` = `.arena`（flex1）+ `.dock`；**主体胶片固定 3:2 片窗**（JS fit()：宽 = min(62% 舞台宽, 高×1.5×0.92, 1000px)，常规源 cover、超宽源 >1.55 用 contain 留左右黑边）居中；**左右槽位常驻「半露按钮(±58%) + 灰黑渐变占位 ghost」hidden 互斥**（首尾不成环，←/→ 越界即 return）；点击胶片进备忘 `/photos/<slug>/`。**红光射线**（spec §26 `Rays.astro`，ogl 移植 SideRays 去 react 壳）：overlay 为 **absolute 填满 arena 内**（勿 fixed 全屏盖页脚）、backdrop（z-1）沉于备忘页玻璃卡后。备忘页版面（横版整行、竖版 1.5fr/1fr，<880px 单列）。**无**单张照片页、无灯箱、无搜索。
+  - `/photos` 是**长胶卷画廊**（spec §30，替代 §27 单帧版式）：Base 传 `dark gallery`（`body.page-gallery` = 视口锁高、页脚保留可见）；一条连续 135 底片（每卷封面 3:2 等宽等距 + 上下贯穿齿孔带，首尾纯灰占位，几何变量挂 `.arena`）；视口中心=当前卷，翻卷 = reel `translateX` 弹簧非线性平移（邻卷在左右仅露 ~100px）；**日期居中在封面上方、地点居中下方**（红光白字 overlay），dock 只剩「N 张」+提示；首尾不循环。**红光射线**（spec §26 `Rays.astro`，ogl 移植去 react 壳）：首页 overlay 增强配方 intensity4.5/falloff.95（黑场大+光源在画布外，默认强度会显得「消失」）、备忘页 backdrop 弱配方。备忘页版面横/竖混排 + backdrop 射线。**无**单张照片页、无灯箱、无搜索。
+  - **字体**（spec §28/§29）：正文 = `MapleMono Web`（MapleMono-NF-CN 子集 199KB；摄影页 page-dark 覆写为华文中宋）；代码 = `JetBrains Mono Web`（用户已转 woff2，注释 token `.token.comment` 斜体命中 Italic 面；markdown 已切 prism 高亮，勿改回 shiki —— 注释字体依赖其类名）。`--font-song` 首项 Song Web。
   - 404 页有搜索框？没有 —— 搜索已全链路删除（fuse.js、SearchBox、/search 均不存在）。
-- **视觉系统**：token 全在 `src/styles/tokens.css`（单一 `:root` 亮色；`body.page-dark` 在 base.css 覆写为暗房 token：`--accent #ff6b6b` 红光，并将**正文字体切为 `--font-song`**（spec §28：华文中宋子集嵌入，@font-face "Song Web" local 优先、无系统字体才下载 51KB woff2））。玻璃配方 v3.1：**面板全透**（`--glass-bg: rgba(255,255,255,0)`）+ `--glass-inset` 内外影对仗 + 右下重投阴影；`--glass-blur: 1px`。`--grid-line/--grid-size` 是方格背景。`base.css` 提供 `.glass/.btn(12px 圆角)/.pill/.prism/.prose`。
-- **交互脚本**（均无框架）：Nav 水滴滑块 = **鼠标跟随液态吸附**（spec §25：pointermove 现量 + rAF 指数阻尼 τ90ms，离开回激活栏，点击跳页；落位刷新 = document/window 双挂 astro:page-load + MutationObserver 兜底；垂直居中 `translateY(-50%)` 常驻 CSS、JS 只写 `--sx`/width；暗色页覆写为暗红辉光）；PostList 过滤；photos stage 切换（请求令牌 + 两段式线性换卷动画 + 定时器清理防竞态）。
+- **视觉系统**：token 全在 `src/styles/tokens.css`（单一 `:root` 亮色；`body.page-dark` 在 base.css 覆写为暗房 token：`--accent #ff6b6b` 红光，并将**正文字体切为 `--font-song`**（spec §28：华文中宋子集嵌入，@font-face "Song Web" local 优先、无系统字体才下载 51KB woff2））。玻璃配方 v3.1：**面板全透**（`--glass-bg: rgba(255,255,255,0)`）+ `--glass-inset` 内外影对仗 + 右下重投阴影 + **§31 边缘色差线**（±1px 红/青）；`--glass-blur: 1px`。`--grid-line/--grid-size` 是方格背景。`base.css` 提供 `.glass/.btn(12px 圆角)/.pill/.prism/.prose`。
+- **交互脚本**（均无框架）：Nav 水滴滑块 = **鼠标跟随液态吸附**（spec §25：pointermove 现量 + rAF 指数阻尼 τ90ms，离开回激活栏，点击跳页；落位刷新 = document/window 双挂 astro:page-load + MutationObserver 兜底；垂直居中 `translateY(-50%)` 常驻 CSS、JS 只写 `--sx`/width；暗色页覆写为暗红辉光；边缘色差层 ::before 左红右青，§31）；PostList 过滤；photos reel 平移翻卷（几何变量 setGeom + CSS 弹簧 --tx，无逐帧动画）。
 
 ## 关键坑（踩过并验证，改动前必读）
 
