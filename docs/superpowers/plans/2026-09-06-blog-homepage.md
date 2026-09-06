@@ -2404,8 +2404,10 @@ import type { ProjectItem } from '../lib/collections';
 interface Props { project: ProjectItem }
 const { project } = Astro.props;
 ---
-<GlassCard class="prjcard" hover>
-  <article>
+{/* 约定：样式类放本组件自渲染元素上，不传给 GlassCard 根（根元素持 GlassCard 自身 scope，
+    调用方 class 上的 scoped 样式会失效 —— PostCard/LinkCard 已两次验证并修复，见 02e2e7a/feadf4e） */}
+<GlassCard hover>
+  <article class="prjcard">
     <h3 class="pt"><a href={project.url ?? project.repo ?? '#'}>{project.title}</a></h3>
     <p class="ps">{project.summary}</p>
     <div class="tech">
