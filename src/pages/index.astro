@@ -14,7 +14,8 @@ import {
 const [notes, musings, links, projects] = await Promise.all([
   noteItems(), musingItems(), linkItems(), projectItems(),
 ]);
-const photos = (await photoEntries()).slice(0, 3);
+const allPhotos = await photoEntries();
+const photos = allPhotos.slice(0, 3);
 const photoMetas = await Promise.all(
   photos.map(async (p) => {
     const g = await getImage({
@@ -44,7 +45,7 @@ const photoMetas = await Promise.all(
   </section>
 
   <section class="stream">
-    <SectionHeader title="摄影精选" count={photos.length} moreHref="/photos/" />
+    <SectionHeader title="摄影精选" count={allPhotos.length} moreHref="/photos/" />
     {
       photos.length > 0 ? (
         <div class="cols cols-photo">
