@@ -10,8 +10,12 @@ interface Props {
   title?: string;
   description?: string;
   noindex?: boolean;
+  /** 暗房页（spec §21.1）：body.page-dark 覆写全局 token 为暗色 */
+  dark?: boolean;
+  /** 沉浸页（spec §21.1）：body.page-immersive 隐藏页脚、main padding 归零 */
+  immersive?: boolean;
 }
-const { title, description = site.tagline, noindex } = Astro.props;
+const { title, description = site.tagline, noindex, dark = false, immersive = false } = Astro.props;
 const headTitle = title ? `${title} · ${site.title}` : `${site.title} — ${site.tagline}`;
 ---
 <!doctype html>
@@ -25,7 +29,7 @@ const headTitle = title ? `${title} · ${site.title}` : `${site.title} — ${sit
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <ViewTransitions />
   </head>
-  <body>
+  <body class:list={['base-body', dark && 'page-dark', immersive && 'page-immersive']}>
     <Nav />
     <main class="wrap main"><slot /></main>
     <Footer />

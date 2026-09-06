@@ -262,3 +262,34 @@ img { max-width: 100%; height: auto; display: block; }
 body.film-on .foot .inner {
   box-shadow: var(--glass-inset), var(--glass-shadow), 0 0 44px -6px color-mix(in srgb, var(--accent) 45%, transparent);
 }
+
+/* —— 暗房页（spec §21.1）：photos 模块页面 dark —— */
+body.page-dark {
+  --canvas: #0b0c10;
+  --grid-line: rgba(255, 255, 255, 0.035);
+  --text-1: #eceef4;
+  --text-2: #b4bacb;
+  --text-3: #7e8598;
+  --accent: #ff6b6b;
+  --link-underline: rgba(255, 107, 107, 0.4);
+  --glass-bg: rgba(12, 13, 18, 0.4);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-inset:
+    inset 3px 3px 7px -2px rgba(0, 0, 0, 0.5),
+    inset -3px -3px 7px -2px rgba(255, 255, 255, 0.1);
+}
+body.page-dark .topbar {
+  background: rgba(9, 10, 14, 0.55);
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+body.page-dark .drawer { background: #0d0e13; }
+/* Nav .slider 背景为硬编码白 rgba（Nav.astro）→ 暗色覆写为深玻璃水滴 */
+body.page-dark .slider {
+  background: radial-gradient(130% 70% at 50% 0%, rgba(255, 255, 255, 0.14), transparent 55%),
+    rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+/* —— 沉浸页（spec §21.2）：无边框全屏，隐藏页脚 —— */
+body.page-immersive .foot { display: none; }
+body.page-immersive .main { padding: 0; }
