@@ -51,9 +51,10 @@ const isActive = (href: string) =>
   });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
+      const wasOpen = panel?.classList.contains('open') ?? false;
       panel?.classList.remove('open');
       btn?.setAttribute('aria-expanded', 'false');
-      btn?.focus();
+      if (wasOpen) btn?.focus(); // 仅关闭实际展开的菜单时归还焦点
     }
   });
 </script>
