@@ -2,8 +2,8 @@
 import Base from '../layouts/Base.astro';
 import { site } from '../site.config';
 ---
-<!-- 欢迎页（spec §35：液态玻璃镜头已删除）。站名 = 打字机动效（spec §39，
-     react-bits TextType 的零框架移植：逐字打出 → 停顿 → 逐字删 → 循环） -->
+<!-- 欢迎页（spec §35：液态玻璃镜头已删除）。站名 = 打字机动效（spec §39/§40，
+     react-bits TextType 的零框架移植：逐字打出一次后定格，光标继续闪烁） -->
 <Base>
   <section class="welcome">
     <div class="stack">
@@ -31,9 +31,9 @@ import { site } from '../site.config';
 </script>
 
 <script>
-  // —— 站名打字机（spec §39，react-bits TextType 行为：type 75 → pause 1500 →
-  //    delete 50 → hold → 无限循环；variableSpeed 默认关闭）——
-  const cfg = { type: 75, del: 50, pause: 1500, hold: 260 };
+  // —— 站名打字机（spec §39/§40）：逐字打出一次后定格全文（不打字时的
+  //    删除/循环已按用户要求移除），光标持续闪烁 ——
+  const cfg = { type: 75 };
   const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
   const h1 = document.querySelector<HTMLElement>('[data-type-name]');
   if (h1 && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -64,21 +64,12 @@ import { site } from '../site.config';
     const run = async () => {
       measure();
       txt.textContent = '';
-      while (h1.isConnected) {
-        for (let i = 1; i <= full.length; i++) {
-          if (!h1.isConnected) return;
-          txt.textContent = full.slice(0, i);
-          await wait(cfg.type);
-        }
-        await wait(cfg.pause); // 全文停顿
-        if (!h1.isConnected) return;
-        for (let i = full.length - 1; i >= 0; i--) {
-          if (!h1.isConnected) return;
-          txt.textContent = full.slice(0, i);
-          await wait(cfg.del);
-        }
-        await wait(cfg.hold); // 空串短暂停留再重打
+      for (let i = 1; i <= full.length; i++) {
+        if (!h1.isConnected) return; // 换页离场即停
+        txt.textContent = full.slice(0, i);
+        await wait(cfg.type);
       }
+      // 定格：全文常驻，仅光标继续闪烁
     };
     (document.fonts?.ready ?? Promise.resolve()).then(run).catch(run);
   }

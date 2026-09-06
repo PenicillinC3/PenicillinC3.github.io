@@ -405,3 +405,7 @@ src/content/
 1. **行为**：欢迎页中央大站名 PenicillinC3 打字机循环 —— 逐字打出（75ms/字）→ 全文停顿 1.5s → 逐字删除（50ms/字）→ 空串停留 260ms → 重打；`_` 下划线光标常显、逐格闪烁（1s 周期对半透明）。调参常量在 `src/pages/index.astro` 模块内 `cfg` 对象。
 2. **零框架实现**（React 已下线 §35）：原生 JS 状态机 + CSS `@keyframes caret-blink`。防 SSR 全文闪现 = `<script is:inline>` 解析期先清空文本（reduced-motion 用户不清空）。**宽度恒定防抖动**：先把「完整站名 + 光标」放进隐藏 probe 量出整宽、写到 h1（text-align 居中 + resize 150ms 防抖重测）→ 打字/删除过程中宽度不变，文字从中心向两侧生长（实测 8 帧宽度恒 615px）。无 JS 回退 = 静态全文 + `html:not(.js)` 隐藏光标；`prefers-reduced-motion` = 全文常驻不打字。打字循环以 `h1.isConnected` 守卫，换页离场即止。
 3. **aria**：h1 `aria-label` 全名，动态文本与光标 `aria-hidden` —— 读屏器不逐字播报。
+
+## 40. 打字机定格（2026-09-07，用户指定；§39 的删除/循环段作废）
+
+打完一遍后定格：run() 只保留「逐字打出 → 保持全文」，删除、空串停留与无限循环全部移除；全文定格后 `_` 光标继续逐格闪烁（CSS 不变）。cfg 仅剩 type 75ms/字。换页重访（View Transitions 重新执行模块）会再次从空串打一遍，属预期。
