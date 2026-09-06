@@ -1,9 +1,118 @@
 ---
+import { getImage } from 'astro:assets';
 import Base from '../layouts/Base.astro';
+import Hero from '../components/Hero.astro';
+import SectionHeader from '../components/SectionHeader.astro';
+import PostCard from '../components/PostCard.astro';
+import PhotoCard from '../components/PhotoCard.astro';
+import LinkCard from '../components/LinkCard.astro';
+import ProjectCard from '../components/ProjectCard.astro';
+import {
+  noteItems, musingItems, linkItems, projectItems, photoEntries,
+} from '../lib/collections';
+
+const [notes, musings, links, projects] = await Promise.all([
+  noteItems(), musingItems(), linkItems(), projectItems(),
+]);
+const photos = (await photoEntries()).slice(0, 3);
+const photoMetas = await Promise.all(
+  photos.map(async (p) => {
+    const g = await getImage({
+      src: p.data.image,
+      widths: [420, 800],
+      sizes: '(min-width: 760px) 30vw, 92vw',
+      format: 'webp',
+    });
+    return { src: g.src, srcset: g.attributes.srcset ?? undefined };
+  }),
+);
 ---
 <Base>
-  <section class="glass card">
-    <h1>脚手架已就绪</h1>
-    <p>导航、玻璃外壳、主题切换已可用。欢迎首页将在 Task 9 落地。</p>
+  <Hero />
+
+  <section class="stream">
+    <SectionHeader title="最新笔记" count={notes.length} moreHref="/notes/" />
+    {
+      notes.length > 0 ? (
+        <div class="cols">
+          {notes.slice(0, 3).map((p) => <PostCard post={p} />)}
+        </div>
+      ) : (
+        <div class="glass empty">笔记区空着 —— 期待第一篇。</div>
+      )
+    }
+  </section>
+
+  <section class="stream">
+    <SectionHeader title="摄影精选" count={photos.length} moreHref="/photos/" />
+    {
+      photos.length > 0 ? (
+        <div class="cols cols-photo">
+          {photos.map((p, i) => (
+            <PhotoCard
+              title={p.data.title}
+              alt={p.data.alt}
+              date={p.data.date}
+              location={p.data.location}
+              img={photoMetas[i]}
+              href="/photos/"
+            />
+          ))}
+        </div>
+      ) : (
+        <div class="glass empty">摄影集空着 —— 等第一张照片。</div>
+      )
+    }
+  </section>
+
+  <section class="stream">
+    <SectionHeader title="最近迷思" count={musings.length} moreHref="/musings/" />
+    {
+      musings.length > 0 ? (
+        <div class="cols">
+          {musings.slice(0, 3).map((p) => <PostCard post={p} hideTags />)}
+        </div>
+      ) : (
+        <div class="glass empty">迷思区空着。</div>
+      )
+    }
+  </section>
+
+  <section class="stream">
+    <SectionHeader title="网站参考" count={links.length} moreHref="/links/" />
+    {
+      links.length > 0 ? (
+        <div class="cols">
+          {links.slice(0, 3).map((l) => <LinkCard link={l} />)}
+        </div>
+      ) : (
+        <div class="glass empty">收藏夹空着。</div>
+      )
+    }
+  </section>
+
+  <section class="stream">
+    <SectionHeader title="最近项目" count={projects.length} moreHref="/projects/" />
+    {
+      projects.length > 0 ? (
+        <div class="cols">
+          {projects.slice(0, 2).map((p) => <ProjectCard project={p} />)}
+        </div>
+      ) : (
+        <div class="glass empty">项目区空着。</div>
+      )
+    }
   </section>
 </Base>
+
+<style>
+  .stream { margin: clamp(40px, 7vw, 64px) 0 0; }
+  .stream:first-of-type { margin-top: clamp(24px, 4vw, 40px); }
+  .cols {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+    gap: clamp(14px, 2vw, 20px);
+  }
+  .cols-photo { grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+  .empty { padding: clamp(24px, 4vw, 44px); text-align: center; color: var(--text-2); }
+</style>
