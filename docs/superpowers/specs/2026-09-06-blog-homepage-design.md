@@ -505,3 +505,127 @@ setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160）
 - 消费方：`.prose pre code`（代码块）、`.prose :not(pre) > code`（行内代码）、`LinkCard .host`（域名字符串，拉丁不受影响）。
 - 注释规则不动：`.token.comment/.prolog/.doctype/.cdata` 仍 `--font-comment`（斜体 JetBrains → 斜体 Maple），注释与字符串中文由此分处正/斜两体。
 - 实现：`tokens.css` 的 `--font-mono` 链 + 注释更新；产物字体子集照旧 `npm run fonts:subset` 重建。
+
+---
+
+## §58（2026-09-07 晚）首页玻璃小球 —— react-bits FluidGlass 精简移植（覆盖 §35「React 全量下线」部分）
+
+用户当晚要求把 react-bits 的 FluidGlass「玻璃小球」移植到首页。经核实：所贴源码是含 ScrollControls/React Bits 字样/Unsplash 远程图的整页模板、非独立小球；站点依赖未装、无 .glb 模型。路线三选一定为**精简移植**，构图（AskUserQuestion）定为**右上角位小装饰球**（直径≈视口 1/3、轻跟手）。§35「React 栈全量下线、回到 astro+ogl」就此**部分撤销**（仅限此镜头岛所需依赖集）；§34 的实现蓝图与安装注记继续有效。
+
+1. **组件 `src/components/LensBall.tsx`**（全站唯一框架岛，`index.astro` `client:only="react"`，仅首页加载，chunk ~900KB raw 属预期）：机制照 §34 LensGlass + react-bits 原版 FBO 回路 —— `createPortal` 把后台（浅底墙 `#f6f8fc` z-6 + GridHelper 正对相机 opacity.07 + 三枚棱光色斑 CanvasTexture 缓慢漂移）渲入独立 scene → `useFBO` buffer → 主场景整屏 quad 贴出 → 球在前折射同一 buffer。几何 = 程序椭球（sphere 128 段，z 压扁 0.5 → 双凸），**无 .glb**；场景不折射 DOM（同 §34/demo）。
+2. **材质/手感**：`MeshTransmissionMaterial` ior 1.15 / thickness 3 / chromaticAberration 0.08 / anisotropy 0.02 / distortion 0.15 / temporalDistortion 0.1 / white（§34 与 react-bits 折中）。跟手沿用 §34 v2 修过的口径：窗口级 pointermove 整页归一化（clamp ±1.35）× 轻幅度（`min(vp)×0.16`），damp3 τ0.13，静止呼吸 ±0.012；reduced-motion 静态落位无呼吸。`window.__lensReady` 首帧置真（headless 断言）。
+3. **槽位/工程**：`.lens-slot` fixed 右上（top `nav+5vh`、right 4vw、`min(33vw,360px)` 方槽）、z-index 5、pointer-events none、<900px 隐藏、淡入 0.8s。`astro.config.mjs` 加 `react()` 集成 + `chunkSizeWarningLimit: 1800`（维持「构建 0 警告」验收纪律）；tsconfig 补 jsx react-jsx；安装 `--legacy-peer-deps`（drei/fiber react-native/expo optional peers 冲突，同 §34.1）。版本矩阵（2026-09-07 latest）：react 19.2 / @astrojs/react 6.0 / fiber 9.7 / drei 10.7 / three 0.185 / maath 0.10。
+
+---
+
+## §59（2026-09-07 深夜）玻璃球 v2：全屏吸鼠标 + 折射真实页面（覆盖 §58 角位构图）
+
+用户走查 §58 角位小球后提出四点修改：不要自绘浅底/棱光晕彩；访问即**吸在鼠标上、默认居中**；再小一点；上下移动与鼠标相反（v1 bug：屏幕下移被当作世界 +y，实为 −y）、左右跟手不足。重构为 v2：
+
+1. **构图**：`.lens-slot` 改为全屏 `fixed inset:0` 透明覆盖层（pointer-events none、z 5），球默认居中，指针全页吸附跟随（damp3 τ0.08），幅度 = 球深度处（z15）视口半幅并 clamp 球缘不越视口；直径 ≈ 视口高 27%（`RATIO=0.034`，比角位版小）；<900px 与 prefers-reduced-motion 均隐藏（后者不再静态呈现）。
+2. **折射内容 = 真实页面镜像**：球内显示的是鼠标下方真实 DOM 的折射放大。镜像 = **html2canvas 自绘快照**（`scale 2`、裁视口、`ignoreElements` 跳过自身、字体同源可被 canvas 使用），700ms 重拍覆盖打字机/光标变化，纹理贴 z-6 大平面 1:1 映射，RT 采样。
+3. **⚠ 曾用 foreignObject+SVG blob 方案，实测现版 Chromium 对 foreignObject-svg 一律判跨域污染**（连无样式纯文本 svg 也 taint，canvas 直接废）→ 弃用，改 html2canvas（新增依赖，仅此岛内用，装于 dependencies）。
+4. **GL 报错排除**：drei `useFBO` 默认（MSAA/HalfFloat）在部分 GPU/SwiftShader 触发 `THREE.WebGLState` GL_INVALID_OPERATION 刷屏 → 自建经典 `WebGLRenderTarget`（UnsignedByte + Linear、无 MSAA），headless 全断言零 console 错误。
+5. 镜像纹理超采样 `SNAP_SS=2`（上限 4096）；球材质参数：ior 1.15 / thickness 2.2 / chromaticAberration 0.08 / anisotropy 0.02 / distortion 0.12 / temporalDistortion 0.08（§58 材质在更小体积下略减）。几何仍程序椭球（z×0.72 微扁），无 .glb。
+6. 验证：headless 12 断言全绿（快照成功 / 居中 / 右+x 下−y 同向 / 左上反向 / 无 console 错误 / 移动与减动效隐藏）。
+
+---
+
+## §60（2026-09-08 凌晨）玻璃球 v3：透明折射修复 + 指针离场 + 再缩小（§59 收尾）
+
+用户真机走查 §59 v2 报四题：球不透明无折射；Alt+Tab 出现许多无意义窗口；要求指针离场球缩没、刚访问默认不在；球仍过大。修复与实测记录：
+
+1. **不透明/无折射根因（drei 源码实证）**：`MeshTransmissionMaterial` 传入自建 `buffer` 后**跳过内部自采样**（`buffer.value === fboMain.texture` 才自渲场景）；v2 把内容全挪进 portal 后主场景为空 → 真机球发白不透明、SwiftShader 全透明。修：**整屏 quad 放回主场景**（贴 buffer.texture，内容 = DOM 镜像、像素与真实页面一致 → 视觉等同透明），MTT 与自采样均有源；portal 镜像平面只负责喂 RT。
+2. **canvas 换图纹理不重建（三处实测定位）**：仅 `needsUpdate` 后 GL 纹理不更新（保持首帧旧图）；html2canvas 产物直传 WebGL 全黑（2D 读正常；4×4 手绘 canvas 对照正常）→ **换图必须 `snapTex.dispose()` 强重建**后正常。SwiftShader/真机同路径。canvas 纹理须 `colorSpace = SRGBColorSpace`。
+3. **指针离场/入场**：`documentElement mouseleave` + `window pointermove`（pointerIn 状态）驱动可见度 vis 阻尼（τ0.12）；**刚访问默认 vis=0（球不可见）**，首次移动放大 —— 与「吸在鼠标」语义一致；reduced-motion 整层隐藏不变。
+4. **尺寸**：直径 27% → **~19% 视口高**（`RATIO 0.034→0.024`，半径 ≈ tan7.5°×5 处 0.126 world）。
+5. **快照卫生（Alt+Tab 窗口疑云的对策）**：`inFlight` 防 html2canvas 重叠重绘、`document.visibilityState` 非 visible 暂停 + 回显即补拍、周期 700→1000ms。另 `gl preserveDrawingBuffer: true`（供探针/截图读回，代价极小）。
+6. 验证：headless 像素/行为 7 断言全绿（初始隐藏、入场可见、球内 63 色内容折射、离场缩没、回场放大）；球尺寸按构造断言（quad 全屏不透明后 alpha 边缘法失效）。Alt+Tab 现象待用户真机复核（若再现需另查系统级来源）。
+
+---
+
+## §61（2026-09-08）玻璃球 v4：撤整屏镜像盖层 + 按需渲染 + 玻璃参数照用户配方
+
+用户真机走查 §60 v3 报三题：特别卡（打字机动效都被卡没）；首页两枚按钮样式消失（棱光动画静止）；玻璃观感要照给定 lens 配方重调。根因与修复：
+
+1. **盖层是卡顿与按钮 bug 的共同元凶**：§60 为修折射把「整屏镜像 quad」画在最上层 —— 它盖住真实 DOM（按钮/打字机/棱光动画全部藏在镜像下 → 「样式消失」观感），且 html2canvas 每秒 2880px 全页重绘占主线程（打字机被拖卡）。**撤除整屏 quad**，回「透明顶层只画球」：球外画布 alpha=0，真 DOM 永远可见可交互；球折射源 = portal 镜像快照（页面 22px 网格线在全站提供高频内容，空白处也有折射可见度）。
+2. **帧率（按需渲染）**：`Canvas frameloop="demand"` —— useFrame 只在「球在动 / 可见度收敛中 / 快照到达(mirrorDirty 补帧)」时 invalidate 续帧；球缩没且静止 = 零渲染。⚠ demand 陷阱：`pointermove`/`mouseleave` 事件不会自带帧 → 处理器内必须 `invalidate()`（否则 vis 衰减冻结、球不跟随）。
+3. **快照节流**：仅 `pointerIn` 时周期拍（1200ms），离场停表；入场/回显即补拍；html2canvas 防重叠 + visibility 暂停（同 §60）；SS 2→1.5。打字机首屏完全不被快照拖累（指针未入场前零快照）。
+4. **玻璃参数（用户指定 lens 配方）**：ior 1.15 / **thickness 2** / **chromaticAberration 0.05** / **anisotropy 0.01** / transmission 1 / roughness 0 / color #fff；**去掉 distortion/temporalDistortion**（更清透）；球径维持 ~19% 视口高。
+5. 验证：headless 10 断言全绿（初始透明且球隐、入场可见+补拍、球投影 86px≈19%、球内 240 色折射、球外透明 DOM 可见、离场缩没、回场放大）。Alt+Tab 窗口疑云仍未定位到代码内来源，需用户再核。
+
+---
+
+## §62（2026-09-08）玻璃球 v5：自定义着色器 + C3 默认位 + 乘法色散（弃 drei MTT）
+
+用户反馈 v4 仍卡、按钮感观问题、色散「不够蓝黄红、有奇怪颜色」、要求畸变仅外圈；明确新交互：默认停在站名 "C3" 右上角轻遮、砍掉移入/移出缩放动画（移出回默认位、移入快速吸附）。
+
+1. **渲染架构重写（卡顿根治）**：弃用 drei `MeshTransmissionMaterial` + portal/RT/useFBO 管线（逐帧重渲贵、色散颜色不可控）→ **单张全屏 quad + 自写 `ShaderMaterial`**：球 = 屏幕坐标圆盘，内容直接采样 DOM 镜像纹理（html2canvas 快照）。无 RT、无逐帧场景重渲；`frameloop="demand"` 静止即零渲染。bundle 体积同步下降（不再引 drei 的 MTT 内部链）。
+2. **色散 = 乘法着色环（关键修复）**：先版「加法叠色」在白色页面全被裁剪成白（探针均值≈0 实证）→ 改**乘法**：红 (1.30,.32,.26) / 黄 (1.12,1,.32) / 蓝 (.42,.62,1.18) 三环按距缘距离高斯加权 —— 白底上可读的纯色（探针 red 91 / yel 78 / blue 90），无混色杂绿灰；另加球外薄红/蓝光晕与缘带内逐通道径向错位采样（微色差），畸变仅贴边 24% 内（`uBend≈4px`，中心≈0）。
+3. **交互/构图**：默认位 = 站名 `[data-type-name]` rect 右上角（center ≈ right−0.42d, top−0.1d，d=19% 视口高），加载即现（字体就绪 + 打字完成各落位一次）；指针移入快速吸附（τ0.05），移出回默认位（τ0.22）；**删除 vis 缩放动画**；reduced-motion 常驻默认位。
+4. **快照节流**：仅 入场/移动（≥450ms 间隔）/停稳回位 260ms 后 触发，SS=1；打字完成 2.4s 后再拍准一版；页面隐藏暂停。静止时零 html2canvas、零渲染。
+5. 类型修正：卸载 `@types/html2canvas`（0.5 远古版错配）→ 用 html2canvas 自带类型（dist/types）。验证：headless 10 断言全绿（默认位精确 C3 右上、球外 alpha=0、吸附/回位、红/黄/蓝三环与晕均读数达标）。
+
+---
+
+## §63（2026-09-08）玻璃球 v5.1：畸变回 v4 柔和透镜 + 色散改回物理式色差并拉饱和
+
+用户对 §62 v5 走查：优化全保留；**畸变改回之前**（去掉 v5 外缘弓形弯折，回 v4 整球轻微放大、球缘与外页 1:1 衔接）；**色散染色环不好看**（红/黄/蓝乘法环如贴纸）→ 改回「逐通道采样错位」的物理式色差并**加强幅度/饱和度**：
+
+- 折射：`sp = center + d/uMag`（uMag 1.075 整球放大），无 rim 弓形项；体积微暗、缘内高光保留。
+- 色差：R 采样沿径向 **外移** `chPx = uChroma·len²`（缘 4.8px → 中心 0）、B **内移** ×0.85 —— 内容边界出现红/青饱和色差线；随后整体饱和度 `sat = 1.10 + 0.65·smoothstep(0.35,1,len)`（缘带强升）。
+- 探针：默认位 C3 ✓、缘带强彩像素 35.6%（maxHue 255）、球外透明、回位 ✓。参数：`CHROMA_PX`（4.8）、`MAG`（1.075）、着色器内 sat 系数。
+
+---
+
+## §64（2026-09-08）玻璃球 v6：回原版 drei MeshTransmissionMaterial + 原版交互（覆盖 §62/§63 自定义着色器）
+
+用户对照 react-bits 原版源码后定调：「用原版的 drei MeshTransmissionMaterial（自写着色器不行）；交互也照搬原版；深色背景别搬；只搬玻璃球」。
+
+1. **材质回原版**：弃 §62 自写 ShaderMaterial → 原版 ModeWrapper 的 MTT 用法：`buffer` + ior 1.15 / thickness 5 / anisotropy 0.01 / chromaticAberration 0.1（原版四项默认）+ color #fff。几何 = 原版 lens 形态：`CylinderGeometry`(r1,h0.42) `rotation-x=π/2` 轴向正对相机；scale 0.15（原版 auto 公式 min(0.15, maxWorld/geoWidth) 宽视口下即 0.15）。
+2. **交互照搬原版**：全屏跟手 —— 指针归一化 × 球深度(z15)可视半幅，damp3 τ0.15；无 C3 默认位/无隐藏/无缩放动画（§62 交互约定就此作废）；指针停哪球停哪。
+3. **不搬深色背景**：画布透明（alpha），MTT 折射内容 = 本站真实页面 DOM 镜像（html2canvas，1:1 屏幕映射平面 z-6 → RT）—— §60 后修好 dispose 换图坑，v2 当年「发白不透明」即此坑所致，非拓扑问题。
+4. **保留的性能基建**：frameloop="demand"（静止零渲染、事件 invalidate 脉冲）；portal 只在镜像刷新时渲一次（相机/内容静止，buffer 无需逐帧重渲）；快照节流同 §61（入场/移动≥450ms/打字完成 2.4s 补拍；SS=1）。
+5. 探针（headless）：快照/初始中心/全屏跟手目标（误差 <0.001）/球外透明 全过；球体像素在 SwiftShader 下不可读（MTT 环境限制，同 §60 注记），观感以真机为准。reduced-motion 与 <900px 仍整层隐藏（站点 a11y 政策，非原版行为）。
+
+---
+
+## §66（2026-09-08）v6.1 材质加强 + 首页 3D 站名（drei Text/troika）取代 DOM 打字机
+
+用户真机走查 v6 后：色散/畸变不够、球内文字不居中；并要求首页大字在不删打字机前提下改原版 3D 大字、玻璃观感向原版靠。全部采纳：
+
+1. **MTT 参数加强（§64 基线）**：ior 1.15→1.22、thickness 5→10、anisotropy 0.01→0.02、chromaticAberration 0.1→0.45（真机「不够」）。
+2. **球内文字不居中修复**：镜像平面曾放 z=-6 且 scale 1.5× —— 平面超出视口使 RT uv 与屏幕非 1:1（MTT 按 fragCoord 采样，球越偏离中心错位越大）。改 **z=0、scale=vp×1.001**（该深度可视域恰 = vp）→ uv 与屏幕严格 1:1。
+3. **3D 站名**：drei `<Text>`（troika SDF）双场景渲染 —— 主场景 z=12 显示 + portal 同款副本作折射源（原版「玻璃折射场景内大字」机理，白页深墨 `#17191f`、字号/位置由 DOM h1 占位 rect 实测换算，letterSpacing 0.04 与 CSS 同步）。玻璃(z15)在字前 —— demo 层级同构。
+4. **字体**：troika 不支持 woff2 → `scripts/subset-song.mjs` 增拉丁子集步骤产出 `public/fonts/song-3d.ttf`（17KB，ASCII 32–126），fonts:subset 链同步。
+5. **打字机迁入 canvas**（语义同 §39/§40）：fonts.ready 后逐字 75ms 一次定格，光标 `_` 字形 500ms 闪烁（打字中与定格后都闪）；主/portal 两份 Text 同步推进。DOM 旧打字机脚本与 caret CSS 删除；h1 保留为占位（宽屏 + html.js → 文本 `visibility:hidden` 让位 canvas，盒子保留原高 → tagline/按钮布局不动；aria-label/SEO 不丢）。
+6. **降级**：prefers-reduced-motion → 全文立即定格、无光标、球隐藏（CSS 不再整层隐藏 slot，3D 名字仍显示）；<900px → slot 隐藏、DOM 名字静态全文（移动端打字机退化静态，已知妥协）；无 JS → DOM 静态全文。快照 ignoreElements 增 `.name`（防球内双影）。
+7. 验证：headless 12 断言全绿（打字推进中途 len4→12、光标翻转、名字区深墨字形 86%、快照、玻璃跟手、reduced 定格无光标、移动/无 JS 静态全文）。
+
+---
+
+## §65（2026-09-08）v6 修复：球「看不见」= visible 绑定 ref 不触发重渲
+
+用户真机反馈 v6 完全看不到球。根因：`<mesh visible={mirrorReady.current}>` —— `mirrorReady` 是 ref，快照就绪后赋值**不触发 React 重渲染**，mesh 永远停在初始 `visible=false`（首帧镜像未就绪时的隐藏态），球从未显示。修复：JSX 去掉 visible prop，在 useFrame 每帧直写 `mesh.visible = mirrorReady.current`。修复后 headless 像素探针可读到球（盘内 83% 覆盖、中心不透明、无 console 错误）—— 说明此前「SwiftShader 不渲染 MTT」的判断亦由此 bug 污染，MTT 在本环境渲染正常。教训：**React 属性受 ref 驱动时，勿用 JSX prop 绑定 ref 初值，须 setState 或逐帧直写**。
+
+---
+
+## §67（2026-09-08）v8：首页液态玻璃英雄区 —— react-bits FluidGlass 一比一复刻（覆盖 §66 自造方案）
+
+用户终稿指示：打字效果删除；「原版怎么来这个项目就怎么来，除了深色背景和贴图之外一比一复刻」。
+
+1. **组件 = 原版 FluidGlass lens 模式忠实移植**（`LensBall.tsx`）：Canvas（fov15 z20）+ ScrollControls(pages=1) + LensGlass(ModeWrapper 同构)：portal 场景（白底大平面 + 站名 3D 大字）→ useFBO → 整屏 quad 贴出 → 玻璃 mesh 折射同一 buffer；R3F 画布 pointer 全屏跟手 damp3 τ0.15（画布自身承接事件）；材质 = 原版默认 ior1.15/thickness5/aniso.01/chrom0.1。
+2. **除项**：深色背景 → 白平面 #fff（Canvas 同步白底）；贴图（Unsplash IMAGE_URLS/Images）不搬 → 场景内容 = 站名 Typography（song-3d.ttf，device 档位 0.2/0.4/0.6，letterSpacing −0.05，深墨 #17191f —— 白底上原版白字须反色）；打字机删除（§66 打字机/占位 h1/双场景副本/html2canvas DOM 镜像 全部移除，html2canvas 依赖卸载）。
+3. **几何**：lens.glb 缺 → 程序 CylinderGeometry(1,1,0.42,128) rotation-x π/2（原版 cylinder 口径，scale auto min(0.15,…)）。
+4. **页面**：`.lens-slot` fixed 顶栏以下整层（z5，nav60 之上可点击；画布承接指针）；DOM 静态回退（站名/tagline/双按钮，原 welcome 结构）在 <900px 与无 JS 显示，桌面有 JS 隐藏 —— 移动端与无 JS 保底内容/SEO（h1 语义）。
+5. **a11y 增项（原版无）**：prefers-reduced-motion → 镜头静止居中不跟手。
+6. 验证：headless 8 断言全绿（首帧、镜头居中、白底+深墨大字像素、画布事件跟手、移动/无 JS 回退）。⚠ preserveDrawingBuffer:true 供读回/截图（勿删，探针依赖）。
+
+---
+
+## §68（2026-09-08 深夜）撤销玻璃球全套 —— 回到打字机初版（§58–§67 留档）
+
+用户在 v8（一比一复刻英雄区）走查后决定**不再添加透明玻璃**，要求回到「没有让我添加这个透明玻璃的初版」。代码整体回滚到玻璃会话前基线（= 打字机首页 §39/§40 + tagline + 双按钮、零框架、依赖 astro+ogl）：
+
+- 删除 `src/components/LensBall.tsx` 与 `public/fonts/song-3d.ttf`（subset-song 脚本同步还原，无 3D 拉丁子集步骤）；`index.astro`/`astro.config.mjs`（react 集成与 vite chunk 项移除）/`tsconfig.json`（jsx 项移除）/`package.json`+lock（卸载 @astrojs/react react react-dom three @react-three/fiber @react-three/drei maath 与 @types/*）/README/CLAUDE.md 全部还原。
+- §58–§67 全部实现（含各自的 portal/FBO/镜像/3D 大字/打字机迁移等方案与教训）**留档于本 spec，不再采用**；§65（ref 勿绑 JSX visible prop）与 §60（canvas 换图须 dispose）为通用 three/React 教训，他处可借鉴。远端线上从未含玻璃（未推送），恢复零部署成本。
