@@ -646,3 +646,7 @@ setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160）
 - 依赖：**React 栈回归（特批，仅此 island）** —— @astrojs/react **v4.4.2**（须配 Astro5/vite6；v6 系 Astro6/vite8 不可用，实测装错即降）、react 19.2.8、three 0.185、@react-three/fiber 9.7、@react-three/drei 10.7、maath 0.10、devDeps @types/react(-dom) 19；astro.config 恢复 `integrations: [react()]`，tsconfig 补 jsx react-jsx。**依赖纪律（CLAUDE §8）更新：React 栈仅限此 island，禁止再加其它 UI 框架**。
 - 降级：<900px / prefers-reduced-motion / 无 JS → 不挂载（`FluidGlass.jsx` 内 matchMedia 守卫），页面与 §68 基线白页一致；场景 `aria-hidden`。
 - 验证：build 16 页 0 警告；preview 路由 `/`、`/notes/`、`/assets/3d/lens.glb` 200、`/nope-xyz` 404。视觉项由用户真机走查驱动（调参旋钮 = `FluidGlass.jsx` 顶部 `LENS_PROPS` 与 `GRID_*` 常量）。
+
+**§69.1 修正（2026-09-08 走查）：层叠 bug —— 文字被垫底 canvas 盖住**
+
+§69 首版把 `:global(.main:has(.welcome))` 提层 z1，意图让欢迎内容盖过 `.glass-scene`（fixed z0）。实际**失效**：z-index 使 `.main` 成为堆叠上下文，fixed canvas 被收进 main 自身上下文、按其内 z0 画在普通流文字之上 → 首页打字机站名/tagline/按钮全部被不透明 canvas 遮没（用户报「首页的字没了」）。修复：`.main` 不设 z-index/transform（保持根级上下文），改由 **`.welcome` 自身 `position:relative; z-index:1`** 与 canvas 同处根上下文盖过它；`.acts` 在 `.welcome { pointer-events:none }` 下重开 auto。教训：**fixed 后代的堆叠归属最近的有 z-index/transform 祖先，提层必须落在与 fixed 层同级的元素上，或让内容元素自身提层**。
