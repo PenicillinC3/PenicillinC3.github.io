@@ -667,3 +667,9 @@ setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160）
 修复：**整体删除 NameEcho**（portal 场景回归纯网格折射素材；折射内容自 §69.2 起已含可见网格，水印非必需）；`LENS_PROPS.scale` 0.25→**0.18**（直径 0.5→0.36 世界单位，约屏高 38%→27%）；`subset-song.mjs` 拉丁 truetype 步骤与 `public/fonts/song-3d.ttf` 一并回撤（未来若要做「镂空/异位水印」可经 fonts:subset 再生）。构建 0 警告回归。
 
 另答用户问：打字机与「网页快照喂球」（html2canvas 路线）**冲突** —— 打字 75ms/字，快照需频繁重拍 DOM，CPU 拖垮打字动画（§59–63 已证）；当前官方组件路线**不拍 DOM**、球只折射场景内网格，与 DOM 打字机完全解耦，无冲突。代价：球被 DOM 文字像素盖住处不显示（层叠如此），字迹间隙与网格区仍可见折射。
+
+**§69.4 修正（2026-09-08 走查）：删打字动画、球 .12、背景对齐普通页**
+
+用户终调：① 打字动画的背景（canvas 未就绪前的 DOM 底）与打字后（canvas 0.12 网格）仍不一致 —— 直接**删除打字动画**（§39/§40 首页不再启用），标题静态全文；② 球再缩至 scale **0.12**（直径 0.24 世界 ≈ 屏高 18%）；③ 背景「把个人笔记那个拿过来」—— notes 等普通页背景 = body 原生 CSS 方格（22px、rgba(15,23,42,.05)、1csspx 发丝）。首页此前被 canvas 自绘 0.12/2px 纹理网格盖住，观感与普通页不一。
+
+修复（`src/components/FluidGlass.jsx`）：**折射素材弃 CanvasTexture，改矢量细条几何**（每格 22csspx、线宽 1csspx、alpha 0.05，随视口重建 BufferGeometry）—— 纹理经「纹理→FBO→quad」两次重采样浓度必然失真（§69.2 教训：0.05→近隐、0.12→过重），矢量线直接把 CSS 原生 1px 浓度搬进场景；首页背景自此与 notes 等页**视觉统一**，且 canvas 从首帧即此观感（无 glb 加载完成前的反差时段）。index.astro 打字机相关内联/模块脚本与 caret CSS 全删（含 html.js 挂载、宽度探针、reduced-motion 分支），h1 直接渲染 `site.title`。

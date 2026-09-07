@@ -13,10 +13,9 @@
  * 定制点（仅「内容」层，不改机制）：
  *   - 官方紫底 #5227ff / 白字 "React Bits" / 5 张 Unsplash 照片 —— 全删；
  *     清屏改白 0xffffff。
- *   - 折射内容 = 本站背景方格（22px；§69.2 线宽/浓度已加粗至可见——
- *     0.05/1px 经纹理重采样后隐形）。§69.2 的深墨站名水印 NameEcho 已删
- *     （§69.3：与 DOM 打字机标题重叠难看、且 fonts.ready 后才现身导致打字
- *     前后背景不一 —— 详见 spec；折射素材回归纯网格）。
+ *   - 折射内容 = 与普通页一致的矢量发丝方格（§69.4：22px/0.05、细条几何，
+ *     非 CanvasTexture —— 纹理经「FBO → quad」两次重采样浓度失真，§69.2/§69.3
+ *     已证；NameEcho 站名水印按用户要求删除）。
  *   - bar/cube 模式、ScrollControls、NavItems、Typography、Images 均未移植。
  *   - <900px 或 prefers-reduced-motion：不挂载（页面回退纯 DOM 欢迎页）。
  *
@@ -25,53 +24,32 @@
  * chromaticAberration .05 / anisotropy .01（调这里即可微调观感）。
  */
 import * as THREE from 'three';
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { Canvas, createPortal, useFrame, useThree } from '@react-three/fiber';
 import { MeshTransmissionMaterial, useFBO, useGLTF } from '@react-three/drei';
 import { easing } from 'maath';
 
-/* 玻璃球材质参数（官方 docs 面板默认 scale .25；§69.3 用户走查「球太大」
-   缩至 .18 —— 直径 0.5→0.36 世界单位，约屏高 38%→27%） */
+/* 玻璃球材质参数（官方 docs 面板默认 scale .25；§69.3→.18、§69.4→.12
+   用户逐次走查缩小 —— 直径 0.5→0.36→0.24 世界单位，约屏高 27%→18%） */
 const LENS_PROPS = {
-  scale: 0.18,
+  scale: 0.12,
   ior: 1.15,
   thickness: 2,
   chromaticAberration: 0.05,
   anisotropy: 0.01,
 };
 
-/* 折射内容：本站背景方格（观感同 tokens.css --grid-line / --grid-size）。
-   注意（§69.2）：alpha 0.05 的 1px 发丝线在「纹理 → 缓冲 → 全屏 quad」的
-   两次重采样后被压到肉眼不可见（页面看似纯白、球无物可折射）——故线宽加粗
-   至 2px、alpha 提到 0.12，方格成为球的可视折射源。 */
-const GRID_CSS_PX = 22; // 单元格 22px
-const GRID_TEX_PX = 2048; // 纹理边长像素
-const GRID_CELL_TEX = 16; // 每格 16px → 每张纹理 128 格
-const GRID_LINE = 'rgba(15, 23, 42, 0.12)';
-
-function makeGridTexture() {
-  const c = document.createElement('canvas');
-  c.width = c.height = GRID_TEX_PX;
-  const ctx = c.getContext('2d');
-  ctx.strokeStyle = GRID_LINE;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  for (let x = 1; x <= GRID_TEX_PX; x += GRID_CELL_TEX) {
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, GRID_TEX_PX);
-  }
-  for (let y = 1; y <= GRID_TEX_PX; y += GRID_CELL_TEX) {
-    ctx.moveTo(0, y);
-    ctx.lineTo(GRID_TEX_PX, y);
-  }
-  ctx.stroke();
-  const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.generateMipmaps = false;
-  tex.minFilter = THREE.LinearFilter;
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
+/* 折射内容：矢量发丝方格（§69.4）—— 与 body 背景同观感（22px、
+   rgba(15,23,42,0.05) 1csspx 线，即 notes 等普通页的背景）。不用 CanvasTexture
+   的理由：发丝纹理经「纹理 → FBO → 全屏 quad」重采样后浓度失真（§69.2 教训，
+   0.05 变不可见 / 0.12 又比普通页重）→ 改为每帧按视口重建的细条几何，浓度
+   与 CSS 原生 1px 线一致，首页背景与其余页面视觉统一。 */
+const GRID_COLOR = 0x0f172a; // rgb(15,23,42)，同 tokens --grid-line
+const GRID_ALPHA = 0.05;
+const GRID_CSS_PX = 22;
+const CAM_Z = 20;
+const FOV = 15;
+const worldHeightAt = (z) => 2 * Math.tan((FOV * Math.PI) / 360) * (CAM_Z - z);
 
 /* 玻璃球本体 + 离屏管线（官方 ModeWrapper，机制原样；Lens 专用） */
 const Lens = memo(function Lens() {
@@ -140,25 +118,57 @@ const Lens = memo(function Lens() {
   );
 });
 
-/* 折射内容：铺满视口的方格底（每帧按视口尺寸铺平 + 按 22px 换算纹理平铺数） */
+/* 折射内容：矢量发丝方格，铺满视口（z=0 平面，与球 z15 同相机）。
+   视口尺寸/窗口变化时重建几何 —— 每格 22csspx、线宽 1csspx。 */
 function Backdrop() {
-  const mesh = useRef();
-  const tex = useMemo(() => makeGridTexture(), []);
-  const cellsPerTex = GRID_TEX_PX / GRID_CELL_TEX; // 每张纹理含多少格
-
-  useFrame((state) => {
-    const { viewport: vp, size } = state;
-    mesh.current.scale.set(vp.width, vp.height, 1);
-    // 格宽 css 22px → 平铺张数 = 视口尺寸 / (22px × 每张格数)
-    const tx = size.width / (GRID_CSS_PX * cellsPerTex);
-    const ty = size.height / (GRID_CSS_PX * cellsPerTex);
-    tex.repeat.set(tx, ty);
-  });
-
+  const [geo, setGeo] = useState(null);
+  useEffect(() => {
+    const build = () => {
+      const cssW = window.innerWidth;
+      const cssH = window.innerHeight;
+      const worldH = worldHeightAt(0); // z=0 平面可视高
+      const perPx = worldH / cssH; // 每 css px 的世界单位（纵横一致）
+      const cell = GRID_CSS_PX * perPx;
+      const hw = perPx / 2; // 1csspx 线宽的一半
+      const halfH = worldH / 2;
+      const halfW = (cssW / 2) * perPx;
+      const v = [];
+      // 一根竖线 = 两端点外扩 hw 的细条（两三角形）
+      const bar = (x0, y0, x1, y1) => {
+        v.push(
+          x0 - hw, y0, 0, x0 + hw, y0, 0, x1 + hw, y1, 0,
+          x0 - hw, y0, 0, x1 + hw, y1, 0, x1 - hw, y1, 0,
+        );
+      };
+      for (let x = -halfW; x <= halfW + 1e-6; x += cell) bar(x, -halfH, x, halfH);
+      for (let y = -halfH; y <= halfH + 1e-6; y += cell) bar(-halfW, y, halfW, y);
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+      setGeo((old) => {
+        old?.dispose();
+        return g;
+      });
+    };
+    build();
+    window.addEventListener('resize', build);
+    return () => {
+      window.removeEventListener('resize', build);
+      setGeo((old) => {
+        old?.dispose();
+        return null;
+      });
+    };
+  }, []);
+  if (!geo) return null;
   return (
-    <mesh ref={mesh}>
-      <planeGeometry />
-      <meshBasicMaterial map={tex} transparent depthWrite={false} toneMapped={false} />
+    <mesh geometry={geo}>
+      <meshBasicMaterial
+        color={GRID_COLOR}
+        transparent
+        opacity={GRID_ALPHA}
+        depthWrite={false}
+        toneMapped={false}
+      />
     </mesh>
   );
 }
