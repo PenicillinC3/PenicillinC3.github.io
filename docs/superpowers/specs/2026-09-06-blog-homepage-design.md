@@ -659,3 +659,11 @@ setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160）
 3. 字体：troika 不吃 woff2 → `subset-song.mjs` 增 ASCII 32–126 truetype 拉丁子集 `public/fonts/song-3d.ttf`（17KB，npm run fonts:subset 链更新）。
 4. 构建零警告回归：玻璃 island 单 chunk 1.1MB 触发 vite 500kB 警告 —— astro.config 在 **`vite.build.chunkSizeWarningLimit: 1300`**（须放 vite 段，astro 顶层 build 段不接收 vite 选项）消除；此 chunk 仅首页、勿拆。
 教训：**折射内容必须自带可见对比度 —— 发丝级浅网格在两次纹理重采样后不构成可折射信号**。
+
+**§69.3 修正（2026-09-08 走查）：删站名水印、球缩小、打字前后背景一致**
+
+用户走查 §69.2：光学性能已良好，但 ① 深墨站名水印与 DOM 打字机标题重叠难看（1.5× 放大绕字形露边）；② 打字动画阶段与完成后背景颜色不同 —— 根因同 ①：NameEcho 挂在 `document.fonts.ready` 后才测量挂载，打字进行中场景还没画字，打完字水印突然出现 → 背景骤变；③ 球偏大。
+
+修复：**整体删除 NameEcho**（portal 场景回归纯网格折射素材；折射内容自 §69.2 起已含可见网格，水印非必需）；`LENS_PROPS.scale` 0.25→**0.18**（直径 0.5→0.36 世界单位，约屏高 38%→27%）；`subset-song.mjs` 拉丁 truetype 步骤与 `public/fonts/song-3d.ttf` 一并回撤（未来若要做「镂空/异位水印」可经 fonts:subset 再生）。构建 0 警告回归。
+
+另答用户问：打字机与「网页快照喂球」（html2canvas 路线）**冲突** —— 打字 75ms/字，快照需频繁重拍 DOM，CPU 拖垮打字动画（§59–63 已证）；当前官方组件路线**不拍 DOM**、球只折射场景内网格，与 DOM 打字机完全解耦，无冲突。代价：球被 DOM 文字像素盖住处不显示（层叠如此），字迹间隙与网格区仍可见折射。

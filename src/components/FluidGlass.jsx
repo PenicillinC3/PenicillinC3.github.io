@@ -14,8 +14,9 @@
  *   - 官方紫底 #5227ff / 白字 "React Bits" / 5 张 Unsplash 照片 —— 全删；
  *     清屏改白 0xffffff。
  *   - 折射内容 = 本站背景方格（22px；§69.2 线宽/浓度已加粗至可见——
- *     0.05/1px 经纹理重采样后隐形）+ 深墨站名水印 NameEcho（troika Text，
- *     位置/字号按 DOM h1 实测换算，1.5× 放大，见下）。
+ *     0.05/1px 经纹理重采样后隐形）。§69.2 的深墨站名水印 NameEcho 已删
+ *     （§69.3：与 DOM 打字机标题重叠难看、且 fonts.ready 后才现身导致打字
+ *     前后背景不一 —— 详见 spec；折射素材回归纯网格）。
  *   - bar/cube 模式、ScrollControls、NavItems、Typography、Images 均未移植。
  *   - <900px 或 prefers-reduced-motion：不挂载（页面回退纯 DOM 欢迎页）。
  *
@@ -26,13 +27,13 @@
 import * as THREE from 'three';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, createPortal, useFrame, useThree } from '@react-three/fiber';
-import { MeshTransmissionMaterial, Text, useFBO, useGLTF } from '@react-three/drei';
+import { MeshTransmissionMaterial, useFBO, useGLTF } from '@react-three/drei';
 import { easing } from 'maath';
-import { site } from '../site.config';
 
-/* 玻璃球材质参数（官方 docs 面板默认值） */
+/* 玻璃球材质参数（官方 docs 面板默认 scale .25；§69.3 用户走查「球太大」
+   缩至 .18 —— 直径 0.5→0.36 世界单位，约屏高 38%→27%） */
 const LENS_PROPS = {
-  scale: 0.25,
+  scale: 0.18,
   ior: 1.15,
   thickness: 2,
   chromaticAberration: 0.05,
@@ -70,54 +71,6 @@ function makeGridTexture() {
   tex.minFilter = THREE.LinearFilter;
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
-}
-
-/* 场景站名水印（spec §69）：深墨 3D 文本铺在缓冲场景里作球的折射素材 ——
-   球掠过字迹时弯曲/色差最明显。位置与字号按 DOM h1 实测换算：相机 fov15
-   距 z=20，某深度 z 的可见高度 = 2·tan(7.5°)·(20−z)，据此把 CSS 像素映射到
-   世界坐标；字号取 DOM 站名的 ECHO_SCALE 倍（稍大一圈，从 DOM 字形边缘
-   露出来构成水印层）。troika 只吃 ttf → public/fonts/song-3d.ttf（§69）。 */
-const CAM_Z = 20;
-const FOV = 15;
-const ECHO_Z = 3; // 字在网格(z0)前、球(z15)后
-const ECHO_SCALE = 1.5; // 相对 DOM 站名的放大倍数
-const ECHO_COLOR = '#17191f'; // 深墨（白页深字，高对比折射源）
-
-const worldHeightAt = (z) => 2 * Math.tan((FOV * Math.PI) / 360) * (CAM_Z - z);
-
-function NameEcho() {
-  const [geo, setGeo] = useState({ y: 0, fs: 0 });
-  useEffect(() => {
-    const measure = () => {
-      const el = document.querySelector('[data-type-name]');
-      if (!el) return;
-      const r = el.getBoundingClientRect();
-      const cssFS = parseFloat(getComputedStyle(el).fontSize);
-      if (!cssFS || !r.height) return;
-      const cssH = window.innerHeight;
-      const perPx = worldHeightAt(ECHO_Z) / cssH; // 每 css px 的世界单位
-      const y = (cssH / 2 - (r.top + r.height / 2)) * perPx; // 屏幕 y↓ → 世界 y↑
-      setGeo({ y, fs: cssFS * ECHO_SCALE * perPx });
-    };
-    measure();
-    document.fonts?.ready.then(measure).catch(() => {});
-    window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
-  }, []);
-  if (!geo.fs) return null;
-  return (
-    <Text
-      position={[0, geo.y, ECHO_Z]}
-      fontSize={geo.fs}
-      color={ECHO_COLOR}
-      font="/fonts/song-3d.ttf"
-      letterSpacing={0.04} /* 与 CSS .name letter-spacing .04em 同步 */
-      anchorX="center"
-      anchorY="middle"
-    >
-      {site.title}
-    </Text>
-  );
 }
 
 /* 玻璃球本体 + 离屏管线（官方 ModeWrapper，机制原样；Lens 专用） */
@@ -161,13 +114,7 @@ const Lens = memo(function Lens() {
 
   return (
     <>
-      {createPortal(
-        <>
-          <Backdrop />
-          <NameEcho />
-        </>,
-        scene,
-      )}
+      {createPortal(<Backdrop />, scene)}
       {/* 全屏 quad：把 buffer（= 折射内容）铺回屏幕当背景 */}
       <mesh scale={[vp.width, vp.height, 1]}>
         <planeGeometry />
