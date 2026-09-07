@@ -650,3 +650,12 @@ setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160）
 **§69.1 修正（2026-09-08 走查）：层叠 bug —— 文字被垫底 canvas 盖住**
 
 §69 首版把 `:global(.main:has(.welcome))` 提层 z1，意图让欢迎内容盖过 `.glass-scene`（fixed z0）。实际**失效**：z-index 使 `.main` 成为堆叠上下文，fixed canvas 被收进 main 自身上下文、按其内 z0 画在普通流文字之上 → 首页打字机站名/tagline/按钮全部被不透明 canvas 遮没（用户报「首页的字没了」）。修复：`.main` 不设 z-index/transform（保持根级上下文），改由 **`.welcome` 自身 `position:relative; z-index:1`** 与 canvas 同处根上下文盖过它；`.acts` 在 `.welcome { pointer-events:none }` 下重开 auto。教训：**fixed 后代的堆叠归属最近的有 z-index/transform 祖先，提层必须落在与 fixed 层同级的元素上，或让内容元素自身提层**。
+
+**§69.2 修正（2026-09-08 走查）：折射内容隐形 —— 网格加粗 + 深墨站名水印**
+
+用户报「背景和球的光学性质没了」；走查实际状态 = 纯白页面 + 隐隐跟手的球影（组件与渲染管线正常）。根因：§69 场景网格沿用 DOM 方格 alpha 0.05/1px 发丝线，经「CanvasTexture → FBO 缓冲 → 全屏 quad」两次重采样后淡至不可见 —— 球无内容可折射，光学全无。修复（按用户选定方案）：
+1. 网格加粗：线宽 1→2px、alpha 0.05→0.12（DOM 观感被 canvas 覆盖，可独立调 —— 仍类白方格气质）。
+2. **NameEcho 站名水印**：portal 场景加 drei `<Text>`（troika）深墨 `#17191f` 大站名 `site.title` —— 球的折射素材，掠过字迹产生弯曲/色差；字号与位置按 DOM `[data-type-name]` h1 实测换算（`perPx = 视深可视高/css高`，2·tan7.5°·(20−z)），字号 1.5× DOM 放大成水印层，letterSpacing .04 与 CSS 同步，resize/fonts.ready 重测。
+3. 字体：troika 不吃 woff2 → `subset-song.mjs` 增 ASCII 32–126 truetype 拉丁子集 `public/fonts/song-3d.ttf`（17KB，npm run fonts:subset 链更新）。
+4. 构建零警告回归：玻璃 island 单 chunk 1.1MB 触发 vite 500kB 警告 —— astro.config 在 **`vite.build.chunkSizeWarningLimit: 1300`**（须放 vite 段，astro 顶层 build 段不接收 vite 选项）消除；此 chunk 仅首页、勿拆。
+教训：**折射内容必须自带可见对比度 —— 发丝级浅网格在两次纹理重采样后不构成可折射信号**。

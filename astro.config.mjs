@@ -17,4 +17,11 @@ export default defineConfig({
   devToolbar: {
     enabled: false, // 隐藏底部 Astro 开发工具栏（仅影响本地 dev）
   },
+  vite: {
+    build: {
+      // §69 玻璃球 island（three/fiber/drei/react）单 chunk ~1.1MB（gzip 315KB），
+      // 仅首页加载；上限抬到 1300 消除 vite 默认 500kB 警告（非框架散包，勿拆）
+      chunkSizeWarningLimit: 1300,
+    },
+  },
 });
