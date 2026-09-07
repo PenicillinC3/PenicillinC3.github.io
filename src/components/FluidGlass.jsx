@@ -40,17 +40,45 @@ const LENS_PROPS = {
   anisotropy: 0.01,
 };
 
-/* 折射内容：矢量发丝方格（§69.4）—— 与 body 背景同观感（22px、
-   rgba(15,23,42,0.05) 1csspx 线，即 notes 等普通页的背景）。不用 CanvasTexture
-   的理由：发丝纹理经「纹理 → FBO → 全屏 quad」重采样后浓度失真（§69.2 教训，
-   0.05 变不可见 / 0.12 又比普通页重）→ 改为每帧按视口重建的细条几何，浓度
-   与 CSS 原生 1px 线一致，首页背景与其余页面视觉统一。 */
-const GRID_COLOR = 0x0f172a; // rgb(15,23,42)，同 tokens --grid-line
-const GRID_ALPHA = 0.05;
+/* 折射内容：方格 = 与 body CSS 原生渲染 1:1 的 CanvasTexture（§69.7）。
+   历史：矢量细条几何（§69.4）低 alpha 下边缘被 AA 软化、观感与 CSS 页不
+   同步；固定 2048 纹理（§69.2）发丝经「纹理→FBO→quad」重采样失真是另一
+   极端。正解：纹理尺寸 = 视口设备像素（css×dpr），1px 设备线按 22×dpr 步进
+   直接画 —— buffer 像素 = 屏幕像素 1:1，无任何重采样/软化，与 CSS 原生
+   一致（rgba(15,23,42,.05)，tokens --grid-line/--grid-size）。 */
+const GRID_RGBA = 'rgba(15, 23, 42, 0.05)';
 const GRID_CSS_PX = 22;
+const MAX_DPR = 1.75; // 与 Canvas dpr 上限一致
 const CAM_Z = 20;
 const FOV = 15;
 const worldHeightAt = (z) => 2 * Math.tan((FOV * Math.PI) / 360) * (CAM_Z - z);
+
+function makeGridTexture() {
+  const rdpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.ceil(window.innerWidth * rdpr) + 1);
+  c.height = Math.max(1, Math.ceil(window.innerHeight * rdpr) + 1);
+  const ctx = c.getContext('2d');
+  ctx.strokeStyle = GRID_RGBA;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  const step = GRID_CSS_PX * rdpr; // 设备像素步进 = 22 css px
+  for (let x = 0.5; x <= c.width; x += step) {
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, c.height);
+  }
+  for (let y = 0.5; y <= c.height; y += step) {
+    ctx.moveTo(0, y);
+    ctx.lineTo(c.width, y);
+  }
+  ctx.stroke();
+  const tex = new THREE.CanvasTexture(c);
+  tex.generateMipmaps = false;
+  tex.minFilter = THREE.NearestFilter;
+  tex.magFilter = THREE.NearestFilter;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
 
 /* —— 场景文字（标题 + tagline，spec §69.5/§69.6）—— 首页标题与「记录 · 拍摄 ·
    思考」tagline 都做进折射场景本体：球掠过即折射字迹（官方 demo 同构）；
@@ -183,57 +211,41 @@ const Lens = memo(function Lens() {
   );
 });
 
-/* 折射内容：矢量发丝方格，铺满视口（z=0 平面，与球 z15 同相机）。
-   视口尺寸/窗口变化时重建几何 —— 每格 22csspx、线宽 1csspx。 */
+/* 折射内容：1:1 像素 CanvasTexture 方格铺满视口（z=0 平面，与球同相机）。
+   纹理尺寸随视口重建（resize 时按当前 dpr 重画）；mesh 每帧按 viewport
+   铺平 —— buffer 像素与屏幕 1:1，网格与 body CSS 原生渲染观感一致。 */
 function Backdrop() {
-  const [geo, setGeo] = useState(null);
+  const mesh = useRef();
+  const [tex, setTex] = useState(null);
   useEffect(() => {
     const build = () => {
-      const cssW = window.innerWidth;
-      const cssH = window.innerHeight;
-      const worldH = worldHeightAt(0); // z=0 平面可视高
-      const perPx = worldH / cssH; // 每 css px 的世界单位（纵横一致）
-      const cell = GRID_CSS_PX * perPx;
-      const hw = perPx / 2; // 1csspx 线宽的一半
-      const halfH = worldH / 2;
-      const halfW = (cssW / 2) * perPx;
-      const v = [];
-      // 一根竖线 = 两端点外扩 hw 的细条（两三角形）
-      const bar = (x0, y0, x1, y1) => {
-        v.push(
-          x0 - hw, y0, 0, x0 + hw, y0, 0, x1 + hw, y1, 0,
-          x0 - hw, y0, 0, x1 + hw, y1, 0, x1 - hw, y1, 0,
-        );
-      };
-      for (let x = -halfW; x <= halfW + 1e-6; x += cell) bar(x, -halfH, x, halfH);
-      for (let y = -halfH; y <= halfH + 1e-6; y += cell) bar(-halfW, y, halfW, y);
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
-      setGeo((old) => {
+      const t = makeGridTexture();
+      setTex((old) => {
         old?.dispose();
-        return g;
+        return t;
       });
     };
     build();
     window.addEventListener('resize', build);
     return () => {
       window.removeEventListener('resize', build);
-      setGeo((old) => {
+      setTex((old) => {
         old?.dispose();
         return null;
       });
     };
   }, []);
-  if (!geo) return null;
+
+  useFrame((state) => {
+    const { viewport: vp } = state;
+    mesh.current.scale.set(vp.width, vp.height, 1);
+  });
+
+  if (!tex) return null;
   return (
-    <mesh geometry={geo}>
-      <meshBasicMaterial
-        color={GRID_COLOR}
-        transparent
-        opacity={GRID_ALPHA}
-        depthWrite={false}
-        toneMapped={false}
-      />
+    <mesh ref={mesh}>
+      <planeGeometry />
+      <meshBasicMaterial map={tex} transparent depthWrite={false} toneMapped={false} />
     </mesh>
   );
 }
