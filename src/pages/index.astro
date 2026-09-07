@@ -84,6 +84,10 @@ import { site } from '../site.config';
   /* —— §69 玻璃球层叠：canvas fixed 全屏垫底(z0)，顶栏(z60)/欢迎内容(z1)/页脚(z1)
        提层盖其上；顶栏、欢迎文字都允许事件穿透到 canvas（球全域跟手），
        唯按钮区保留交互（pointer-events auto） —— */
+  /* 层叠策略：canvas(fixed z0) 与 .welcome(z1) 须同处**根级**堆叠上下文。
+     关键坑（§69.1）：勿给 .main 加 z-index/transform —— 那会把 fixed canvas
+     收进 main 自身堆叠上下文，文字反而压在 canvas 之下（首页字消失 bug）。
+     正解：.main 不设 z-index，由 .welcome 自身提层盖过 canvas。 */
   .glass-scene {
     position: fixed;
     inset: 0;
@@ -95,15 +99,13 @@ import { site } from '../site.config';
     pointer-events: auto; /* R3F 事件绑在 canvas 或其容器 div 上，两者都放行 */
     display: block;
   }
-  :global(.main:has(.welcome)) {
+  .welcome {
     position: relative;
-    z-index: 1; /* 盖过 canvas 层（fixed 定位元素默认画在普通流之上） */
-  }
-  :global(.welcome) {
+    z-index: 1; /* 盖过垫底 canvas（与 .glass-scene 同处根上下文） */
     pointer-events: none; /* 文字区不拦 pointer → canvas 收到事件、球全域跟手 */
   }
-  :global(.welcome .acts) {
-    pointer-events: auto; /* 两枚入口按钮保留点击/悬停 */
+  .acts {
+    pointer-events: auto; /* 两枚入口按钮保留点击/悬停（在 pointer-events:none 下重开） */
   }
   :global(body:has(.welcome) > footer) {
     position: relative;
