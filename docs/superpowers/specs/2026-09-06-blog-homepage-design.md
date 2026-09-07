@@ -699,3 +699,9 @@ setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160）
 **§69.8 修正（2026-09-08 走查）：网格墨量 = CSS 线宽；球改 window 级全域跟手**
 
 ① 网格加载前一致、加载后变淡：§69.7 把线画成 1 **设备像素**宽，而 CSS 的 1px 线 = 1 **CSS 像素** = dpr(≈1.75) 设备像素 —— 墨量只有一半 → 加载后发虚。修复：`ctx.lineWidth = rdpr`（等墨量，纹理仍 1:1 设备像素）。② 悬停「个人笔记/摄影作品集」按钮时球冻结：球吃 canvas 自身 pointer 事件，按钮在 DOM 上层截走事件 → 改为 **window pointermove → 归一化 ref（y↑）**，Lens useFrame 阻尼目标直接读 ref —— 与 canvas 事件完全解耦，全页（含按钮/顶栏上方）都跟手；官方阻尼参数不变。
+
+**§69.9（2026-09-08）切页返回双层标题 —— 根因：ViewTransitions 抹掉首屏 inline 挂的 html 类**
+
+用户从个人笔记页切回主页出现两层标题重叠。无头复现定位：DOM 占位标题本应 `opacity:0`（隐藏规则绑 `html.js`，由首页首屏 `<script is:inline>` 挂载）—— Astro ViewTransitions 历史返回（goBack/popstate）会恢复 `<html>` 的类状态，把 `js` 类抹掉 → 规则失效 → DOM 标题（CSS 原生字形）与场景标题（troika）同屏叠出。另实证：canvas/场景切回后正常单实例（1 canvas），故非旧岛残留。
+
+修复：删除首屏 inline 挂类脚本；改为 **`html.fg-on` 由 FluidGlass island 生命周期挂/摘**（`useEffect` toggle，条件 = JS + ≥900px + 非减动效，即场景文字确实在场才隐藏 DOM；卸载/降级/无 JS 自动回退 DOM 可见）。教训：**经 ViewTransitions 切页的页面，不要依赖首屏 inline script 往 html 上挂类做 CSS 开关** —— 状态化标志应绑在组件/state 生命周期上。验证：无头探针 notes→back 后 `h1Opacity=0`、canvas=1、glass-scene=1。

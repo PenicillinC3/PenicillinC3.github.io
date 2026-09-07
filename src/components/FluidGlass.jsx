@@ -281,6 +281,14 @@ export default function FluidGlass() {
     };
   }, []);
 
+  // §69.9：html.fg-on 随 island 生命周期挂/摘 —— 它是「DOM 标题隐藏」的唯一开关。
+  //   不能用首屏 inline script 挂类：Astro ViewTransitions 历史返回会恢复
+  //   <html> 类状态、把该类抹掉 → 双层标题（bug 实证）。
+  useEffect(() => {
+    document.documentElement.classList.toggle('fg-on', ok);
+    return () => document.documentElement.classList.remove('fg-on');
+  }, [ok]);
+
   if (!ok) return null;
 
   return (
