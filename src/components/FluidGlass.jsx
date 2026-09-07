@@ -46,7 +46,7 @@ const LENS_PROPS = {
    极端。正解：纹理尺寸 = 视口设备像素（css×dpr），1px 设备线按 22×dpr 步进
    直接画 —— buffer 像素 = 屏幕像素 1:1，无任何重采样/软化，与 CSS 原生
    一致（rgba(15,23,42,.05)，tokens --grid-line/--grid-size）。 */
-const GRID_RGBA = 'rgba(15, 23, 42, 0.05)';
+const GRID_RGBA = 'rgba(15, 23, 42, 0.08)'; // §69.10：用户调深（原 0.05 与 body 一致）
 const GRID_CSS_PX = 22;
 const MAX_DPR = 1.75; // 与 Canvas dpr 上限一致
 const CAM_Z = 20;
