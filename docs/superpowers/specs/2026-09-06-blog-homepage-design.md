@@ -683,3 +683,5 @@ setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160）
 - **DOM h1 降级为占位**：`.name` `opacity:0` + user-select none —— 盒子保留（welcome 布局/tagline 定位/场景测量基准不破坏），文本仍在 a11y 树与 SEO；标题视觉由场景版承接，背景=普通页方格+标题，与上传版观感一致。
 - 网格沿用 §69.4 矢量发丝线（0.05/22px）—— 球在标题与方格上均有折射素材；`TITLE_COLOR #17191f` = tokens `--text-1`。
 - 已知取舍：troika SDF 字形与 CSS 原生字形渲染存在细微差异（原大 1:1 下肉眼难辨；若用户在意可切 CanvasTexture 高分辨率光栅化方案）。
+
+**§69.5 补：DOM 标题隐藏的条件保护** —— opacity:0 仅作用于「≥900px + html.js + prefers-reduced-motion:no-preference」（与 FluidGlass 挂载条件完全一致，index.astro 重挂 html.js 标记）；<900px / 减动效 / 无 JS 时 DOM h1 回退可见。盒子始终保留（布局与场景测量基准不变）。
