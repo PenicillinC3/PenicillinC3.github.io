@@ -673,3 +673,13 @@ setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160）
 用户终调：① 打字动画的背景（canvas 未就绪前的 DOM 底）与打字后（canvas 0.12 网格）仍不一致 —— 直接**删除打字动画**（§39/§40 首页不再启用），标题静态全文；② 球再缩至 scale **0.12**（直径 0.24 世界 ≈ 屏高 18%）；③ 背景「把个人笔记那个拿过来」—— notes 等普通页背景 = body 原生 CSS 方格（22px、rgba(15,23,42,.05)、1csspx 发丝）。首页此前被 canvas 自绘 0.12/2px 纹理网格盖住，观感与普通页不一。
 
 修复（`src/components/FluidGlass.jsx`）：**折射素材弃 CanvasTexture，改矢量细条几何**（每格 22csspx、线宽 1csspx、alpha 0.05，随视口重建 BufferGeometry）—— 纹理经「纹理→FBO→quad」两次重采样浓度必然失真（§69.2 教训：0.05→近隐、0.12→过重），矢量线直接把 CSS 原生 1px 浓度搬进场景；首页背景自此与 notes 等页**视觉统一**，且 canvas 从首帧即此观感（无 glb 加载完成前的反差时段）。index.astro 打字机相关内联/模块脚本与 caret CSS 全删（含 html.js 挂载、宽度探针、reduced-motion 分支），h1 直接渲染 `site.title`。
+
+**§69.5（2026-09-08）标题场景化 —— DOM 标题做进折射场景本体**
+
+用户终调：① 首页背景仍与上传版（普通页 body 方格 + 无 canvas 叠层）有观感差异 —— 归因：canvas 不透明层上重绘的网格与 CSS 原生渲染永远有细微差，且 DOM 大标题叠在 canvas 之上把球挡得只剩字间隙；② 指示「把首页的标题直接做进背景里来实现球体的光学性能」—— 即官方 demo 同构：标题属折射场景内容，球掠过即折射字迹，不再被 DOM 层遮挡。
+
+实现（`FluidGlass.jsx` + `index.astro`）：
+- **SceneTitle**：portal 场景内 troika `<Text>` 渲染 `site.title`（华文中宋 —— `subset-song.mjs` 重新输出 `song-3d.ttf` 拉丁 truetype 子集 17KB；troika 不吃 woff2），字号/位置 = DOM h1 rect 实测换算至 TITLE_Z=3（网格 z0 前、球 z15 后），字号原大 1:1（TITLE_SCALE=1 旋钮），letterSpacing 0.04 与 CSS 同步，resize/fonts.ready 重测。
+- **DOM h1 降级为占位**：`.name` `opacity:0` + user-select none —— 盒子保留（welcome 布局/tagline 定位/场景测量基准不破坏），文本仍在 a11y 树与 SEO；标题视觉由场景版承接，背景=普通页方格+标题，与上传版观感一致。
+- 网格沿用 §69.4 矢量发丝线（0.05/22px）—— 球在标题与方格上均有折射素材；`TITLE_COLOR #17191f` = tokens `--text-1`。
+- 已知取舍：troika SDF 字形与 CSS 原生字形渲染存在细微差异（原大 1:1 下肉眼难辨；若用户在意可切 CanvasTexture 高分辨率光栅化方案）。

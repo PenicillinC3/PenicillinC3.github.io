@@ -12,7 +12,10 @@ import { site } from '../site.config';
   </div>
   <section class="welcome">
     <div class="stack">
-      <h1 class="name">{site.title}</h1>
+      <!-- §69.5：标题已做进 FluidGlass 场景（球折射它）；此处 h1 opacity:0 仅作
+           语义/占位 —— 盒子保留（tagline/按钮布局与场景标题测量都靠它），
+           屏幕阅读器与 SEO 不丢 -->
+      <h1 class="name" data-scene-title={site.title} aria-label={site.title}>{site.title}</h1>
       <p class="tagline">{site.tagline}</p>
       <div class="acts">
         <a class="btn prism" href="/notes/">个人笔记</a>
@@ -74,6 +77,8 @@ import { site } from '../site.config';
     line-height: 1.15;
     letter-spacing: 0.04em; /* 拉丁长站名，收紧字距比华文中宋习惯值更稳 */
     color: var(--text-1);
+    opacity: 0; /* §69.5：视觉交给场景版标题，盒子保留（tagline 定位/场景测量） */
+    user-select: none;
   }
   .tagline {
     margin: clamp(14px, 3vh, 26px) 0 0;
