@@ -6,6 +6,9 @@ import { site } from '../site.config';
 <!-- 欢迎页。站名 = 静态大标题（spec §69.4：打字机动效 §39/§40 按用户要求删除，
      直接展示全文）。§69：全屏垫底 react-bits FluidGlass 玻璃球 island（方案 B，
      背景观感与 notes 页一致：白底 0.05 发丝方格矢量线）；其余页面仍零框架 -->
+<script is:inline>
+  document.documentElement.classList.add('js');
+</script>
 <Base>
   <div class="glass-scene" aria-hidden="true">
     <FluidGlass client:load />
@@ -77,8 +80,15 @@ import { site } from '../site.config';
     line-height: 1.15;
     letter-spacing: 0.04em; /* 拉丁长站名，收紧字距比华文中宋习惯值更稳 */
     color: var(--text-1);
-    opacity: 0; /* §69.5：视觉交给场景版标题，盒子保留（tagline 定位/场景测量） */
-    user-select: none;
+  }
+  /* §69.5：仅当场景版标题确实在场（≥900px + JS + 非减动效，与 FluidGlass
+     挂载条件一致）时隐藏 DOM 标题；其余情况（<900px/reduced-motion/无 JS）
+     回退 DOM 可见 —— 盒子始终保留，布局与场景测量不变 */
+  @media (min-width: 900px) and (prefers-reduced-motion: no-preference) {
+    html.js .name {
+      opacity: 0;
+      user-select: none;
+    }
   }
   .tagline {
     margin: clamp(14px, 3vh, 26px) 0 0;
