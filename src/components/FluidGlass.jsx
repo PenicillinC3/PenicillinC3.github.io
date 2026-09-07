@@ -60,7 +60,9 @@ function makeGridTexture() {
   c.height = Math.max(1, Math.ceil(window.innerHeight * rdpr) + 1);
   const ctx = c.getContext('2d');
   ctx.strokeStyle = GRID_RGBA;
-  ctx.lineWidth = 1;
+  // §69.8：线宽 = rdpr 设备像素（CSS 1px 线 = 1 css px = dpr 个设备像素；
+  //   此前固定 1 设备像素 = 只有 CSS 一半墨量 → 加载后网格发虚不显）
+  ctx.lineWidth = rdpr;
   ctx.beginPath();
   const step = GRID_CSS_PX * rdpr; // 设备像素步进 = 22 css px
   for (let x = 0.5; x <= c.width; x += step) {
@@ -138,8 +140,10 @@ function SceneTexts() {
   );
 }
 
-/* 玻璃球本体 + 离屏管线（官方 ModeWrapper，机制原样；Lens 专用） */
-const Lens = memo(function Lens() {
+/* 玻璃球本体 + 离屏管线（官方 ModeWrapper，机制原样；Lens 专用）。
+   follow = { current: {x,y} } 归一化指针（§69.8：window 级 pointermove 写入，
+   不再依赖 canvas 自身事件 —— 悬停按钮等 DOM 上层元素时球仍全域跟手） */
+const Lens = memo(function Lens({ follow }) {
   const ref = useRef();
   const { nodes } = useGLTF('/assets/3d/lens.glb');
   const buffer = useFBO();
@@ -156,10 +160,10 @@ const Lens = memo(function Lens() {
   }, [nodes]);
 
   useFrame((state, delta) => {
-    const { gl, viewport, pointer, camera } = state;
+    const { gl, viewport, camera } = state;
     const v = viewport.getCurrentViewport(camera, [0, 0, 15]);
-    const destX = (pointer.x * v.width) / 2;
-    const destY = (pointer.y * v.height) / 2;
+    const destX = (follow.current.x * v.width) / 2;
+    const destY = (follow.current.y * v.height) / 2;
     // 跟手阻尼（官方阻尼系数 0.15）
     easing.damp3(ref.current.position, [destX, destY, 15], 0.15, delta);
 
@@ -252,6 +256,18 @@ function Backdrop() {
 
 export default function FluidGlass() {
   const [ok, setOk] = useState(false);
+  // §69.8：全页指针（window 级）→ 归一化 [-1,1]（y↑），与 canvas 事件解耦；
+  //   悬停按钮/导航等 DOM 上层元素时球仍跟手
+  const pt = useRef({ x: 0, y: 0 });
+  useEffect(() => {
+    const onMove = (e) => {
+      pt.current.x = (e.clientX / window.innerWidth) * 2 - 1;
+      pt.current.y = -(e.clientY / window.innerHeight) * 2 + 1;
+    };
+    window.addEventListener('pointermove', onMove);
+    return () => window.removeEventListener('pointermove', onMove);
+  }, []);
+
   useEffect(() => {
     const small = matchMedia('(max-width: 899px)');
     const rm = matchMedia('(prefers-reduced-motion: reduce)');
@@ -275,7 +291,7 @@ export default function FluidGlass() {
       camera={{ position: [0, 0, 20], fov: 15 }}
       gl={{ alpha: true, powerPreference: 'high-performance' }}
     >
-      <Lens />
+      <Lens follow={pt} />
     </Canvas>
   );
 }

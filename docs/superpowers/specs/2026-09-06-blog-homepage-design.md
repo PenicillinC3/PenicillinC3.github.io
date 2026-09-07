@@ -695,3 +695,7 @@ setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160）
 **§69.7 修正（2026-09-08 走查）：网格与普通页同步 = 1:1 设备像素 CanvasTexture**
 
 用户：首页网格格式与其他页不同步。历史两版皆偏：矢量细条几何（§69.4）低 alpha 边缘被 AA 软化发虚；固定 2048 纹理（§69.2）有重采样失真。正解：**纹理画布尺寸 = 视口设备像素**（css×min(dpr,1.75)），1px 线按 22×dpr 步进绘制，Nearest 采样 —— buffer 像素 = 屏幕像素严格 1:1，无重采样无软化，与 body CSS 原生方格（--grid-line rgba(15,23,42,.05)/--grid-size 22px）观感一致；resize 按当前 dpr 重建纹理，plane 每帧铺满 viewport。
+
+**§69.8 修正（2026-09-08 走查）：网格墨量 = CSS 线宽；球改 window 级全域跟手**
+
+① 网格加载前一致、加载后变淡：§69.7 把线画成 1 **设备像素**宽，而 CSS 的 1px 线 = 1 **CSS 像素** = dpr(≈1.75) 设备像素 —— 墨量只有一半 → 加载后发虚。修复：`ctx.lineWidth = rdpr`（等墨量，纹理仍 1:1 设备像素）。② 悬停「个人笔记/摄影作品集」按钮时球冻结：球吃 canvas 自身 pointer 事件，按钮在 DOM 上层截走事件 → 改为 **window pointermove → 归一化 ref（y↑）**，Lens useFrame 阻尼目标直接读 ref —— 与 canvas 事件完全解耦，全页（含按钮/顶栏上方）都跟手；官方阻尼参数不变。
