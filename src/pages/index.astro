@@ -15,11 +15,11 @@ import { site } from '../site.config';
   </div>
   <section class="welcome">
     <div class="stack">
-      <!-- §69.5：标题已做进 FluidGlass 场景（球折射它）；此处 h1 opacity:0 仅作
-           语义/占位 —— 盒子保留（tagline/按钮布局与场景标题测量都靠它），
-           屏幕阅读器与 SEO 不丢 -->
+      <!-- §69.5/§69.6：标题与 tagline 已做进 FluidGlass 场景（球折射它们）；
+           此处同名元素 opacity:0 仅作语义/占位 —— 盒子保留（布局与场景文字
+           测量都靠它们），屏幕阅读器与 SEO 不丢 -->
       <h1 class="name" data-scene-title={site.title} aria-label={site.title}>{site.title}</h1>
-      <p class="tagline">{site.tagline}</p>
+      <p class="tagline" data-scene-tagline={site.tagline}>{site.tagline}</p>
       <div class="acts">
         <a class="btn prism" href="/notes/">个人笔记</a>
         <a class="btn prism" href="/photos/">摄影作品集</a>
@@ -75,17 +75,18 @@ import { site } from '../site.config';
   .name {
     margin: 0;
     font-family: var(--font-song);
-    font-size: clamp(3rem, 9.5vw, 5.6rem);
+    font-size: clamp(3.2rem, 11vw, 6.6rem); /* §69.6：标题加大一档 */
     font-weight: 600;
     line-height: 1.15;
     letter-spacing: 0.04em; /* 拉丁长站名，收紧字距比华文中宋习惯值更稳 */
     color: var(--text-1);
   }
-  /* §69.5：仅当场景版标题确实在场（≥900px + JS + 非减动效，与 FluidGlass
-     挂载条件一致）时隐藏 DOM 标题；其余情况（<900px/reduced-motion/无 JS）
-     回退 DOM 可见 —— 盒子始终保留，布局与场景测量不变 */
+  /* §69.5/§69.6：仅当场景版文字确实在场（≥900px + JS + 非减动效，与
+     FluidGlass 挂载条件一致）时隐藏 DOM 标题/tagline；其余情况（<900px/
+     reduced-motion/无 JS）回退 DOM 可见 —— 盒子始终保留，布局与场景测量不变 */
   @media (min-width: 900px) and (prefers-reduced-motion: no-preference) {
-    html.js .name {
+    html.js .name,
+    html.js .tagline {
       opacity: 0;
       user-select: none;
     }

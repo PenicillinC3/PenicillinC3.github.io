@@ -685,3 +685,9 @@ setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160）
 - 已知取舍：troika SDF 字形与 CSS 原生字形渲染存在细微差异（原大 1:1 下肉眼难辨；若用户在意可切 CanvasTexture 高分辨率光栅化方案）。
 
 **§69.5 补：DOM 标题隐藏的条件保护** —— opacity:0 仅作用于「≥900px + html.js + prefers-reduced-motion:no-preference」（与 FluidGlass 挂载条件完全一致，index.astro 重挂 html.js 标记）；<900px / 减动效 / 无 JS 时 DOM h1 回退可见。盒子始终保留（布局与场景测量基准不变）。
+
+**§69.6（2026-09-08 走查）：tagline 场景化、标题加大、球 .10、背景泛灰根因 = ACES 色调映射**
+
+用户反馈：① 球再缩至 scale **0.10**；② 「记录 · 拍摄 · 思考」tagline 也做进背景（折射素材）；③ 标题加大一档（.name clamp 3–5.6rem → 3.2–6.6rem）；④ 背景「很灰、网格消失」—— 根因：**R3F v9 Canvas 默认 ACES 电影色调映射**，纯白 FBO 底（1.0）被映射成 ~#ddd 灰、0.05 发丝网格压在灰底上近不可见；CSS 页面无此处理故观感断裂。
+
+修复：Canvas 加 **`flat`**（关色调映射，白底与 CSS 页一致，网格恢复可视）；`SceneTitle` 泛化为 **`SceneTexts`**（TEXT_META 两张表：`[data-scene-title]` 与新增 `[data-scene-tagline]`，各自实测换算、字色 = --text-1/--text-2、letterSpacing .04/.02 与 CSS 同步）；DOM tagline 同样 opacity:0 条件占位；`subset-song.mjs` 的 song-3d.ttf 字符集改为「site.config.ts 提取 title+tagline + ASCII」（含中文与「·」，19KB）。教训：**WebGL 场景当纯色/接近白的背景用时必须关色调映射（flat），否则与 CSS 白底永远有色差**。

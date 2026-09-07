@@ -29,12 +29,11 @@ import { memo, useEffect, useRef, useState } from 'react';
 import { Canvas, createPortal, useFrame, useThree } from '@react-three/fiber';
 import { MeshTransmissionMaterial, Text, useFBO, useGLTF } from '@react-three/drei';
 import { easing } from 'maath';
-import { site } from '../site.config';
 
-/* 玻璃球材质参数（官方 docs 面板默认 scale .25；§69.3→.18、§69.4→.12
-   用户逐次走查缩小 —— 直径 0.5→0.36→0.24 世界单位，约屏高 27%→18%） */
+/* 玻璃球材质参数（官方 docs 面板默认 scale .25；§69.3→.18、§69.4→.12、
+   §69.6→.10 —— 直径 0.5→0.36→0.24→0.20 世界单位，约屏高 18%→15%） */
 const LENS_PROPS = {
-  scale: 0.12,
+  scale: 0.10,
   ior: 1.15,
   thickness: 2,
   chromaticAberration: 0.05,
@@ -53,47 +52,61 @@ const CAM_Z = 20;
 const FOV = 15;
 const worldHeightAt = (z) => 2 * Math.tan((FOV * Math.PI) / 360) * (CAM_Z - z);
 
-/* —— 场景大标题（spec §69.5）—— 首页标题做进折射场景本体：
-   球掠过标题即折射字迹（官方 demo 同构）；DOM 侧 h1 以 opacity:0 保留盒子
-   与语义（布局/居中测量不破坏，屏幕阅读器可读）。位置与字号按 DOM h1
-   rect 实测换算到 TITLE_Z 平面（与网格同缓冲、球 z15 在字前）；字号 = DOM
-   计算值原大（TITLE_SCALE 微调钮），troika 吃 ttf → song-3d.ttf。 */
-const TITLE_Z = 3; // 网格(z0)前、球(z15)后
-const TITLE_SCALE = 1; // 相对 DOM 标题字号倍数（视觉微调）
-const TITLE_COLOR = '#17191f'; // = tokens --text-1，与原本 DOM 标题同色
+/* —— 场景文字（标题 + tagline，spec §69.5/§69.6）—— 首页标题与「记录 · 拍摄 ·
+   思考」tagline 都做进折射场景本体：球掠过即折射字迹（官方 demo 同构）；
+   DOM 侧同名元素以 opacity:0 保留盒子与语义（布局/居中测量不破坏，屏幕
+   阅读器可读）。位置/字号按各 DOM 元素 rect 实测换算到 TEXT_Z 平面（与网格
+   同缓冲、球 z15 在字前）；字号 = DOM 计算值 × 各自 SCALE（微调钮）；
+   字色对应 --text-1/--text-2；troika 吃 ttf → song-3d.ttf（ASCII + tagline
+   中文字形子集）。 */
+const TEXT_Z = 3; // 网格(z0)前、球(z15)后
+const TEXT_META = [
+  { sel: '[data-scene-title]', color: '#17191f', ls: 0.04, scale: 1 }, // --text-1
+  { sel: '[data-scene-tagline]', color: '#565d6e', ls: 0.02, scale: 1 }, // --text-2
+];
 
-function SceneTitle() {
-  const [geo, setGeo] = useState({ y: 0, fs: 0 });
+function SceneTexts() {
+  const [items, setItems] = useState([]);
   useEffect(() => {
     const measure = () => {
-      const el = document.querySelector('[data-scene-title]');
-      if (!el) return;
-      const r = el.getBoundingClientRect();
-      const cssFS = parseFloat(getComputedStyle(el).fontSize);
-      if (!cssFS || !r.height) return;
       const cssH = window.innerHeight;
-      const perPx = worldHeightAt(TITLE_Z) / cssH; // 每 css px 的世界单位
-      const y = (cssH / 2 - (r.top + r.height / 2)) * perPx; // 屏幕 y↓ → 世界 y↑
-      setGeo({ y, fs: cssFS * TITLE_SCALE * perPx });
+      const perPx = worldHeightAt(TEXT_Z) / cssH; // 每 css px 的世界单位
+      const out = [];
+      for (const m of TEXT_META) {
+        const el = document.querySelector(m.sel);
+        if (!el) continue;
+        const r = el.getBoundingClientRect();
+        const cssFS = parseFloat(getComputedStyle(el).fontSize);
+        if (!cssFS || !r.height) continue;
+        out.push({
+          ...m,
+          text: el.textContent ?? '',
+          y: (cssH / 2 - (r.top + r.height / 2)) * perPx, // 屏幕 y↓ → 世界 y↑
+          fs: cssFS * m.scale * perPx,
+        });
+      }
+      setItems(out);
     };
     measure();
     document.fonts?.ready.then(measure).catch(() => {});
     window.addEventListener('resize', measure);
     return () => window.removeEventListener('resize', measure);
   }, []);
-  if (!geo.fs) return null;
-  return (
-    <Text
-      position={[0, geo.y, TITLE_Z]}
-      fontSize={geo.fs}
-      color={TITLE_COLOR}
-      font="/fonts/song-3d.ttf"
-      letterSpacing={0.04} /* 与 CSS .name letter-spacing .04em 同步 */
-      anchorX="center"
-      anchorY="middle"
-    >
-      {site.title}
-    </Text>
+  return items.map((it) =>
+    it.text ? (
+      <Text
+        key={it.sel}
+        position={[0, it.y, TEXT_Z]}
+        fontSize={it.fs}
+        color={it.color}
+        font="/fonts/song-3d.ttf"
+        letterSpacing={it.ls}
+        anchorX="center"
+        anchorY="middle"
+      >
+        {it.text}
+      </Text>
+    ) : null,
   );
 }
 
@@ -141,7 +154,7 @@ const Lens = memo(function Lens() {
       {createPortal(
         <>
           <Backdrop />
-          <SceneTitle />
+          <SceneTexts />
         </>,
         scene,
       )}
@@ -244,6 +257,8 @@ export default function FluidGlass() {
 
   return (
     <Canvas
+      flat /* §69.6：关 ACES 色调映射 —— 纯白 FBO 底经 ACES 变灰(#ddd)且
+               压没 0.05 发丝网格；flat 后白底与 CSS 页面一致 */
       dpr={[1, 1.75]}
       camera={{ position: [0, 0, 20], fov: 15 }}
       gl={{ alpha: true, powerPreference: 'high-performance' }}
