@@ -5,8 +5,6 @@ tags: [AI, 效率]
 summary: 自用的Claude Code写前端或者其他项目很舒适的小技巧。
 ---
 
-从 Windows Terminal 到 macOS 的 iTerm，能统一的地方尽量统一。
-
 ## 命令
 
 - 重新恢复之前会话：`/resume`
