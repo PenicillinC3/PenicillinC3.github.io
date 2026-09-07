@@ -3,18 +3,16 @@ import Base from '../layouts/Base.astro';
 import FluidGlass from '../components/FluidGlass.jsx';
 import { site } from '../site.config';
 ---
-<!-- 欢迎页。站名 = 打字机动效（spec §39/§40：逐字打出一次后定格，光标继续闪烁）。
-     §69：全屏垫底 react-bits FluidGlass 玻璃球 island（方案 B，白网格折射内容）；
-     其余页面仍零框架 -->
+<!-- 欢迎页。站名 = 静态大标题（spec §69.4：打字机动效 §39/§40 按用户要求删除，
+     直接展示全文）。§69：全屏垫底 react-bits FluidGlass 玻璃球 island（方案 B，
+     背景观感与 notes 页一致：白底 0.05 发丝方格矢量线）；其余页面仍零框架 -->
 <Base>
   <div class="glass-scene" aria-hidden="true">
     <FluidGlass client:load />
   </div>
   <section class="welcome">
     <div class="stack">
-      <h1 class="name" data-type-name={site.title} aria-label={site.title}>
-        <span class="tp" data-type-text aria-hidden="true">{site.title}</span><span class="caret" data-caret aria-hidden="true">_</span>
-      </h1>
+      <h1 class="name">{site.title}</h1>
       <p class="tagline">{site.tagline}</p>
       <div class="acts">
         <a class="btn prism" href="/notes/">个人笔记</a>
@@ -23,62 +21,6 @@ import { site } from '../site.config';
     </div>
   </section>
 </Base>
-
-<!-- 解析期先清空站名文本：避免先闪现完整站名再从头重打；
-     顺带挂 html.js 供 CSS 只在有 JS 时开光标闪烁（无 JS 落回静态全文 + 无光标） -->
-<script is:inline>
-  document.documentElement.classList.add('js');
-  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    const n = document.querySelector('[data-type-name]');
-    const t = n && n.querySelector('[data-type-text]');
-    if (t) t.textContent = '';
-  }
-</script>
-
-<script>
-  // —— 站名打字机（spec §39/§40）：逐字打出一次后定格全文（不打字时的
-  //    删除/循环已按用户要求移除），光标持续闪烁 ——
-  const cfg = { type: 75 };
-  const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
-  const h1 = document.querySelector<HTMLElement>('[data-type-name]');
-  if (h1 && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    const txt = h1.querySelector<HTMLElement>('[data-type-text]')!;
-    const full = h1.dataset.typeName ?? 'PenicillinC3';
-
-    // 预留「完整站名 + 光标」的整宽：打字/删除过程中 h1 宽度恒定，
-    // 居中文本从中心向两侧生长，不逐字左右跳
-    const measure = () => {
-      const probe = document.createElement('span');
-      probe.style.cssText =
-        'position:absolute;visibility:hidden;white-space:nowrap;pointer-events:none;top:0;left:0';
-      probe.textContent = full + '_';
-      h1.appendChild(probe);
-      h1.style.width = `${probe.offsetWidth}px`;
-      probe.remove();
-    };
-    let rsT: number | undefined;
-    const W = window as unknown as { __typerResize?: boolean };
-    if (!W.__typerResize) {
-      W.__typerResize = true; // 换页重挂只补一次 resize 监听
-      window.addEventListener('resize', () => {
-        window.clearTimeout(rsT);
-        rsT = window.setTimeout(measure, 150); // 字号随 vw 变 → 重测整宽
-      });
-    }
-
-    const run = async () => {
-      measure();
-      txt.textContent = '';
-      for (let i = 1; i <= full.length; i++) {
-        if (!h1.isConnected) return; // 换页离场即停
-        txt.textContent = full.slice(0, i);
-        await wait(cfg.type);
-      }
-      // 定格：全文常驻，仅光标继续闪烁
-    };
-    (document.fonts?.ready ?? Promise.resolve()).then(run).catch(run);
-  }
-</script>
 
 <style>
   /* —— §69 玻璃球层叠：canvas fixed 全屏垫底(z0)，顶栏(z60)/欢迎内容(z1)/页脚(z1)
@@ -148,16 +90,4 @@ import { site } from '../site.config';
     gap: 12px;
   }
 
-  /* —— 打字机光标（spec §39）：下划线逐格闪烁（周期 1s，两态对半）；仅 html.js 亮起 —— */
-  .caret {
-    display: inline-block;
-    animation: caret-blink 1s steps(1, end) infinite;
-  }
-  html:not(.js) .caret { display: none; } /* 无 JS：静态全文 + 不闪光标 */
-  @media (prefers-reduced-motion: reduce) {
-    .caret { display: none; } /* 减动效用户：全文常驻（JS 侧同样跳过打字） */
-  }
-  @keyframes caret-blink {
-    50% { opacity: 0; }
-  }
 </style>
