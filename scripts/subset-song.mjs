@@ -46,13 +46,3 @@ const inKb = Math.round((await stat(FONT_IN)).size / 1024);
 const outKb = Math.round(out.length / 1024);
 console.log(`华文中宋子集完成: ${inKb} KB -> ${outKb} KB (${Math.round((out.length / (await stat(FONT_IN)).size) * 1000) / 10}%)`);
 console.log(`输出: ${FONT_OUT}`);
-
-// —— 站名场景水印用拉丁子集（spec §69）：troika Text 不吃 woff2，
-//     只吃 ttf/otf/woff → 从同一原件出 ASCII 32–126 的 truetype 子集，
-//     供 src/components/FluidGlass.jsx 的 NameEcho（3D 折射文字） ——
-const LATIN_OUT = join(ROOT, 'public/fonts/song-3d.ttf');
-const latin = String.fromCharCode(...Array.from({ length: 95 }, (_, i) => i + 32));
-const latinFont = await subsetFont(font, latin, { targetFormat: 'truetype' });
-await writeFile(LATIN_OUT, latinFont);
-console.log(`站名拉丁子集完成: ${inKb} KB -> ${Math.round(latinFont.length / 1024)} KB`);
-console.log(`输出: ${LATIN_OUT}`);
