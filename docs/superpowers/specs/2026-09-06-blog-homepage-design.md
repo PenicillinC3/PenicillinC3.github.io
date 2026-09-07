@@ -629,3 +629,20 @@ setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160）
 
 - 删除 `src/components/LensBall.tsx` 与 `public/fonts/song-3d.ttf`（subset-song 脚本同步还原，无 3D 拉丁子集步骤）；`index.astro`/`astro.config.mjs`（react 集成与 vite chunk 项移除）/`tsconfig.json`（jsx 项移除）/`package.json`+lock（卸载 @astrojs/react react react-dom three @react-three/fiber @react-three/drei maath 与 @types/*）/README/CLAUDE.md 全部还原。
 - §58–§67 全部实现（含各自的 portal/FBO/镜像/3D 大字/打字机迁移等方案与教训）**留档于本 spec，不再采用**；§65（ref 勿绑 JSX visible prop）与 §60（canvas 换图须 dispose）为通用 three/React 教训，他处可借鉴。远端线上从未含玻璃（未推送），恢复零部署成本。
+
+## §69（2026-09-08）玻璃球回归（方案 B）—— react-bits 官方 FluidGlass lens 模式移植
+
+§68 撤销后，用户以**新版官方组件**（mode=lens/bar/cube + GLB 模型 —— 与 §58–67 移植的旧版 demo 非同代）再次要求把玻璃球放回首页、一比一复刻。经澄清技术事实后用户选定方案 B。本段与 §58–67 历史的本质区别：**官方组件折射的是场景内内容副本，不折射 DOM**（纯白无内容则 MTT 无从折射、球近乎隐身）。
+
+**官方组件事实**（源：D-Mbithi/react-bits commit 86dfdfc，reactbits.dev 现行版本）：
+1. 顶层 `scale/ior/thickness/transmission/...` props **不生效** —— 组件 API 只认 `lensProps/barProps/cubeProps`（官方示例页顶层重复值系面板代码产物）。玻璃参数实际默认：scale .25 / ior 1.15 / thickness 2 / CA .05 / aniso .01（docs 面板值）。
+2. 光学为**屏幕空间近似实时渲染**，非光追、非烘焙：内容场景每帧离屏渲染进 FBO → 同一纹理 A. 由全屏 quad 铺为屏幕背景、B. 供 MeshTransmissionMaterial 采样折射（uv 偏移 + 模糊 + 通道分离色差，片元级实时）。球与背景**机制上绑定同一 buffer**（MTT 必须吃一张纹理）；球跟手 = maath easing.damp3 τ0.15，z=15。
+3. 资源：`lens.glb`（"Cylinder"，直径 2.0 世界单位）/`cube.glb`/`bar.glb` + `figtreeblack.ttf`（本方案未用，bar/cube 模式亦未移植）。
+
+**实现**（src/components/FluidGlass.jsx + src/pages/index.astro）：
+- 机制逐行保留官方 Lens 模式（portal→useFBO→quad→MTT→damp3）；仅内容层定制：清屏 **#fff**（官方紫 #5227ff），删 Typography/Images/ScrollControls/NavItems/bar/cube。
+- 折射内容 = **本站方格底**：CanvasTexture 2048²、16px/格 1px 发丝线，`tex.repeat` 按视口换算 22px css 格 —— 观感同 tokens.css `--grid-line/--grid-size`（DOM body 方格被 opaque canvas 覆盖，场景网格即页面背景，无缝延续极简白）。
+- 层叠：`.glass-scene` fixed inset-0 **z0**、pointer-events none（canvas 及其 R3F 容器 div 重新 auto）→ 球全域跟手；`.main:has(.welcome)` 与首页 footer 提 **z1**；`.welcome` pointer-events none 穿透文字区、`.acts` auto 保按钮；Nav 顶栏 z60 不变。**打字机/tagline/双按钮 DOM 零改动**，球从文字下层穿过（字形间隙/网格区可见折射）。
+- 依赖：**React 栈回归（特批，仅此 island）** —— @astrojs/react **v4.4.2**（须配 Astro5/vite6；v6 系 Astro6/vite8 不可用，实测装错即降）、react 19.2.8、three 0.185、@react-three/fiber 9.7、@react-three/drei 10.7、maath 0.10、devDeps @types/react(-dom) 19；astro.config 恢复 `integrations: [react()]`，tsconfig 补 jsx react-jsx。**依赖纪律（CLAUDE §8）更新：React 栈仅限此 island，禁止再加其它 UI 框架**。
+- 降级：<900px / prefers-reduced-motion / 无 JS → 不挂载（`FluidGlass.jsx` 内 matchMedia 守卫），页面与 §68 基线白页一致；场景 `aria-hidden`。
+- 验证：build 16 页 0 警告；preview 路由 `/`、`/notes/`、`/assets/3d/lens.glb` 200、`/nope-xyz` 404。视觉项由用户真机走查驱动（调参旋钮 = `FluidGlass.jsx` 顶部 `LENS_PROPS` 与 `GRID_*` 常量）。
