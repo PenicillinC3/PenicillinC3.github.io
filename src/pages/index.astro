@@ -1,10 +1,15 @@
 ---
 import Base from '../layouts/Base.astro';
+import FluidGlass from '../components/FluidGlass.jsx';
 import { site } from '../site.config';
 ---
-<!-- 欢迎页（spec §35：液态玻璃镜头已删除）。站名 = 打字机动效（spec §39/§40，
-     react-bits TextType 的零框架移植：逐字打出一次后定格，光标继续闪烁） -->
+<!-- 欢迎页。站名 = 打字机动效（spec §39/§40：逐字打出一次后定格，光标继续闪烁）。
+     §69：全屏垫底 react-bits FluidGlass 玻璃球 island（方案 B，白网格折射内容）；
+     其余页面仍零框架 -->
 <Base>
+  <div class="glass-scene" aria-hidden="true">
+    <FluidGlass client:load />
+  </div>
   <section class="welcome">
     <div class="stack">
       <h1 class="name" data-type-name={site.title} aria-label={site.title}>
@@ -76,6 +81,35 @@ import { site } from '../site.config';
 </script>
 
 <style>
+  /* —— §69 玻璃球层叠：canvas fixed 全屏垫底(z0)，顶栏(z60)/欢迎内容(z1)/页脚(z1)
+       提层盖其上；顶栏、欢迎文字都允许事件穿透到 canvas（球全域跟手），
+       唯按钮区保留交互（pointer-events auto） —— */
+  .glass-scene {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none; /* 包装层穿透；canvas 子元素自身重新接收事件 */
+  }
+  .glass-scene canvas,
+  .glass-scene > div {
+    pointer-events: auto; /* R3F 事件绑在 canvas 或其容器 div 上，两者都放行 */
+    display: block;
+  }
+  :global(.main:has(.welcome)) {
+    position: relative;
+    z-index: 1; /* 盖过 canvas 层（fixed 定位元素默认画在普通流之上） */
+  }
+  :global(.welcome) {
+    pointer-events: none; /* 文字区不拦 pointer → canvas 收到事件、球全域跟手 */
+  }
+  :global(.welcome .acts) {
+    pointer-events: auto; /* 两枚入口按钮保留点击/悬停 */
+  }
+  :global(body:has(.welcome) > footer) {
+    position: relative;
+    z-index: 1; /* 首页版权行：垫底 canvas 之上可见 */
+  }
+
   .welcome {
     flex: 1 1 auto;
     min-height: 0;

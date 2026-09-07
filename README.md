@@ -2,7 +2,7 @@
 
 Apple 液态玻璃风格的静态个人站点。内容全部是 Markdown 文件，推送到 GitHub 即自动构建部署到 GitHub Pages。
 
-技术：Astro 5 · TypeScript · 纯 CSS（零 UI 框架）。设计依据见 `docs/superpowers/specs/`，实现计划见 `docs/superpowers/plans/`。
+技术：Astro 5 · TypeScript · 纯 CSS（React 仅首页玻璃球一个 island，spec §69 特批；其余零框架）。设计依据见 `docs/superpowers/specs/`，实现计划见 `docs/superpowers/plans/`。
 
 ## 本地开发
 
