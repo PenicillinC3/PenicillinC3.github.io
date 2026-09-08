@@ -367,14 +367,17 @@ body.page-gallery .topbar {
     rgba(9, 10, 14, 0.28) 100%
   );
 }
+/* §70-5：右上角玻璃透明后露黑底（导航栏上方本无光，见 spec）——
+   光层须自持浓度：角落红晕加强回可见，玻璃底保持透明渐变 */
 body.page-gallery .topbar::before {
   content: '';
   position: absolute;
   inset: 0;
   background: radial-gradient(
-    90% 320% at 100% -20%,
-    rgba(255, 92, 80, 0.12),
-    transparent 74%
+    120% 360% at 100% 0%,
+    rgba(255, 96, 84, 0.3),
+    rgba(255, 70, 60, 0.12) 42%,
+    transparent 72%
   );
   pointer-events: none;
 }
