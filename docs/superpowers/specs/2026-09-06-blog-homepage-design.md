@@ -743,3 +743,7 @@ setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160）
 ## §72（2026-09-08）顶栏真·透光 = 全视口同款 Rays 裁出导航条带
 
 用户（§71 玻璃面板后）：右上光路透不过来、缺玻璃效果。根因不变：顶栏 0–56px 带背后无光。新方案：**`Rays variant="navstrip"`** —— 与 arena 同款着色器的全视口画布（光位/形态同源），`clip-path: inset(0 0 calc(100% - var(--nav-h)) 0)` 只保留顶栏条带，`z 59 < 顶栏 60`，经 §71 毛玻璃 backdrop-blur 透出 = 物理上的光穿玻璃；与 arena overlay（absolute-in-arena）合成互不干扰（§70 教训），复用 §70-2 的多实例遍历绑定。验证：画布 1440×900 在场，顶栏右上 avgR 79 vs 左 50（红光方向正确透出）。
+
+## §74（2026-09-08）指针离开页面 → 球回初始静置点
+
+用户小改：鼠标离开页面（移出视口或失焦）时玻璃球自动回到静置点（§73 标题中心+2px）。实现：静置逻辑抽为 `setIdle()`（§73/§74 共用）；`documentElement.pointerleave` + `window.blur`（含 Alt-Tab 等失焦）→ 重置 moved 标志并 setIdle，球经既有 damp 平滑归位。
