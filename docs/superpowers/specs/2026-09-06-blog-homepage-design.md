@@ -705,3 +705,7 @@ setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160）
 用户从个人笔记页切回主页出现两层标题重叠。无头复现定位：DOM 占位标题本应 `opacity:0`（隐藏规则绑 `html.js`，由首页首屏 `<script is:inline>` 挂载）—— Astro ViewTransitions 历史返回（goBack/popstate）会恢复 `<html>` 的类状态，把 `js` 类抹掉 → 规则失效 → DOM 标题（CSS 原生字形）与场景标题（troika）同屏叠出。另实证：canvas/场景切回后正常单实例（1 canvas），故非旧岛残留。
 
 修复：删除首屏 inline 挂类脚本；改为 **`html.fg-on` 由 FluidGlass island 生命周期挂/摘**（`useEffect` toggle，条件 = JS + ≥900px + 非减动效，即场景文字确实在场才隐藏 DOM；卸载/降级/无 JS 自动回退 DOM 可见）。教训：**经 ViewTransitions 切页的页面，不要依赖首屏 inline script 往 html 上挂类做 CSS 开关** —— 状态化标志应绑在组件/state 生命周期上。验证：无头探针 notes→back 后 `h1Opacity=0`、canvas=1、glass-scene=1。
+
+## §70（2026-09-08）暗色页（摄影作品集）顶栏改毛玻璃
+
+用户：摄影作品集右上角 Rays 红光透不进导航栏，要求该栏目导航栏单独做成毛玻璃。根因：亮色顶栏本为毛玻璃（rgba(255,255,255,.72)+blur14 saturate1.6），而 `body.page-dark .topbar` 覆写为近实心 rgba(9,10,14,.55) 且无 backdrop-filter → 铺满视口的 Rays overlay(z20) 被挡在顶栏(z60)下。修复：暗色顶栏改 rgba(9,10,14,.38) + 同配方 backdrop-filter blur(14px) saturate(1.6)，红光射线晕进导航栏；page-dark 目前仅摄影栏目（画廊+备忘页）使用，故改动恰作用域为摄影作品集。
