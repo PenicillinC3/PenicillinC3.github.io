@@ -33,6 +33,8 @@ const n = covers.length;
     <div class="arena" data-arena tabindex="0" aria-label="摄影作品浏览">
       {/* 射线叠光：统一使用默认配方（spec §32.1 用户选定） */}
       <Rays variant="overlay" />
+      {/* §72：顶栏透光 —— 同款入射光裁出导航条带（z59 < 顶栏60），毛玻璃透出 */}
+      <Rays variant="navstrip" />
 
       <!-- 封面日期：居中于当前封面上方 -->
       <p class="cap cap--top" data-cap-top aria-hidden="true"><span class="ts" data-ts>{n ? covers[0].date : ''}</span></p>

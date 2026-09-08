@@ -27,7 +27,12 @@ const DEFAULTS: RaysConfig = {
 };
 const { variant = 'backdrop', config } = Astro.props;
 const cfg = JSON.stringify({ ...DEFAULTS, ...config }).replace(/</g, '\\u003c');
-const vc = variant === 'overlay' ? 'rays rays--overlay' : 'rays rays--backdrop';
+const vc =
+  variant === 'overlay'
+    ? 'rays rays--overlay'
+    : variant === 'navstrip'
+      ? 'rays rays--navstrip'
+      : 'rays rays--backdrop';
 ---
 <div class={vc} data-rays aria-hidden="true"></div>
 <script is:inline type="application/json" data-rays-cfg set:html={cfg}></script>
@@ -198,5 +203,14 @@ void main() {
     position: absolute;
     inset: 0;
     z-index: 20;
+  }
+  /* navstrip（§72）：顶栏透光 = 全视口同款入射光裁出顶栏条带 —— canvas 按
+     全视口绘制（与 arena 光位/形态同源），clip-path 只留顶栏 56px（z59 < 顶栏
+     z60，经毛玻璃 blur 透出 = 真·光穿玻璃）；blend/层级不与 arena overlay 冲突 */
+  .rays--navstrip {
+    position: fixed;
+    inset: 0;
+    z-index: 59;
+    clip-path: inset(0 0 calc(100% - var(--nav-h)) 0);
   }
 </style>
