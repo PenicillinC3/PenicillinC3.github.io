@@ -357,14 +357,24 @@ body.page-dark .topbar {
   backdrop-filter: blur(14px) saturate(1.6);
   border-bottom-color: rgba(255, 255, 255, 0.08);
 }
+/* §70-4：最右上角近乎半透明 —— 玻璃底改径向渐变（角落 ≈0.06 → 左侧/下部
+   回到暗玻璃浓度），配合极淡入射光层；blur 仍全栏生效 */
+body.page-gallery .topbar {
+  background: radial-gradient(
+    150% 340% at 100% 0%,
+    rgba(9, 10, 14, 0.06),
+    rgba(9, 10, 14, 0.24) 55%,
+    rgba(9, 10, 14, 0.28) 100%
+  );
+}
 body.page-gallery .topbar::before {
   content: '';
   position: absolute;
   inset: 0;
   background: radial-gradient(
     90% 320% at 100% -20%,
-    rgba(255, 92, 80, 0.2),
-    transparent 70%
+    rgba(255, 92, 80, 0.12),
+    transparent 74%
   );
   pointer-events: none;
 }
