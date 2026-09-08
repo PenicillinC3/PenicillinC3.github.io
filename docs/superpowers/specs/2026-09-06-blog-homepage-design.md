@@ -713,3 +713,7 @@ setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160）
 **§70 补（同日）：光效延伸进导航栏 —— overlay 由 absolute-in-arena 改 fixed 全视口**
 
 §70 首改后用户仍问「右上角光效背景」：像素采样发现导航栏区域红光为 0 —— 根因：`.rays--overlay` 是 absolute 嵌在 `.arena`（顶栏以下的舞台），光效画布止步于导航栏下方，毛玻璃顶栏背后无光可透。修复：overlay 改 `position: fixed; inset: 0`（z20 不变，仍压 nav z60 之下；胶片区观感不变，canvas 高度上扩 ~56px）。headless 几何断言：rays rect = 1440×900 含 nav 带；光晕真容需真机 GPU 走查（SwiftShader 无法验 WebGL 光效）。
+
+**§70 回退（同日）：overlay 定位改 fixed 致入射光消失 —— 已还原 arena-absolute**
+
+真机走查：§70 补（`.rays--overlay` absolute→fixed 全视口）后胶片画廊**入射光背景彻底消失**（重大回归）。机制推断：overlay 依赖 absolute-in-arena 的容器尺寸与 `mix-blend-mode: screen` 合成上下文，fixed 后层级/画布上下文改变破坏了叠光。**已回退**该行 CSS 至原版（含注释警示勿再直接改定位）；§70 首项（暗色顶栏毛玻璃 rgba(9,10,14,.38)+blur）保留 —— 但顶栏区域无光可透的问题仍在（overlay 止步顶栏下方），后续要「光进导航栏」需另走方案（如独立第二层全视口 canvas 或 nav 底缘自发光晕），未再实施。
