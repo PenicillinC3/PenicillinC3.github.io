@@ -381,7 +381,8 @@ body.page-gallery .topbar::before {
   pointer-events: none;
 }
 /* §70-8：光与文字之间 = 横向渐变 —— 文字行（左至 ~58% 宽，实测 links 止于
-   x830/1440）衬暗、向右渐亮让出右上光区；垂直渐变已按用户更正 */
+   x830/1440）衬暗、向右渐亮让出右上光区；§70-8 用户调「梯度右移」：起暗
+   端压缩、透明端退后 */
 body.page-gallery .topbar::after {
   content: '';
   position: absolute;
@@ -389,8 +390,8 @@ body.page-gallery .topbar::after {
   background: linear-gradient(
     to right,
     rgba(9, 10, 14, 0.6) 0%,
-    rgba(9, 10, 14, 0.4) 45%,
-    rgba(9, 10, 14, 0) 82%
+    rgba(9, 10, 14, 0.42) 58%,
+    rgba(9, 10, 14, 0) 90%
   );
   pointer-events: none;
 }
