@@ -187,12 +187,12 @@ void main() {
     height: 100% !important;
     display: block;
   }
-  /* overlay（胶片画廊，§70）：fixed 铺满全视口 —— 原 absolute-in-arena 使光效
-     止步于顶栏下方，红光到不了导航栏（毛玻璃顶栏背后无光可透）；改 fixed 后
-     右上角光晕延伸进 nav(z60) 之下，经毛玻璃晕入导航栏。仍压于 nav 之下、
-     对胶片部分观感不变（canvas 视口高度略有上扩）。 */
+  /* overlay（胶片画廊 arena 内）：absolute 填满相对定位的舞台容器，盖在胶片上。
+     ⚠ §70 曾改 fixed 全视口欲让光晕进导航栏 → 入射光背景整体消失（合成层级/
+     mix-blend 破坏，重大回归），已回退；光效进导航栏方案需另行设计，勿再直接
+     改定位。 */
   .rays--overlay {
-    position: fixed;
+    position: absolute;
     inset: 0;
     z-index: 20;
   }
