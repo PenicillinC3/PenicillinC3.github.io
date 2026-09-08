@@ -348,12 +348,25 @@ body.page-dark {
 }
 /* §70：暗色页（= 摄影作品集画廊 + 备忘页，page-dark 仅此栏目）顶栏改毛玻璃 ——
    原 rgba(9,10,14,.55) 近实心且无 backdrop-filter，右上角 Rays 红光透不进
-   导航栏；改半透明 + blur/saturate（与亮色顶栏同配方），射线光晕晕进导航 */
+   导航栏；改半透明 + blur/saturate（与亮色顶栏同配方）。
+   §70-3：画廊页 arena 入射光止步于顶栏下缘（overlay 定位不可动，§70 回退教训），
+   无法真透 —— 顶栏内叠同源红色径向光（::before，inner 之下）作透光观感 */
 body.page-dark .topbar {
   background: rgba(9, 10, 14, 0.38);
   -webkit-backdrop-filter: blur(14px) saturate(1.6);
   backdrop-filter: blur(14px) saturate(1.6);
   border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+body.page-gallery .topbar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    90% 320% at 100% -20%,
+    rgba(255, 92, 80, 0.32),
+    transparent 62%
+  );
+  pointer-events: none;
 }
 body.page-dark .drawer { background: #0d0e13; }
 /* Nav .slider 顶部高光硬编码白（Nav.astro）→ 暗色覆写为暗红辉光水滴（spec §25.2） */

@@ -35,11 +35,13 @@ const vc = variant === 'overlay' ? 'rays rays--overlay' : 'rays rays--backdrop';
 <script>
   import { Mesh, Program, Renderer, Triangle } from 'ogl';
 
-  const holder = document.querySelector<HTMLElement>('[data-rays]');
-  const cfgEl = document.querySelector<HTMLScriptElement>('script[data-rays-cfg]');
-  if (holder && cfgEl && !holder.dataset.ready) {
+  // §70-2：一页多实例（画廊页 = arena overlay + 导航条带 nav）。模块每页只执行
+  // 一次 → 遍历全部 [data-rays] 各自绑定（原 querySelector 只绑第一个，nav 实例
+  // 被 data.ready 跳过、画布缺失）
+  const bindRays = (holder: HTMLElement | null, cfgEl: Element | null) => {
+    if (!holder || !cfgEl || holder.dataset.ready) return;
     holder.dataset.ready = '1';
-    const cfg = JSON.parse(cfgEl.textContent ?? '{}') as {
+    const cfg = JSON.parse((cfgEl as HTMLScriptElement).textContent ?? '{}') as {
       speed: number; rayColor1: string; rayColor2: string; intensity: number;
       spread: number; origin: string; tilt: number; saturation: number;
       blend: number; falloff: number; opacity: number;
@@ -168,7 +170,10 @@ void main() {
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
-  }
+  };
+  document
+    .querySelectorAll<HTMLElement>('[data-rays]')
+    .forEach((h) => bindRays(h, h.nextElementSibling));
 </script>
 
 <style>
@@ -188,9 +193,7 @@ void main() {
     display: block;
   }
   /* overlay（胶片画廊 arena 内）：absolute 填满相对定位的舞台容器，盖在胶片上。
-     ⚠ §70 曾改 fixed 全视口欲让光晕进导航栏 → 入射光背景整体消失（合成层级/
-     mix-blend 破坏，重大回归），已回退；光效进导航栏方案需另行设计，勿再直接
-     改定位。 */
+     ⚠ 勿改 fixed 全视口：破坏 mix-blend 合成（§70 回退教训）。 */
   .rays--overlay {
     position: absolute;
     inset: 0;

@@ -717,3 +717,7 @@ setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160）
 **§70 回退（同日）：overlay 定位改 fixed 致入射光消失 —— 已还原 arena-absolute**
 
 真机走查：§70 补（`.rays--overlay` absolute→fixed 全视口）后胶片画廊**入射光背景彻底消失**（重大回归）。机制推断：overlay 依赖 absolute-in-arena 的容器尺寸与 `mix-blend-mode: screen` 合成上下文，fixed 后层级/画布上下文改变破坏了叠光。**已回退**该行 CSS 至原版（含注释警示勿再直接改定位）；§70 首项（暗色顶栏毛玻璃 rgba(9,10,14,.38)+blur）保留 —— 但顶栏区域无光可透的问题仍在（overlay 止步顶栏下方），后续要「光进导航栏」需另走方案（如独立第二层全视口 canvas 或 nav 底缘自发光晕），未再实施。
+
+**§70-3（同日终版）：导航栏透光 = 顶栏内同源径向光层；nav canvas 方案废弃**
+
+§70-2 尝试给导航条带加独立 56px Rays 小画布（z59）——两问题：① Rays 脚本原 querySelector 只绑首个容器（多实例需遍历绑定，已修）；② 小画布极端宽高比下入射光 shader 光晕退化不可用。终版：撤 nav 实例与 CSS，保留「多实例遍历绑定」能力；改在 **`body.page-gallery .topbar::before`** 叠同源红色径向光（`radial-gradient(90% 320% at 100% -20%, rgba(255,92,80,.32), transparent 62%)`，位于 .inner 之下、pointer-events none）——毛玻璃下的透光观感，零 WebGL/合成回归风险。像素验证：顶栏右上 R−B +25.4（红光）、左侧 −6.5（无光，方向正确）。备忘页（backdrop 版 rays 铺全视口）无需此层。
