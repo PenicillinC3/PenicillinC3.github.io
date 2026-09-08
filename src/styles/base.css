@@ -357,29 +357,15 @@ body.page-dark .topbar {
   backdrop-filter: blur(14px) saturate(1.6);
   border-bottom-color: rgba(255, 255, 255, 0.08);
 }
-/* §70-4：最右上角近乎半透明 —— 玻璃底改径向渐变（角落 ≈0.06 → 左侧/下部
-   回到暗玻璃浓度），配合极淡入射光层；blur 仍全栏生效 */
+/* §70-6：右上角直接改全透明（用户终选）—— 光层方案删除；径向渐变角 α0
+   完全透出背景（顶栏上方为暗底，即顶栏在此"消失"），向左下过渡回暗玻璃 */
 body.page-gallery .topbar {
   background: radial-gradient(
     150% 340% at 100% 0%,
-    rgba(9, 10, 14, 0.06),
-    rgba(9, 10, 14, 0.24) 55%,
-    rgba(9, 10, 14, 0.28) 100%
+    rgba(9, 10, 14, 0),
+    rgba(9, 10, 14, 0.2) 55%,
+    rgba(9, 10, 14, 0.26) 100%
   );
-}
-/* §70-5：右上角玻璃透明后露黑底（导航栏上方本无光，见 spec）——
-   光层须自持浓度：角落红晕加强回可见，玻璃底保持透明渐变 */
-body.page-gallery .topbar::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(
-    120% 360% at 100% 0%,
-    rgba(255, 96, 84, 0.3),
-    rgba(255, 70, 60, 0.12) 42%,
-    transparent 72%
-  );
-  pointer-events: none;
 }
 body.page-dark .drawer { background: #0d0e13; }
 /* Nav .slider 顶部高光硬编码白（Nav.astro）→ 暗色覆写为暗红辉光水滴（spec §25.2） */
