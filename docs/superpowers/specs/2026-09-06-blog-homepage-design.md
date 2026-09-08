@@ -721,3 +721,5 @@ setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160）
 **§70-3（同日终版）：导航栏透光 = 顶栏内同源径向光层；nav canvas 方案废弃**
 
 §70-2 尝试给导航条带加独立 56px Rays 小画布（z59）——两问题：① Rays 脚本原 querySelector 只绑首个容器（多实例需遍历绑定，已修）；② 小画布极端宽高比下入射光 shader 光晕退化不可用。终版：撤 nav 实例与 CSS，保留「多实例遍历绑定」能力；改在 **`body.page-gallery .topbar::before`** 叠同源红色径向光（`radial-gradient(90% 320% at 100% -20%, rgba(255,92,80,.32), transparent 62%)`，位于 .inner 之下、pointer-events none）——毛玻璃下的透光观感，零 WebGL/合成回归风险。像素验证：顶栏右上 R−B +25.4（红光）、左侧 −6.5（无光，方向正确）。备忘页（backdrop 版 rays 铺全视口）无需此层。
+
+**§70-4（同日）：画廊顶栏右上角近乎半透明** —— bg 改径向渐变（`150% 340% at 100% 0%`，角 α0.06 → 55% 处 0.24 → 0.28），仅 page-gallery 生效（备忘页仍平铺 0.26）；入射光层降至 α0.12/衰减 74%。blur 全栏保留。
