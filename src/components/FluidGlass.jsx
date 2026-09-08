@@ -291,17 +291,42 @@ export default function FluidGlass() {
   }, []);
 
   // §74：指针离开页面（移出视口/失焦）→ 球自动阻尼回初始静置点
+  // §74-1：离开判定加坐标兜底 —— 事件里 clientX/Y 仍落在页面元素上
+  //   （如悬停顶栏）则忽略，避免「移到导航栏也回位」的误触发
   useEffect(() => {
-    const onLeave = () => {
+    const reset = () => {
       moved.current = false;
       setIdle();
     };
+    const onLeave = (e) => {
+      if (document.hidden) {
+        reset(); // 真失焦（Alt-Tab/切窗口）
+        return;
+      }
+      const { clientX, clientY } = e;
+      const outside =
+        clientX < 1 || clientY < 1 || clientX > window.innerWidth - 1 || clientY > window.innerHeight - 1;
+      if (!outside) {
+        // 仍在视口内：除非下方没有任何页面元素，否则视为误报
+        const el = document.elementFromPoint(clientX, clientY);
+        if (el) return;
+      }
+      reset();
+    };
+    const onBlur = () => {
+      if (document.hidden) reset();
+    };
+    const onVis = () => {
+      if (document.hidden) reset();
+    };
     const root = document.documentElement;
     root.addEventListener('pointerleave', onLeave);
-    window.addEventListener('blur', onLeave);
+    window.addEventListener('blur', onBlur);
+    document.addEventListener('visibilitychange', onVis);
     return () => {
       root.removeEventListener('pointerleave', onLeave);
-      window.removeEventListener('blur', onLeave);
+      window.removeEventListener('blur', onBlur);
+      document.removeEventListener('visibilitychange', onVis);
     };
   }, []);
 

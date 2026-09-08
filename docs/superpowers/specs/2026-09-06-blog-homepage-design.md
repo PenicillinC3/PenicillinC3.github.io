@@ -747,3 +747,5 @@ setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160）
 ## §74（2026-09-08）指针离开页面 → 球回初始静置点
 
 用户小改：鼠标离开页面（移出视口或失焦）时玻璃球自动回到静置点（§73 标题中心+2px）。实现：静置逻辑抽为 `setIdle()`（§73/§74 共用）；`documentElement.pointerleave` + `window.blur`（含 Alt-Tab 等失焦）→ 重置 moved 标志并 setIdle，球经既有 damp 平滑归位。
+
+**§74-1（同日）：离开判定加坐标兜底** —— 用户反馈「移到导航栏也算移出」。headless 事件实测 pointerleave 悬停顶栏并不触发（rel=null 仅真离屏）；仍加兜底防真机差异：pointerleave 时若 clientX/Y 在视口内且下方有页面元素（elementFromPoint）→ 忽略；越界或 `visibilitychange`/blur 且 hidden → 复位。
