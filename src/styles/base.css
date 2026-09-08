@@ -380,6 +380,20 @@ body.page-gallery .topbar::before {
   );
   pointer-events: none;
 }
+/* §70-8：光与文字之间的渐变 —— 顶栏下半（文字行）衬暗色、上半透光：
+   右上光晕只在上部显现，链接/站名背后保持黑色底 */
+body.page-gallery .topbar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(9, 10, 14, 0) 30%,
+    rgba(9, 10, 14, 0.42) 55%,
+    rgba(9, 10, 14, 0.6) 100%
+  );
+  pointer-events: none;
+}
 body.page-dark .drawer { background: #0d0e13; }
 /* Nav .slider 顶部高光硬编码白（Nav.astro）→ 暗色覆写为暗红辉光水滴（spec §25.2） */
 body.page-dark .slider {
