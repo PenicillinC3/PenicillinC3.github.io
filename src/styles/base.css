@@ -352,7 +352,7 @@ body.page-dark {
    §70-3：画廊页 arena 入射光止步于顶栏下缘（overlay 定位不可动，§70 回退教训），
    无法真透 —— 顶栏内叠同源红色径向光（::before，inner 之下）作透光观感 */
 body.page-dark .topbar {
-  background: rgba(9, 10, 14, 0.38);
+  background: rgba(9, 10, 14, 0.26);
   -webkit-backdrop-filter: blur(14px) saturate(1.6);
   backdrop-filter: blur(14px) saturate(1.6);
   border-bottom-color: rgba(255, 255, 255, 0.08);
@@ -363,8 +363,8 @@ body.page-gallery .topbar::before {
   inset: 0;
   background: radial-gradient(
     90% 320% at 100% -20%,
-    rgba(255, 92, 80, 0.32),
-    transparent 62%
+    rgba(255, 92, 80, 0.2),
+    transparent 70%
   );
   pointer-events: none;
 }
