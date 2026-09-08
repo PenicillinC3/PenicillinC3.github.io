@@ -262,6 +262,15 @@ export default function FluidGlass() {
   const moved = useRef(false);
   useEffect(() => {
     const onMove = (e) => {
+      // §74-2：悬停导航栏 = 视为移出（球回静置点）；下方内容区才跟手
+      const nav = document.querySelector('.topbar');
+      if (nav) {
+        const r = nav.getBoundingClientRect();
+        if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
+          setIdle();
+          return;
+        }
+      }
       moved.current = true;
       pt.current.x = (e.clientX / window.innerWidth) * 2 - 1;
       pt.current.y = -(e.clientY / window.innerHeight) * 2 + 1;
