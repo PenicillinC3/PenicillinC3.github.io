@@ -357,8 +357,9 @@ body.page-dark .topbar {
   backdrop-filter: blur(14px) saturate(1.6);
   border-bottom-color: rgba(255, 255, 255, 0.08);
 }
-/* §70-6：右上角直接改全透明（用户终选）—— 光层方案删除；径向渐变角 α0
-   完全透出背景（顶栏上方为暗底，即顶栏在此"消失"），向左下过渡回暗玻璃 */
+/* §70-6/§70-7：右上角形态终版 = 玻璃内叠入射光晕（用户选定）——
+   背景径向渐变角 α0（透明玻璃）；::before 光晕自持亮度（黑底由光点亮），
+   与栏同层、浓淡可调：改 0.34 / 38% / 68% 三个值 */
 body.page-gallery .topbar {
   background: radial-gradient(
     150% 340% at 100% 0%,
@@ -366,6 +367,18 @@ body.page-gallery .topbar {
     rgba(9, 10, 14, 0.2) 55%,
     rgba(9, 10, 14, 0.26) 100%
   );
+}
+body.page-gallery .topbar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    150% 380% at 100% -10%,
+    rgba(255, 104, 92, 0.34),
+    rgba(255, 80, 68, 0.14) 38%,
+    transparent 68%
+  );
+  pointer-events: none;
 }
 body.page-dark .drawer { background: #0d0e13; }
 /* Nav .slider 顶部高光硬编码白（Nav.astro）→ 暗色覆写为暗红辉光水滴（spec §25.2） */
