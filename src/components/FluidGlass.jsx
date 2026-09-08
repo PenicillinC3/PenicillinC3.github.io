@@ -271,13 +271,15 @@ export default function FluidGlass() {
   }, []);
 
   // §73：初始静置点 = 大标题中心（DOM h1 实测；标题中心在视口中心偏上）。
-  //   pointer 未动过时把静置目标钉在标题中心；动过之后 resize 不再覆盖
+  //   pointer 未动过时把静置目标钉在标题中心（再上抬 IDLE_LIFT_PX=2px，用户调）；
+  //   动过之后 resize 不再覆盖
+  const IDLE_LIFT_PX = 2;
   useEffect(() => {
     const measure = () => {
       const el = document.querySelector('[data-scene-title]');
       if (!el) return;
       const r = el.getBoundingClientRect();
-      const cy = r.top + r.height / 2;
+      const cy = r.top + r.height / 2 - IDLE_LIFT_PX; // css px 上抬
       pt.current.y = -(cy / window.innerHeight) * 2 + 1; // 屏幕 y↓ → 归一化 y↑
     };
     measure();
