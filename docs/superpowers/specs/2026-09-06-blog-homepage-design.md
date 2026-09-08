@@ -709,3 +709,7 @@ setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160）
 ## §70（2026-09-08）暗色页（摄影作品集）顶栏改毛玻璃
 
 用户：摄影作品集右上角 Rays 红光透不进导航栏，要求该栏目导航栏单独做成毛玻璃。根因：亮色顶栏本为毛玻璃（rgba(255,255,255,.72)+blur14 saturate1.6），而 `body.page-dark .topbar` 覆写为近实心 rgba(9,10,14,.55) 且无 backdrop-filter → 铺满视口的 Rays overlay(z20) 被挡在顶栏(z60)下。修复：暗色顶栏改 rgba(9,10,14,.38) + 同配方 backdrop-filter blur(14px) saturate(1.6)，红光射线晕进导航栏；page-dark 目前仅摄影栏目（画廊+备忘页）使用，故改动恰作用域为摄影作品集。
+
+**§70 补（同日）：光效延伸进导航栏 —— overlay 由 absolute-in-arena 改 fixed 全视口**
+
+§70 首改后用户仍问「右上角光效背景」：像素采样发现导航栏区域红光为 0 —— 根因：`.rays--overlay` 是 absolute 嵌在 `.arena`（顶栏以下的舞台），光效画布止步于导航栏下方，毛玻璃顶栏背后无光可透。修复：overlay 改 `position: fixed; inset: 0`（z20 不变，仍压 nav z60 之下；胶片区观感不变，canvas 高度上扩 ~56px）。headless 几何断言：rays rect = 1440×900 含 nav 带；光晕真容需真机 GPU 走查（SwiftShader 无法验 WebGL 光效）。
