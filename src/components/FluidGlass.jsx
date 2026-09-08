@@ -259,13 +259,33 @@ export default function FluidGlass() {
   // §69.8：全页指针（window 级）→ 归一化 [-1,1]（y↑），与 canvas 事件解耦；
   //   悬停按钮/导航等 DOM 上层元素时球仍跟手
   const pt = useRef({ x: 0, y: 0 });
+  const moved = useRef(false);
   useEffect(() => {
     const onMove = (e) => {
+      moved.current = true;
       pt.current.x = (e.clientX / window.innerWidth) * 2 - 1;
       pt.current.y = -(e.clientY / window.innerHeight) * 2 + 1;
     };
     window.addEventListener('pointermove', onMove);
     return () => window.removeEventListener('pointermove', onMove);
+  }, []);
+
+  // §73：初始静置点 = 大标题中心（DOM h1 实测；标题中心在视口中心偏上）。
+  //   pointer 未动过时把静置目标钉在标题中心；动过之后 resize 不再覆盖
+  useEffect(() => {
+    const measure = () => {
+      const el = document.querySelector('[data-scene-title]');
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const cy = r.top + r.height / 2;
+      pt.current.y = -(cy / window.innerHeight) * 2 + 1; // 屏幕 y↓ → 归一化 y↑
+    };
+    measure();
+    const onResize = () => {
+      if (!moved.current) measure();
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
   }, []);
 
   useEffect(() => {
