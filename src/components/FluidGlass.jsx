@@ -270,24 +270,39 @@ export default function FluidGlass() {
     return () => window.removeEventListener('pointermove', onMove);
   }, []);
 
-  // §73：初始静置点 = 大标题中心（DOM h1 实测；标题中心在视口中心偏上）。
-  //   pointer 未动过时把静置目标钉在标题中心（再上抬 IDLE_LIFT_PX=2px，用户调）；
-  //   动过之后 resize 不再覆盖
+  // §73/§74：静置点 = 大标题中心（DOM h1 实测，上抬 IDLE_LIFT_PX=2px）。
+  //   应用于：初始（§73）、resize 未动过时、指针离开页面回位（§74）
   const IDLE_LIFT_PX = 2;
+  const setIdle = () => {
+    const el = document.querySelector('[data-scene-title]');
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const cy = r.top + r.height / 2 - IDLE_LIFT_PX; // css px 上抬
+    pt.current.x = 0;
+    pt.current.y = -(cy / window.innerHeight) * 2 + 1; // 屏幕 y↓ → 归一化 y↑
+  };
   useEffect(() => {
-    const measure = () => {
-      const el = document.querySelector('[data-scene-title]');
-      if (!el) return;
-      const r = el.getBoundingClientRect();
-      const cy = r.top + r.height / 2 - IDLE_LIFT_PX; // css px 上抬
-      pt.current.y = -(cy / window.innerHeight) * 2 + 1; // 屏幕 y↓ → 归一化 y↑
-    };
-    measure();
+    setIdle();
     const onResize = () => {
-      if (!moved.current) measure();
+      if (!moved.current) setIdle();
     };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  // §74：指针离开页面（移出视口/失焦）→ 球自动阻尼回初始静置点
+  useEffect(() => {
+    const onLeave = () => {
+      moved.current = false;
+      setIdle();
+    };
+    const root = document.documentElement;
+    root.addEventListener('pointerleave', onLeave);
+    window.addEventListener('blur', onLeave);
+    return () => {
+      root.removeEventListener('pointerleave', onLeave);
+      window.removeEventListener('blur', onLeave);
+    };
   }, []);
 
   useEffect(() => {
