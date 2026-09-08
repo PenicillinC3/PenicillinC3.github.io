@@ -216,20 +216,20 @@ const Lens = memo(function Lens({ follow }) {
 });
 
 /* 折射内容：1:1 像素 CanvasTexture 方格铺满视口（z=0 平面，与球同相机）。
-   纹理尺寸随视口重建（resize 时按当前 dpr 重画）；mesh 每帧按 viewport
-   铺平 —— buffer 像素与屏幕 1:1，网格与 body CSS 原生渲染观感一致。 */
+   纹理同步创建于首帧（§69.11：曾用 effect 异步 setState → 首帧 mesh 未挂载，
+   useFrame 里 mesh.current.scale 抛错，网格从未画出 —— 像素探针实证加载后
+   全白）；resize 按当前 dpr 重建。buffer 像素与屏幕 1:1，与 body CSS 同观感。 */
 function Backdrop() {
   const mesh = useRef();
-  const [tex, setTex] = useState(null);
+  const [tex, setTex] = useState(() => makeGridTexture()); // 同步：首帧即有
+
   useEffect(() => {
     const build = () => {
-      const t = makeGridTexture();
       setTex((old) => {
         old?.dispose();
-        return t;
+        return makeGridTexture();
       });
     };
-    build();
     window.addEventListener('resize', build);
     return () => {
       window.removeEventListener('resize', build);
@@ -242,7 +242,7 @@ function Backdrop() {
 
   useFrame((state) => {
     const { viewport: vp } = state;
-    mesh.current.scale.set(vp.width, vp.height, 1);
+    if (mesh.current) mesh.current.scale.set(vp.width, vp.height, 1);
   });
 
   if (!tex) return null;
