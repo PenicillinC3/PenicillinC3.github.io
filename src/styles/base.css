@@ -380,17 +380,17 @@ body.page-gallery .topbar::before {
   );
   pointer-events: none;
 }
-/* §70-8：光与文字之间的渐变 —— 顶栏下半（文字行）衬暗色、上半透光：
-   右上光晕只在上部显现，链接/站名背后保持黑色底 */
+/* §70-8：光与文字之间 = 横向渐变 —— 文字行（左至 ~58% 宽，实测 links 止于
+   x830/1440）衬暗、向右渐亮让出右上光区；垂直渐变已按用户更正 */
 body.page-gallery .topbar::after {
   content: '';
   position: absolute;
   inset: 0;
   background: linear-gradient(
-    to bottom,
-    rgba(9, 10, 14, 0) 30%,
-    rgba(9, 10, 14, 0.42) 55%,
-    rgba(9, 10, 14, 0.6) 100%
+    to right,
+    rgba(9, 10, 14, 0.6) 0%,
+    rgba(9, 10, 14, 0.4) 45%,
+    rgba(9, 10, 14, 0) 82%
   );
   pointer-events: none;
 }
