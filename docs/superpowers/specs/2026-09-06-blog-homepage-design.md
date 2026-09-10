@@ -787,3 +787,12 @@ setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160）
 3. **画廊移动端**：胶片宽 66%→**86%**、上下余量 176→150（字幕上/下移近：76/44 → 54/32px）、邻卷露出量适配窄侧廊（150–220 → 40–70px）、日期/作品名字距收紧（0.22/0.3em → 0.16/0.2em）。
 4. **画廊滑动手势**：touch 专用——横向位移 >48px 且横向占优才翻卷（左滑=下一卷）；真滑动会被浏览器先 `pointercancel`，据此抑制随之而来的 click 误入备忘（纯点按不受影响）；上下滑不拦截。
 验证：390px 宽实拍两页对照（修复前贴边 → 修复后有 gutter/胶片更大）；构建 0 警告。
+
+## §83（2026-09-08）修复：教程笔记移动端右侧被推出屏外（宽表撑破布局）
+
+用户：笔记页右侧很大一部分被挡住。实证：`/notes/blog-writing-guide/` 等含宽表格的页面在 390px 视口下**文档被撑到 734–770px**（表格单元格内长路径 `<code>` 的 min-content），整页右半外溢——“被挡住”。根因链三层：
+1. `.prose table` 为常规表格，长代码单元 min-content ≈730px；
+2. `.postpage`（及 `.memo`）是 CSS Grid，子项默认 `min-width:auto` → 网格项被内容顶宽出轨道；
+3. **关键**：`.prose` 自带 `margin-inline:auto` 使网格项**取消拉伸（justify-self:auto→stretch 失效）退化为 fit-content**，被内容 min-content 顶宽——`min-width:0` 亦无效（§83 挖出）；bisec 实证：仅内联 `width:100%` 可解。
+
+修复：`.prose.body`/`.prose.memobody` 显式 `width:100%`（+既有 `max-width:none`）；`.postpage`/`.memo` 轨道 `minmax(0,1fr)` 且子项 `min-width:0`（防未来其他宽内容）；`.main` `min-width:0`；`@media ≤760px` 内 `.prose table { display:block; width:100%; overflow-x:auto }` + 单元格 `min-width:8em`（窄屏表格在自身盒子内横向滚动；桌面端保持原满宽观感不受影响）。验证：移动 390 全页 `scrollWidth=390`（另 5 页同验）、表格盒 354 内滚 434；桌面 1440 表格仍 `display:table` 满宽 1104、无内滚。构建 0 警告。

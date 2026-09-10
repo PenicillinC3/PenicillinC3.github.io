@@ -112,12 +112,15 @@ const imgBySlug = new Map(imgs.map((it) => [it.p.slug, it]));
 </Base>
 
 <style>
-  .memo { display: grid; gap: clamp(22px, 3vw, 30px); }
+  /* §83：同 Post.astro —— 轨道 + 子项双约束，防宽内容撑破整页 */
+  .memo { display: grid; grid-template-columns: minmax(0, 1fr); gap: clamp(22px, 3vw, 30px); }
+  .memo > * { min-width: 0; }
   /* §79：备忘正文与个人笔记页同宽（Post.astro 同款 .prose.body 取消 68ch 窄栏）
      §80：正文/照片说明字号略微调大 —— 华文中宋小字号在暗底上笔画细、毛边感
      明显，放大后显著缓解（锯齿观感） */
   .prose.memobody {
     max-width: none;
+    width: 100%; /* §83：同 Post.astro —— 抵消 .prose margin-inline:auto 的 fit-content 退化 */
     font-size: 1.1rem;
     line-height: 1.9;
   }
