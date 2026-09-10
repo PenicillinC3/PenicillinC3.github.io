@@ -48,7 +48,7 @@ const LENS_PROPS = {
    一致（rgba(15,23,42,.05)，tokens --grid-line/--grid-size）。 */
 const GRID_RGBA = 'rgba(15, 23, 42, 0.08)'; // §69.10：用户调深（原 0.05 与 body 一致）
 const GRID_CSS_PX = 22;
-const MAX_DPR = 1.75; // 与 Canvas dpr 上限一致
+const MAX_DPR = 1.5; // 与 Canvas dpr 上限一致（§78 降至 1.5）
 const CAM_Z = 20;
 const FOV = 15;
 const worldHeightAt = (z) => 2 * Math.tan((FOV * Math.PI) / 360) * (CAM_Z - z);
@@ -366,7 +366,7 @@ export default function FluidGlass() {
     <Canvas
       flat /* §69.6：关 ACES 色调映射 —— 纯白 FBO 底经 ACES 变灰(#ddd)且
                压没 0.05 发丝网格；flat 后白底与 CSS 页面一致 */
-      dpr={[1, 1.75]}
+      dpr={[1, 1.5]} /* §78：上限 1.75→1.5 —— 3/4 像素量，观感几乎无差、帧更稳 */
       camera={{ position: [0, 0, 20], fov: 15 }}
       gl={{ alpha: true, powerPreference: 'high-performance' }}
     >

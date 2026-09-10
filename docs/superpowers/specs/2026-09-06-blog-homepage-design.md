@@ -766,3 +766,11 @@ setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160）
 ## §77（2026-09-08）画廊卷序反转：最新在默认位（右），越老越靠左
 
 用户：摄影作品集以最新作品集放默认位置、老作品集依次在左边。实现（photos/index.astro）：`seriesRolls()` 原按日期降序（新→老）；画廊侧 `.reverse()` 成升序 → 胶卷左→右 = 老→新，**最新卷在最右端**；`i` 初始 = `covers.length-1`（默认居中最右=最新），首帧 `setGeom(silent)` 直落在它；服务端初始渲染的日期/作品名字幕与 dock 张数同步取 `covers[n-1]`；灰片占位语义注释更新（左端=没有更老、右端=没有更新）。备忘页不受影响（无前后卷 UI，仅 getStaticPaths 用 seriesRolls，顺序无关）。翻卷/键盘/点击逻辑无需改（基于索引 i 相对移动）。
+
+## §78（2026-09-08）首页加载提速：island 空闲水合 + DPR 降档
+
+用户：首页加载太慢。瓶颈 = 玻璃球 island chunk ~1.1MB(gzip 315KB) 以 `client:load` 与首屏抢主线程（下载/解析/font+glb 请求/WebGL 初始化）。优化：
+1. **`client:load` → `client:idle`**：首屏先出 DOM 标题/tagline/按钮与 CSS 背景（与场景版观感一致，§69.4 后二者同为白+方格），空闲后拉取水合并淡入场景版（DOM 标题仍由 html.fg-on 条件隐藏，无闪差）；无 JS/降级路径不变。
+2. **Canvas dpr 上限 1.75→1.5**（MAX_DPR 同步，网格纹理 1:1 设备像素约束保持）：像素量约 −26%，GPU 与合成更轻、跟手更稳。
+验证（无头）：DCL 时 island chunk 未加载、canvas=0、DOM 标题 opacity=1（立即可读）；约 1.45s 空闲水合完成 canvas=1、DOM 标题转 opacity=0。构建 0 警告。
+注：本地 dev 期间多次遇到 vite `504 Outdated Optimize Dep` 与 `.astro` content 缓存 EPERM（装依赖后残留句柄）——清 `.astro` + `node_modules/.vite` 重启 dev 即恢复，属开发环境伪影，不影响构建/线上。

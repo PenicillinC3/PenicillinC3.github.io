@@ -8,7 +8,9 @@ import { site } from '../site.config';
      背景观感与 notes 页一致：白底 0.05 发丝方格矢量线）；其余页面仍零框架 -->
 <Base>
   <div class="glass-scene" aria-hidden="true">
-    <FluidGlass client:load />
+    <!-- §78：client:load → idle —— 玻璃球 chunk ~1.1MB(gzip 315KB) 与首屏抢主线程；
+         空闲时再拉取+水合，首屏文字/按钮/背景先出，球随后无缝补上（背景观感一致） -->
+    <FluidGlass client:idle />
   </div>
   <section class="welcome">
     <div class="stack">
