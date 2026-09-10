@@ -4,7 +4,9 @@ import Base from '../../layouts/Base.astro';
 import Rays from '../../components/Rays.astro';
 import { seriesRolls } from '../../lib/collections';
 
-const rolls = await seriesRolls();
+// §77：最新的卷放默认位置（最右、居中进入），老卷依次往左 —— seriesRolls 原为
+// 日期降序，这里反转为升序（左→右 = 老→新，最新卷在最右端，初始索引取其）
+const rolls = (await seriesRolls()).reverse();
 const covers = await Promise.all(
   rolls.map(async (r) => {
     // §76：压缩 —— q88→80，档位 900/1600→640/1000/1600（46vw@1440≈660 由 640/1000 覆盖）
@@ -38,18 +40,18 @@ const n = covers.length;
       {/* §72：顶栏透光 —— 同款入射光裁出导航条带（z59 < 顶栏60），毛玻璃透出 */}
       <Rays variant="navstrip" />
 
-      <!-- 封面日期：居中于当前封面上方 -->
-      <p class="cap cap--top" data-cap-top aria-hidden="true"><span class="ts" data-ts>{n ? covers[0].date : ''}</span></p>
+      <!-- 封面日期：居中于当前封面上方（§77：默认显示最新卷 = 末位） -->
+      <p class="cap cap--top" data-cap-top aria-hidden="true"><span class="ts" data-ts>{n ? covers[n - 1].date : ''}</span></p>
       <!-- 地点/作品名：居中于封面下方（§75：卷填了 workName 则显示作品名） -->
       <p class="cap cap--bottom" data-cap-bottom aria-hidden="true">
-        <span class="loc" data-loc style={`opacity:${n ? (covers[0].workName || covers[0].location ? 1 : 0.35) : 0}`}>{n ? (covers[0].workName || covers[0].location || '未标注地点') : ''}</span>
+        <span class="loc" data-loc style={`opacity:${n ? (covers[n - 1].workName || covers[n - 1].location ? 1 : 0.35) : 0}`}>{n ? (covers[n - 1].workName || covers[n - 1].location || '未标注地点') : ''}</span>
       </p>
 
       {
         n > 0 ? (
           <>
             <div class="reel" data-reel>
-              {/* 首端纯灰占位（无上一卷） */}
+              {/* 首端纯灰占位（最左 = 没有更老的卷；§77 左→右 = 老→新） */}
               <div class="frame frame--ghost" data-ghost-l aria-hidden="true"></div>
 
               {covers.map((c, idx) => (
@@ -60,7 +62,7 @@ const n = covers.length;
                 </button>
               ))}
 
-              {/* 末端纯灰占位（无下一卷） */}
+              {/* 末端纯灰占位（最右 = 没有更新的卷；默认居中在最新卷） */}
               <div class="frame frame--ghost" data-ghost-r aria-hidden="true"></div>
 
               <div class="band top" aria-hidden="true"></div>
@@ -75,7 +77,7 @@ const n = covers.length;
 
     <div class="dock">
       <p class="hint">左右胶片切换 · 点击居中胶片进入备忘录 · ←/→ 键</p>
-      <p class="count" data-count>{n ? `${covers[0].count} 张` : ''}</p>
+      <p class="count" data-count>{n ? `${covers[n - 1].count} 张` : ''}</p>
     </div>
   </section>
 </Base>
@@ -95,7 +97,7 @@ const n = covers.length;
     const ts = document.querySelector<HTMLElement>('[data-ts]')!;
     const loc = document.querySelector<HTMLElement>('[data-loc]')!;
     const cnt = document.querySelector<HTMLElement>('[data-count]')!;
-    let i = 0;
+    let i = covers.length - 1; // §77：默认居中 = 最新卷（最右）
     let geom = { step: 0, fw: 0 };
 
     // 几何变量统一挂 .arena（reel 与日期/地点 caption 都从它继承消费 var）
