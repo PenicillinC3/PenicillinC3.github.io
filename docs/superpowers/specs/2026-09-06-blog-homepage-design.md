@@ -796,3 +796,7 @@ setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160）
 3. **关键**：`.prose` 自带 `margin-inline:auto` 使网格项**取消拉伸（justify-self:auto→stretch 失效）退化为 fit-content**，被内容 min-content 顶宽——`min-width:0` 亦无效（§83 挖出）；bisec 实证：仅内联 `width:100%` 可解。
 
 修复：`.prose.body`/`.prose.memobody` 显式 `width:100%`（+既有 `max-width:none`）；`.postpage`/`.memo` 轨道 `minmax(0,1fr)` 且子项 `min-width:0`（防未来其他宽内容）；`.main` `min-width:0`；`@media ≤760px` 内 `.prose table { display:block; width:100%; overflow-x:auto }` + 单元格 `min-width:8em`（窄屏表格在自身盒子内横向滚动；桌面端保持原满宽观感不受影响）。验证：移动 390 全页 `scrollWidth=390`（另 5 页同验）、表格盒 354 内滚 434；桌面 1440 表格仍 `display:table` 满宽 1104、无内滚。构建 0 警告。
+
+## §84（2026-09-08）修复：移动端下拉栏显示不全（抽屉被顶栏 backdrop-filter 困住）
+
+用户：移动端右上角下拉栏显示不全。实证：`[data-menu]` 盒子仅 390×**42px**（恰为其 padding 高度），5 个链接 y 74→310 全被 `overflow-y:auto` 裁掉，只露一条缝。根因：抽屉虽 `position:fixed`，但**嵌在 `.topbar` 内部**，而顶栏的 `backdrop-filter`（毛玻璃）会创建包含块（同 transform/filter 语义）→ fixed 元素相对 56px 高的顶栏定位，`inset: nav-h 0 0 0` 算出的高度 ≈0。修复：**把 `.drawer` 移出 `</header>`** 成为兄弟节点（fixed 回归视口包含块），并加 `env(safe-area-inset-bottom)` 底部安全区。验证：亮/暗两页抽屉均 390×788 全屏、5 链接完整、无裁切；点击切换/Esc/断点自动收起逻辑不受影响（脚本按 `[data-menu]` 全局查询）。教训：**backdrop-filter/filter/transform 的祖先会让 fixed 后代以它为包含块 —— 全屏浮层不要嵌在毛玻璃容器里**。

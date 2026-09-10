@@ -28,21 +28,24 @@ const isActive = (href: string) =>
       <span></span><span></span><span></span>
     </button>
   </div>
-
-  <div class="drawer" data-menu hidden>
-    <nav class="drawer-links" aria-label="移动端导航">
-      {
-        site.nav.map((n) => (
-          <a
-            class:list={['drawer-link', isActive(n.href) && 'is-active']}
-            href={n.href}
-            data-drawer-link
-          >{n.label}</a>
-        ))
-      }
-    </nav>
-  </div>
 </header>
+
+{/* §84：抽屉必须放在 .topbar 之外 —— 顶栏的 backdrop-filter（毛玻璃）会创建
+     包含块，嵌在其中的 fixed 元素会相对 56px 顶栏定位（高度塌成 0、内容被裁），
+     这正是移动端下拉栏「显示不全」的根因 */}
+<div class="drawer" data-menu hidden>
+  <nav class="drawer-links" aria-label="移动端导航">
+    {
+      site.nav.map((n) => (
+        <a
+          class:list={['drawer-link', isActive(n.href) && 'is-active']}
+          href={n.href}
+          data-drawer-link
+        >{n.label}</a>
+      ))
+    }
+  </nav>
+</div>
 
 <script>
   // —— 水滴滑块：鼠标跟随（spec §25.1）——
@@ -354,7 +357,8 @@ const isActive = (href: string) =>
     position: fixed;
     inset: var(--nav-h) 0 0 0;
     z-index: 59;
-    padding: 18px var(--gutter) 24px;
+    /* §84：底部叠加 iPhone 安全区，内容不被 Home 指示条盖住 */
+    padding: 18px var(--gutter) calc(24px + env(safe-area-inset-bottom));
     background: rgba(255, 255, 255, 0.96);
     overflow-y: auto;
   }
