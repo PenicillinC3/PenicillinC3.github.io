@@ -51,6 +51,7 @@ export const collections = {
     schema: z.object({
       ...base,
       location: z.string().optional(),
+      workName: z.string().optional(), // §75 作品名：画廊封面字幕优先显示它（缺省回落 location）
       cover: z.string(), // 卷封面 = 卷内某照片的 slug
     }),
   }),

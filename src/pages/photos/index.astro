@@ -15,6 +15,7 @@ const covers = await Promise.all(
       title: r.entry.data.title,
       date: r.entry.data.date.replaceAll('-', '.'),
       location: r.entry.data.location ?? '',
+      workName: r.entry.data.workName ?? '', // §75：填了则字幕显示作品名
       count: r.photos.length,
       wide: w / h > 1.55,
       src: big.src,
@@ -38,9 +39,9 @@ const n = covers.length;
 
       <!-- 封面日期：居中于当前封面上方 -->
       <p class="cap cap--top" data-cap-top aria-hidden="true"><span class="ts" data-ts>{n ? covers[0].date : ''}</span></p>
-      <!-- 地点：居中于封面下方 -->
+      <!-- 地点/作品名：居中于封面下方（§75：卷填了 workName 则显示作品名） -->
       <p class="cap cap--bottom" data-cap-bottom aria-hidden="true">
-        <span class="loc" data-loc style={`opacity:${n ? (covers[0].location ? 1 : 0.35) : 0}`}>{n ? (covers[0].location || '未标注地点') : ''}</span>
+        <span class="loc" data-loc style={`opacity:${n ? (covers[0].workName || covers[0].location ? 1 : 0.35) : 0}`}>{n ? (covers[0].workName || covers[0].location || '未标注地点') : ''}</span>
       </p>
 
       {
@@ -52,7 +53,7 @@ const n = covers.length;
 
               {covers.map((c, idx) => (
                 <button class="frame" data-frame data-idx={idx} type="button"
-                        aria-label={`《${c.title}》：${c.location || '未标注地点'}，${c.count} 张`}>
+                        aria-label={`《${c.title}》：${c.workName || c.location || '未标注地点'}，${c.count} 张`}>
                   <img class:list={['bg', c.wide && 'bg--wide']} src={c.src} srcset={c.srcset ?? undefined}
                        alt={c.title} loading={idx < 2 ? 'eager' : 'lazy'} decoding="async" draggable="false" />
                 </button>
@@ -83,7 +84,7 @@ const n = covers.length;
 <script is:inline type="application/json" id="roll-data" set:html={json}></script>
 <script>
   const covers = JSON.parse(document.getElementById('roll-data')!.textContent ?? '[]') as {
-    slug: string; title: string; date: string; location: string; count: number; wide: boolean;
+    slug: string; title: string; date: string; location: string; workName: string; count: number; wide: boolean;
     src: string; srcset?: string;
   }[];
   const arena = document.querySelector<HTMLElement>('[data-arena]');
@@ -139,8 +140,9 @@ const n = covers.length;
     const applyMeta = () => {
       const c = covers[i];
       ts.textContent = c.date;
-      loc.textContent = c.location || '未标注地点';
-      loc.style.opacity = c.location ? '1' : '0.35';
+      const sub = c.workName || c.location; // §75：作品名优先，缺省回落地点
+      loc.textContent = sub || '未标注地点';
+      loc.style.opacity = sub ? '1' : '0.35';
       cnt.textContent = `${c.count} 张`;
     };
 
