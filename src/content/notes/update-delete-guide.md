@@ -1,5 +1,5 @@
 ---
-title: 更新与删除网页 · 纯小白教程
+title: 更新与删除网页教程
 date: 2026-09-07
 tags: [站务]
 summary: 改错别字、删整篇、删照片卷、清冗余 —— 每一步都有可复制的命令和「你应该看到什么」，不靠猜。
@@ -17,13 +17,13 @@ summary: 改错别字、删整篇、删照片卷、清冗余 —— 每一步都
 
 **网址的最后一段 = 文件名**（网址没有文件名后缀）：
 
-| 你看到的网址 | 要打开的文件 |
-| --- | --- |
+| 你看到的网址                    | 要打开的文件                                 |
+| ------------------------------- | -------------------------------------------- |
 | `/notes/git-rebase-cheatsheet/` | `src/content/notes/git-rebase-cheatsheet.md` |
-| `/musings/slow-photography/` | `src/content/musings/slow-photography.md` |
-| `/links/plaintext-blog/` | `src/content/links/plaintext-blog.md` |
-| `/projects/photo-organizer/` | `src/content/projects/photo-organizer.md` |
-| `/photos/nikon-roll/` | 见下文「照片和胶卷」 |
+| `/musings/slow-photography/`    | `src/content/musings/slow-photography.md`    |
+| `/links/plaintext-blog/`        | `src/content/links/plaintext-blog.md`        |
+| `/projects/photo-organizer/`    | `src/content/projects/photo-organizer.md`    |
+| `/photos/nikon-roll/`           | 见下文「照片和胶卷」                         |
 
 在电脑上打开项目文件夹 `D:\_Vibe`，按这个路径一层层点进去（`src` → `content` → 对应栏目名），就能看到所有内容文件。**没有记事本以外的编辑器也能改**，但推荐装一个 VS Code，改坏了能 `Ctrl+Z` 撤销。
 
@@ -96,16 +96,16 @@ git push
 
 ## 第 5 步：清理冗余内容（什么能删、什么千万别动）
 
-| 内容 | 处置 |
-| --- | --- |
-| 旧草稿、不再需要的页面 | 删文件（或加 `draft: true` 藏起来） |
-| 示例照片/示例卷 | 可删，方法见第 4 步 |
-| 每个栏目里的 `_xxx-template.md.example` 模板 | **别删** —— 以后开新篇靠复制它 |
-| `src/pages/` 里的文件 | **别碰** —— 列表页/详情页是程序，删了网站结构就坏了 |
-| `node_modules/`、`dist/`、`.astro/` 文件夹 | **别手动删** —— 构建时自动生成 |
-| 根目录 `img/` 文件夹（原始大照片） | **别删** —— 不进 git，删了无法从历史找回，等于丢原片 |
+| 内容                                                                    | 处置                                                                        |
+| ----------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| 旧草稿、不再需要的页面                                                  | 删文件（或加 `draft: true` 藏起来）                                         |
+| 示例照片/示例卷                                                         | 可删，方法见第 4 步                                                         |
+| 每个栏目里的 `_xxx-template.md.example` 模板                            | **别删** —— 以后开新篇靠复制它                                              |
+| `src/pages/` 里的文件                                                   | **别碰** —— 列表页/详情页是程序，删了网站结构就坏了                         |
+| `node_modules/`、`dist/`、`.astro/` 文件夹                              | **别手动删** —— 构建时自动生成                                              |
+| 根目录 `img/` 文件夹（原始大照片）                                      | **别删** —— 不进 git，删了无法从历史找回，等于丢原片                        |
 | 根目录 `font/` 文件夹（字体原件，`STZHONGS.TTF`、`MapleMono-*.ttf` 等） | **别删** —— `npm run fonts:subset` 靠它们重建网站字体，删了该命令会直接报错 |
-| `public/fonts/` 里的字体子集 | 别手动删单个 —— 需要更新就跑 `npm run fonts:subset` 自动重建 |
+| `public/fonts/` 里的字体子集                                            | 别手动删单个 —— 需要更新就跑 `npm run fonts:subset` 自动重建                |
 
 一条内容"还在不在网站上"，以 `npm run dev` 的本地预览（或线上网址）为准，别凭文件夹判断 —— 有些文件（没挂卷的照片）本来就只在硬盘上、不上网站。
 
@@ -123,11 +123,11 @@ git push           # 上传发布，约 2 分钟生效
 
 **build 报错怎么看**（报错名字一定是某个 `.md` 文件，别慌）：
 
-| 红字长这样（节选） | 大白话 | 处理 |
-| --- | --- | --- |
-| `date 需为 YYYY-MM-DD` | 日期格式写错了 | 改成 `2026-09-01` 这种，别加引号 |
-| `alt 必填` | 照片说明缺一行 | 在照片 `.md` 里补 `alt: 描述图片内容` |
-| `找不到图片 / image …` | 图没了或名字对不上 | 检查照片是否和 `.md` 同名同文件夹 |
+| 红字长这样（节选）      | 大白话             | 处理                                  |
+| ----------------------- | ------------------ | ------------------------------------- |
+| `date 需为 YYYY-MM-DD`  | 日期格式写错了     | 改成 `2026-09-01` 这种，别加引号      |
+| `alt 必填`              | 照片说明缺一行     | 在照片 `.md` 里补 `alt: 描述图片内容` |
+| `找不到图片 / image …`  | 图没了或名字对不上 | 检查照片是否和 `.md` 同名同文件夹     |
 | 提到 `series` / `cover` | 删照片时误伤卷封面 | 按第 4 步检查 `series/` 里的 `cover:` |
 
 **最后一句最重要的**：build 不报错才会上线，所以随便折腾，改坏了 build 会拦住你，不会把坏页面发出去。卡在任何一步，把终端里的红字整段发给 Claude Code 就行。
