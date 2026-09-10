@@ -70,8 +70,14 @@ const imgs = await Promise.all(
 
 <style>
   .memo { display: grid; gap: clamp(22px, 3vw, 30px); }
-  /* §79：备忘正文与个人笔记页同宽（Post.astro 同款 .prose.body 取消 68ch 窄栏） */
-  .prose.memobody { max-width: none; }
+  /* §79：备忘正文与个人笔记页同宽（Post.astro 同款 .prose.body 取消 68ch 窄栏）
+     §80：正文/照片说明字号略微调大 —— 华文中宋小字号在暗底上笔画细、毛边感
+     明显，放大后显著缓解（锯齿观感） */
+  .prose.memobody {
+    max-width: none;
+    font-size: 1.1rem;
+    line-height: 1.9;
+  }
   .crumb {
     margin: 0;
     font-size: 0.88rem;
@@ -103,7 +109,11 @@ const imgs = await Promise.all(
   }
   .shot figcaption { padding: 0 6px 4px; }
   .shot-title { margin: 0 0 8px; font-size: 1.15rem; }
-  .shot-body { color: var(--text-2); }
+  .shot-body {
+    color: var(--text-2);
+    font-size: 1.06rem; /* §80：说明文字略调大，缓解小字号毛边 */
+    line-height: 1.85;
+  }
 
   /* 竖版：左图右文 */
   .shot.portrait {
