@@ -751,3 +751,7 @@ setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160）
 **§74-1（同日）：离开判定加坐标兜底** —— 用户反馈「移到导航栏也算移出」。headless 事件实测 pointerleave 悬停顶栏并不触发（rel=null 仅真离屏）；仍加兜底防真机差异：pointerleave 时若 clientX/Y 在视口内且下方有页面元素（elementFromPoint）→ 忽略；越界或 `visibilitychange`/blur 且 hidden → 复位。
 
 **§74-2（同日）：悬停导航栏 = 视为移出（特性，非 bug）** —— 用户澄清此前「移到导航栏也算移出界面」是想要的**特性**（此前 §74-1 的忽略逻辑系误解方向，保留作防误报兜底）：pointermove 落在 `.topbar` 矩形内 → setIdle（球回标题中心静置点）不跟手；移出顶栏回内容区 → 恢复跟手。真离屏/失焦仍回位（§74）。
+
+## §75（2026-09-08）画廊封面字幕支持作品名（workName）
+
+用户：摄影作品集「地点栏」现在可以是作品名。经确认：新增可选字段（不动现有 location）、仅作用于 /photos 画廊封面下方字幕。实现：`series` schema 增可选 `workName`；画廊 `covers` 数据带 `workName`，服务端渲染、roll-data JSON、client `applyMeta`、封面 aria-label 四处统一为 **workName → location → 「未标注地点」** 优先链（opacity 同理：有 workName/location 为 1，否则 0.35）。备忘页不受影响（用户选定范围）。用法：卷 md frontmatter 加一行 `workName: 作品名`。
