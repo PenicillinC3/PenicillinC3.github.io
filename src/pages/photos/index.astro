@@ -107,12 +107,15 @@ const n = covers.length;
       const bh = 22;
       // 胶片再扩一档（spec §50）：宽限 →66%、封顶 1300px；H 余量 196→176
       // （帧上下留白 = 余量/2：176 → 字幕上缘距 arena 顶 ~12px，属最小安全余量）
-      const fw = Math.min(W * 0.66, (H - 176) * 1.5, 1300);
+      // §82 移动端：窄屏胶片放大到 86% 宽、上下字幕让位（余量 176→150），
+      // 邻卷露出量缩小以适配窄侧廊
+      const mobile = W <= 760;
+      const fw = Math.min(W * (mobile ? 0.86 : 0.66), (H - (mobile ? 150 : 176)) * 1.5, 1300);
       const fh = fw / 1.5;
       // 帧距改小（spec §43）：显式 gap = 侧廊 − 邻卷露出量；露出量抬到 150–220px
       // （间距与露出的总预算 = 侧廊宽度，帧越近邻卷自然露越多）
       const corridor = W / 2 - fw / 2;
-      const peek = Math.min(220, Math.max(150, W * 0.12));
+      const peek = mobile ? Math.min(70, Math.max(40, W * 0.1)) : Math.min(220, Math.max(150, W * 0.12));
       const gap = Math.max(64, corridor - peek);
       const step = fw + gap; // 相邻中心距
       const st = arena.style;
@@ -159,6 +162,12 @@ const n = covers.length;
     const enter = () => { window.location.href = `/photos/${covers[i].slug}/`; };
 
     arena.addEventListener('click', (e) => {
+      // §82：滑动手势后浏览器会先取消 pointer（pointercancel）再补一个 click，
+      // 那种 click 不算点按（避免滑到某卷就误进备忘）
+      if (sawCancel) {
+        sawCancel = false;
+        return;
+      }
       const f = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-frame]');
       if (!f) return;
       const idx = Number(f.dataset.idx);
@@ -166,6 +175,29 @@ const n = covers.length;
       if (idx === i) enter();
       else { i = idx; applyMeta(); pan(); arena.focus({ preventScroll: true }); }
     });
+    // §82 移动端：左右滑动手势翻卷（touch 专用）。滑动 > 48px 且横向占优才翻卷；
+    // 真滑动指针会在 touchend 前先行取消（pointercancel），据此抑制随后的 click
+    // 误入备忘 —— 单纯轻触（点按）不受影响。上下滑不拦截。
+    let tx0 = 0, ty0 = 0, sawCancel = false;
+    arena.addEventListener('pointerdown', (e) => {
+      if (e.pointerType !== 'touch') return;
+      sawCancel = false;
+    });
+    arena.addEventListener('pointercancel', () => {
+      sawCancel = true;
+    });
+    arena.addEventListener('touchstart', (e) => {
+      const t = e.touches[0];
+      tx0 = t.clientX; ty0 = t.clientY;
+    }, { passive: true });
+    arena.addEventListener('touchend', (e) => {
+      const t = e.changedTouches[0];
+      const dx = t.clientX - tx0;
+      const dy = t.clientY - ty0;
+      if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy)) {
+        go(dx < 0 ? 1 : -1); // 左滑 = 下一卷（更老在左，故右滑 = 上一卷）
+      }
+    }, { passive: true });
     arena.addEventListener('keydown', (e) => {
       if (e.target !== arena) return;
       if (e.key === 'ArrowLeft') go(-1);
@@ -341,5 +373,10 @@ const n = covers.length;
   @media (max-width: 760px) {
     .hint { display: none; }
     .dock { justify-content: flex-end; }
+    /* §82：窄屏字幕上/下移近胶片（原 76/44 为宽屏留白） */
+    .cap--top { top: calc(50% - var(--fh) / 2 - 54px); }
+    .cap--bottom { top: calc(50% + var(--fh) / 2 + 32px); }
+    .ts { letter-spacing: 0.16em; }
+    .loc { letter-spacing: 0.2em; }
   }
 </style>

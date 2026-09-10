@@ -170,6 +170,14 @@ const groups = groupByYear
     box-shadow: inset 0 0 0 1.5px var(--accent);
   }
   .ygroup { margin-bottom: clamp(28px, 5vw, 44px); }
+  /* §82 移动端：筛选标签放大到手指可点（原 ~28px 高），间距收紧 */
+  @media (max-width: 760px) {
+    .chips { gap: 8px; margin-bottom: 18px; }
+    .chip {
+      padding: 0.55em 1.15em;
+      font-size: 0.9rem;
+    }
+  }
   .yr { font-size: 1rem; color: var(--text-3); font-weight: 600; margin: 0 0 12px; }
   .pcols {
     display: grid;
