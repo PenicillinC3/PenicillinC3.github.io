@@ -810,3 +810,5 @@ setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160）
 ## §87（2026-09-08）玻璃球 island 加载失败静默重试兜底
 
 背景：dev 多次出现 vite `504 Outdated Optimize Dep` → `FluidGlass.jsx` 动态导入失败、**island 静默不水合**（球消失而页面其余正常，不易察觉；线上 chunk 加载失败同理）。用户要求加兜底。实现（index.astro 内联脚本，页面级）：监听 `unhandledrejection` 与脚本 `error`（捕获阶段），消息匹配 `FluidGlass|dynamically imported module` → **整页静默 reload 一次**；`sessionStorage.__fgIslandRetry` 去抖防死循环（重试仍失败即放弃）；水合成功（`.glass-scene canvas` 出现）后清除标记，使后续独立故障仍可再试。验证：正常加载 → canvas=1、标记 null、无额外重载；拦截 three/FluidGlass chunk → 标记置 1、**仅重载一次**后停止。
+
+**§88（2026-09-08）根治 dev 反复 504：ogl 排除依赖预打包** —— 「摄影作品集光照背景没了 / 首页玻璃球没了」在本会话**第五次**出现，同一根因：vite 依赖预打包（`node_modules/.vite`）在重装依赖后过期，`ogl`（Rays）与 `FluidGlass` 相关模块返回 `504 Outdated Optimize Dep`，脚本静默不执行、画布不创建；清缓存重启即恢复（属 dev 伪影，构建产物无此问题，§70/§74/§87 均已记录）。根治：`astro.config.mjs` → `vite.optimizeDeps.exclude: ['ogl']`（按源码直供，去掉该预打包条目）。验证：清缓存重启后 `/photos/` 2 画布、`/photos/nikon-roll/` 1、`/` 1，控制台 **0 错误**。若今后再遇同类 504，优先怀疑新装的运行时依赖并把对应包加入该排除表。

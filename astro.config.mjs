@@ -18,6 +18,10 @@ export default defineConfig({
     enabled: false, // 隐藏底部 Astro 开发工具栏（仅影响本地 dev）
   },
   vite: {
+    // §88：ogl 排除出依赖预打包 —— 多次出现「504 Outdated Optimize Dep」致
+    // Rays/玻璃球模块加载失败、光效画布不创建（重装依赖后尤甚）。直接按源码
+    // 提供可根治该 dev 环境问题（不影响构建产物）
+    optimizeDeps: { exclude: ['ogl'] },
     build: {
       // §69 玻璃球 island（three/fiber/drei/react）单 chunk ~1.1MB（gzip 315KB），
       // 仅首页加载；上限抬到 1300 消除 vite 默认 500kB 警告（非框架散包，勿拆）
