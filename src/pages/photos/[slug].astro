@@ -70,6 +70,8 @@ const imgs = await Promise.all(
 
 <style>
   .memo { display: grid; gap: clamp(22px, 3vw, 30px); }
+  /* §79：备忘正文与个人笔记页同宽（Post.astro 同款 .prose.body 取消 68ch 窄栏） */
+  .prose.memobody { max-width: none; }
   .crumb {
     margin: 0;
     font-size: 0.88rem;
