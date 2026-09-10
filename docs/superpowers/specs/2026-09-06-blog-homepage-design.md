@@ -806,3 +806,7 @@ setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160）
 用户：抽屉做个展开动画。实现（Nav.astro）：`.drawer` 收起态 `opacity:0 + translateY(-10px) + visibility:hidden`，`.is-open` 归位（transform `.3s cubic-bezier(.22,.61,.36,1)`、opacity `.24s`、visibility 过渡延时衔接）；**逐项上浮淡入** —— `.drawer-link` 入场 `translateY(8px)→0`，`is-open` 下按 `nth-child` 递增 `transition-delay` 0.03–0.18s（含第 6 项以后无延迟）；收起不做逐项延迟（整体快速回落）。JS：`openDrawer/closeDrawer` 抽函数（双 rAF 保证初始态先落帧）；关闭经 `transitionend`（滤 target=抽屉本身，避免子项过渡冒泡）后 `hidden=true`，另设 320ms 兜底；Esc/跨断点/点链接收起路径复用；`prefers-reduced-motion` 下过渡全关、直接显隐。验证：开→中途 op0.60/tf-3.6px→终态 op1/390×788/aria true/滚动锁；关→中途 op0.17→hidden/display:none/滚动解锁。
 
 **§86（2026-09-08）抽屉改为内容高度下拉面板** —— 用户：展开不要覆盖整页，栏目多少就下拉多少。`.drawer` 改 `inset: var(--nav-h) 0 auto 0`（只挂顶部、高度自适应）+ `max-height: calc(100dvh - var(--nav-h))` 兜底 + `overflow-y:auto`；下缘加圆角/发丝边/投影收口（玻璃语言一致）；§85 展开动画沿用。验证：390×844 下展开面板 390×**352**（5 项 + 内边距），页面其余区域可见可辨。
+
+## §87（2026-09-08）玻璃球 island 加载失败静默重试兜底
+
+背景：dev 多次出现 vite `504 Outdated Optimize Dep` → `FluidGlass.jsx` 动态导入失败、**island 静默不水合**（球消失而页面其余正常，不易察觉；线上 chunk 加载失败同理）。用户要求加兜底。实现（index.astro 内联脚本，页面级）：监听 `unhandledrejection` 与脚本 `error`（捕获阶段），消息匹配 `FluidGlass|dynamically imported module` → **整页静默 reload 一次**；`sessionStorage.__fgIslandRetry` 去抖防死循环（重试仍失败即放弃）；水合成功（`.glass-scene canvas` 出现）后清除标记，使后续独立故障仍可再试。验证：正常加载 → canvas=1、标记 null、无额外重载；拦截 three/FluidGlass chunk → 标记置 1、**仅重载一次**后停止。

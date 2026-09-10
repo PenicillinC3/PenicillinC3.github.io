@@ -27,6 +27,42 @@ import { site } from '../site.config';
   </section>
 </Base>
 
+<!-- §87：玻璃球 island 加载兜底 —— chunk 拉取失败（网络抖动/缓存过期）时球会
+     静默消失（页面其余正常，不易察觉）；此处监听动态导入/脚本加载失败，静默整页
+     重载一次（sessionStorage 去抖，成功出现 canvas 后清标，杜绝死循环） -->
+<script is:inline>
+  (function () {
+    var KEY = '__fgIslandRetry';
+    var fail = function (msg) {
+      if (!/FluidGlass|dynamically imported module/i.test(String(msg))) return;
+      if (sessionStorage.getItem(KEY)) return; // 重试过仍失败：停，避免循环
+      sessionStorage.setItem(KEY, '1');
+      location.reload();
+    };
+    addEventListener('unhandledrejection', function (e) {
+      var r = e.reason;
+      fail((r && (r.message || r)) || '');
+    });
+    addEventListener(
+      'error',
+      function (e) {
+        var t = e.target;
+        if (t && t.tagName === 'SCRIPT') fail(t.src || '');
+        else if (e.message) fail(e.message);
+      },
+      true,
+    );
+    // 水合成功（canvas 出现）→ 清标记，下次故障仍可再试
+    var n = 0;
+    var iv = setInterval(function () {
+      if (document.querySelector('.glass-scene canvas')) {
+        sessionStorage.removeItem(KEY);
+        clearInterval(iv);
+      } else if (++n > 30) clearInterval(iv); // 30s 后停止观察
+    }, 1000);
+  })();
+</script>
+
 <style>
   /* —— §69 玻璃球层叠：canvas fixed 全屏垫底(z0)，顶栏(z60)/欢迎内容(z1)/页脚(z1)
        提层盖其上；顶栏、欢迎文字都允许事件穿透到 canvas（球全域跟手），
