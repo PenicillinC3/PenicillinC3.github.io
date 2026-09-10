@@ -33,7 +33,10 @@ const { label, backHref, title, date, tags = [], summary } = Astro.props;
 </Base>
 
 <style>
-  .postpage { display: grid; gap: clamp(22px, 4vw, 36px); }
+  /* §83：网格子项默认 min-width:auto，会被宽表等 min-content 大的内容撑出轨道
+     （整页右侧被推出屏外）—— 轨道 minmax(0,1fr) + 子项 min-width:0 双保险 */
+  .postpage { display: grid; grid-template-columns: minmax(0, 1fr); gap: clamp(22px, 4vw, 36px); }
+  .postpage > * { min-width: 0; }
   .phead { padding: clamp(22px, 4vw, 36px) clamp(18px, 4vw, 40px); }
   .crumb { margin: 0 0 14px; font-size: 0.88rem; }
   .crumb a { color: var(--text-2); }
@@ -42,7 +45,9 @@ const { label, backHref, title, date, tags = [], summary } = Astro.props;
   .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 0 0 6px; color: var(--text-3); font-size: 0.9rem; }
   .tagrow { display: inline-flex; gap: 6px; }
   .sum { color: var(--text-2); margin: 10px 0 0; }
-  /* 用户指定：正文与摄影页同宽（取消 .prose 的 68ch 窄栏） */
-  .prose.body { max-width: none; }
+  /* 用户指定：正文与摄影页同宽（取消 .prose 的 68ch 窄栏）
+     §83：必须显式 width:100% —— .prose 的 margin-inline:auto 会取消网格项
+     拉伸、宽度退化 fit-content，进而被宽表 min-content(≈734px) 顶宽外溢 */
+  .prose.body { max-width: none; width: 100%; }
   .body { color: var(--text-1); font-size: 1.02rem; line-height: 1.85; }
 </style>

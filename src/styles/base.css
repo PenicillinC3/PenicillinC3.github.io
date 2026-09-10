@@ -109,6 +109,8 @@ img { max-width: 100%; height: auto; display: block; }
 
 .main {
   flex: 1 0 auto; /* 吸底：短内容时吞掉剩余高度 */
+  min-width: 0; /* §83：弹性子项默认 min-width:auto 会被宽内容（如表格）顶宽，
+                   连带撑破整页 —— 置 0 允许收缩，溢出交给内部容器滚动 */
   /* §82：原 `padding: X 0 Y` 简写把左右设为 0，覆盖了 .wrap 的 --gutter 内边距
      —— 桌面端列居中看不出来，移动端则全部内容贴屏边。改用 padding-block，
      横向内边距回归 .wrap 的 gutter（1104px 通栏 ≈ 规格中的 ~1100 大卡） */
@@ -315,6 +317,18 @@ img { max-width: 100%; height: auto; display: block; }
   padding: 0.5em 0.8em; text-align: left;
 }
 .prose th { background: color-mix(in srgb, var(--text-1) 5%, transparent); }
+/* §83 窄屏：表格自身横向滚动（长路径单元格 min-content 可达 ~730px，会把整页
+   顶宽、右侧内容全被推出屏外）；桌面端保持原满宽观感不受影响 */
+@media (max-width: 760px) {
+  .prose table {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .prose th, .prose td { min-width: 8em; }
+}
 
 /* —— 减少动效（覆盖棱光旋转与水滴动效） —— */
 @media (prefers-reduced-motion: reduce) {
