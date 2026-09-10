@@ -1,0 +1,60 @@
+---
+// 照片卡片（§81 抽出共用）：卷备忘页的底部网格与正文内联（![[slug]]）都渲染它。
+// 横版：图在上、说明在下；竖版：左图右文。样式自 §76/§80 起随组件走。
+import type { CollectionEntry } from 'astro:content';
+
+interface Props {
+  data: {
+    p: CollectionEntry<'photos'>;
+    src: string;
+    srcset?: string;
+    isPortrait: boolean;
+  };
+}
+const { data } = Astro.props;
+const { p, src, srcset, isPortrait } = data;
+---
+<figure class:list={['glass shot', isPortrait && 'portrait']}>
+  <img src={src} srcset={srcset ?? undefined} alt={p.data.alt} loading="lazy" decoding="async"
+       sizes="(min-width: 900px) min(88vw, 1200px), 100vw" />
+  <figcaption>
+    <h2 class="shot-title">{p.data.title}</h2>
+    {p.body && p.body.trim() !== '' && <div class="prose shot-body"><p>{p.body}</p></div>}
+  </figcaption>
+</figure>
+
+<style>
+  /* 横版：照片独占一行，正文在下方 */
+  .shot {
+    margin: 0;
+    padding: 10px;
+    border-radius: calc(var(--radius-m) + 6px);
+    display: grid;
+    gap: 14px;
+  }
+  .shot img {
+    width: 100%;
+    height: auto;
+    max-height: 76vh;
+    object-fit: contain;
+    border-radius: calc(var(--radius-m) - 4px);
+  }
+  .shot figcaption { padding: 0 6px 4px; }
+  .shot-title { margin: 0 0 8px; font-size: 1.15rem; }
+  .shot-body {
+    color: var(--text-2);
+    font-size: 1.06rem; /* §80：说明文字略调大，缓解小字号毛边 */
+    line-height: 1.85;
+  }
+
+  /* 竖版：左图右文 */
+  .shot.portrait {
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    align-items: start;
+  }
+  .shot.portrait figcaption { padding-top: 6px; }
+
+  @media (max-width: 879px) {
+    .shot.portrait { grid-template-columns: 1fr; }
+  }
+</style>
