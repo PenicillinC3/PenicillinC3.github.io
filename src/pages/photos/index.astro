@@ -7,7 +7,8 @@ import { seriesRolls } from '../../lib/collections';
 const rolls = await seriesRolls();
 const covers = await Promise.all(
   rolls.map(async (r) => {
-    const big = await getImage({ src: r.cover.data.image, widths: [900, 1600], sizes: '(min-width: 900px) 46vw, 90vw', format: 'webp', quality: 88 });
+    // §76：压缩 —— q88→80，档位 900/1600→640/1000/1600（46vw@1440≈660 由 640/1000 覆盖）
+    const big = await getImage({ src: r.cover.data.image, widths: [640, 1000, 1600], sizes: '(min-width: 900px) 46vw, 90vw', format: 'webp', quality: 80 });
     const w = r.cover.data.image.width ?? 1;
     const h = r.cover.data.image.height ?? 1;
     return {
@@ -289,10 +290,11 @@ const n = covers.length;
     letter-spacing: 0.22em;
     text-shadow: 0 0 6px rgba(255, 77, 77, 0.9), 0 0 18px rgba(255, 77, 77, 0.55);
   }
-  /* spec §51/§52：地点白光 + 泛黄微光（胶片灯暖色；§52 加白色核心光更亮） */
+  /* spec §51/§52：地点白光 + 泛黄微光（胶片灯暖色；§52 加白色核心光更亮）
+     §75：字号放大一档（作品名/地点字幕，用户调） */
   .loc {
     color: #fff;
-    font-size: clamp(1rem, 2.4vw, 1.4rem);
+    font-size: clamp(1.15rem, 2.8vw, 1.7rem);
     letter-spacing: 0.3em;
     text-shadow:
       0 0 3px rgba(255, 255, 255, 0.9),
