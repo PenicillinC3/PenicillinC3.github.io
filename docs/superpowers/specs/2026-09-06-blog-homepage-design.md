@@ -800,3 +800,7 @@ setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160）
 ## §84（2026-09-08）修复：移动端下拉栏显示不全（抽屉被顶栏 backdrop-filter 困住）
 
 用户：移动端右上角下拉栏显示不全。实证：`[data-menu]` 盒子仅 390×**42px**（恰为其 padding 高度），5 个链接 y 74→310 全被 `overflow-y:auto` 裁掉，只露一条缝。根因：抽屉虽 `position:fixed`，但**嵌在 `.topbar` 内部**，而顶栏的 `backdrop-filter`（毛玻璃）会创建包含块（同 transform/filter 语义）→ fixed 元素相对 56px 高的顶栏定位，`inset: nav-h 0 0 0` 算出的高度 ≈0。修复：**把 `.drawer` 移出 `</header>`** 成为兄弟节点（fixed 回归视口包含块），并加 `env(safe-area-inset-bottom)` 底部安全区。验证：亮/暗两页抽屉均 390×788 全屏、5 链接完整、无裁切；点击切换/Esc/断点自动收起逻辑不受影响（脚本按 `[data-menu]` 全局查询）。教训：**backdrop-filter/filter/transform 的祖先会让 fixed 后代以它为包含块 —— 全屏浮层不要嵌在毛玻璃容器里**。
+
+## §85（2026-09-08）抽屉展开/收起动画
+
+用户：抽屉做个展开动画。实现（Nav.astro）：`.drawer` 收起态 `opacity:0 + translateY(-10px) + visibility:hidden`，`.is-open` 归位（transform `.3s cubic-bezier(.22,.61,.36,1)`、opacity `.24s`、visibility 过渡延时衔接）；**逐项上浮淡入** —— `.drawer-link` 入场 `translateY(8px)→0`，`is-open` 下按 `nth-child` 递增 `transition-delay` 0.03–0.18s（含第 6 项以后无延迟）；收起不做逐项延迟（整体快速回落）。JS：`openDrawer/closeDrawer` 抽函数（双 rAF 保证初始态先落帧）；关闭经 `transitionend`（滤 target=抽屉本身，避免子项过渡冒泡）后 `hidden=true`，另设 320ms 兜底；Esc/跨断点/点链接收起路径复用；`prefers-reduced-motion` 下过渡全关、直接显隐。验证：开→中途 op0.60/tf-3.6px→终态 op1/390×788/aria true/滚动锁；关→中途 op0.17→hidden/display:none/滚动解锁。

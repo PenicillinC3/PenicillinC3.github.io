@@ -218,30 +218,64 @@ const isActive = (href: string) =>
   // 模块每次执行：刷新落点（首次含直接落位；VT 场景由上方持久监听兜底）
   refreshRest();
 
-  // —— 移动端抽屉 ——
+  // —— 移动端抽屉（§85：带展开/收起过渡动画）——
   const menuBtn = document.querySelector<HTMLButtonElement>('[data-menu-btn]');
   const drawer = document.querySelector<HTMLElement>('[data-menu]');
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  const setScrollLock = (on: boolean) => {
+    document.body.style.overflow = on ? 'hidden' : '';
+  };
+  const openDrawer = () => {
+    if (!drawer) return;
+    drawer.hidden = false;
+    setScrollLock(true);
+    menuBtn?.setAttribute('aria-expanded', 'true');
+    // 双 rAF：确保初始态先落一帧，过渡才会真正播放
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => drawer.classList.add('is-open')),
+    );
+  };
+  const closeDrawer = (refocus = false) => {
+    if (!drawer || drawer.hidden) return;
+    setScrollLock(false);
+    menuBtn?.setAttribute('aria-expanded', 'false');
+    if (refocus) menuBtn?.focus();
+    if (reduceMotion.matches) {
+      drawer.classList.remove('is-open');
+      drawer.hidden = true;
+      return;
+    }
+    drawer.classList.remove('is-open');
+    const done = (e: Event) => {
+      if (e.target !== drawer) return;
+      drawer.hidden = true;
+      drawer.removeEventListener('transitionend', done);
+    };
+    drawer.addEventListener('transitionend', done);
+    // 兜底：过渡事件未达（如被 display 中断）时定时收尾
+    window.setTimeout(() => {
+      if (!drawer.classList.contains('is-open')) drawer.hidden = true;
+    }, 320);
+  };
   menuBtn?.addEventListener('click', () => {
-    const open = drawer?.toggleAttribute('hidden') === false;
-    menuBtn.setAttribute('aria-expanded', String(open));
-    document.body.style.overflow = open ? 'hidden' : '';
+    if (!drawer) return;
+    if (drawer.classList.contains('is-open')) closeDrawer();
+    else openDrawer();
+  });
+  // 点击抽屉内链接：立即收起（随后跳转由 VT 接手），不做等待
+  drawer?.addEventListener('click', (e) => {
+    if ((e.target as HTMLElement).closest('.drawer-link')) {
+      drawer.classList.remove('is-open');
+      setScrollLock(false);
+    }
   });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && drawer && !drawer.hidden) {
-      drawer.hidden = true;
-      menuBtn?.setAttribute('aria-expanded', 'false');
-      document.body.style.overflow = '';
-      menuBtn?.focus();
-    }
+    if (e.key === 'Escape') closeDrawer(true);
   });
   // 跨断点：抽屉打开时窗口拉宽过 880px → 关闭抽屉并释放滚动锁
   const mq = matchMedia('(min-width: 881px)');
   const onWide = () => {
-    if (drawer && !drawer.hidden && mq.matches) {
-      drawer.hidden = true;
-      menuBtn?.setAttribute('aria-expanded', 'false');
-      document.body.style.overflow = '';
-    }
+    if (mq.matches) closeDrawer();
   };
   mq.addEventListener('change', onWide);
 </script>
@@ -361,8 +395,45 @@ const isActive = (href: string) =>
     padding: 18px var(--gutter) calc(24px + env(safe-area-inset-bottom));
     background: rgba(255, 255, 255, 0.96);
     overflow-y: auto;
+    /* §85：收起态 = 整体回落 + 淡出（is-open 时归位） */
+    opacity: 0;
+    transform: translateY(-10px);
+    visibility: hidden;
+    transition:
+      opacity 0.22s ease,
+      transform 0.26s cubic-bezier(0.22, 0.61, 0.36, 1),
+      visibility 0s linear 0.26s;
+  }
+  .drawer.is-open {
+    opacity: 1;
+    transform: none;
+    visibility: visible;
+    transition:
+      opacity 0.24s ease,
+      transform 0.3s cubic-bezier(0.22, 0.61, 0.36, 1),
+      visibility 0s;
   }
   .drawer[hidden] { display: none; }
+  /* 逐项上浮淡入（展开时依次进场；收起时统一快速回落，不做逐项延迟） */
+  .drawer .drawer-link {
+    opacity: 0;
+    transform: translateY(8px);
+    transition:
+      opacity 0.18s ease,
+      transform 0.24s cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+  .drawer.is-open .drawer-link { opacity: 1; transform: none; }
+  .drawer.is-open .drawer-link:nth-child(1) { transition-delay: 0.03s; }
+  .drawer.is-open .drawer-link:nth-child(2) { transition-delay: 0.06s; }
+  .drawer.is-open .drawer-link:nth-child(3) { transition-delay: 0.09s; }
+  .drawer.is-open .drawer-link:nth-child(4) { transition-delay: 0.12s; }
+  .drawer.is-open .drawer-link:nth-child(5) { transition-delay: 0.15s; }
+  .drawer.is-open .drawer-link:nth-child(6) { transition-delay: 0.18s; }
+  @media (prefers-reduced-motion: reduce) {
+    .drawer,
+    .drawer .drawer-link { transition: none; }
+    .drawer .drawer-link { opacity: 1; transform: none; }
+  }
   .drawer-links { display: flex; flex-direction: column; gap: 4px; margin-bottom: 18px; }
   .drawer-link {
     padding: 13px 16px;
