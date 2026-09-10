@@ -755,3 +755,10 @@ setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160）
 ## §75（2026-09-08）画廊封面字幕支持作品名（workName）
 
 用户：摄影作品集「地点栏」现在可以是作品名。经确认：新增可选字段（不动现有 location）、仅作用于 /photos 画廊封面下方字幕。实现：`series` schema 增可选 `workName`；画廊 `covers` 数据带 `workName`，服务端渲染、roll-data JSON、client `applyMeta`、封面 aria-label 四处统一为 **workName → location → 「未标注地点」** 优先链（opacity 同理：有 workName/location 为 1，否则 0.35）。备忘页不受影响（用户选定范围）。用法：卷 md frontmatter 加一行 `workName: 作品名`。
+
+## §76（2026-09-08）摄影图片压缩提速
+
+用户：封面/内容图片压缩以获得更快加载。调整（仅质量与档位，不动布局）：
+- 画廊封面（photos/index getImage）：widths [900,1600]→[640,1000,1600]、quality 88→80（46vw 槽位在小屏走 640/1000，明显省流）。
+- 备忘页（photos/[slug]）：去 2400 档 → [900,1600]、quality 86→80（展示宽 ≤1200px，1600 覆盖 1.33× DPR；2× 屏由 1600 上采样，轻微软化可接受，换取显著体积下降）。
+实测：最大文件 392KB→264KB，其余档位同比降 40–70%（如 172→48KB、108→28KB）。构建 0 警告（顺带清 `.astro` 陈旧 content 缓存 —— dev 下那条 duplicate id 警告系缓存残留非真实重复文件）。
