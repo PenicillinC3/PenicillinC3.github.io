@@ -389,11 +389,17 @@ const isActive = (href: string) =>
   /* 移动端抽屉 */
   .drawer {
     position: fixed;
-    inset: var(--nav-h) 0 0 0;
+    /* §86：不再铺满整页 —— 高度随栏目数自适应（下拉浮层），顶栏下悬挂 */
+    inset: var(--nav-h) 0 auto 0;
     z-index: 59;
-    /* §84：底部叠加 iPhone 安全区，内容不被 Home 指示条盖住 */
+    max-height: calc(100dvh - var(--nav-h));
+    /* §84：底部叠加 iPhone 安全区 */
     padding: 18px var(--gutter) calc(24px + env(safe-area-inset-bottom));
     background: rgba(255, 255, 255, 0.96);
+    /* 下拉面板收口：下缘圆角 + 发丝边 + 投影，与玻璃语言一致 */
+    border-bottom: 1px solid var(--glass-border);
+    border-radius: 0 0 var(--radius-m) var(--radius-m);
+    box-shadow: var(--glass-shadow), 0 18px 34px -22px rgba(15, 23, 42, 0.35);
     overflow-y: auto;
     /* §85：收起态 = 整体回落 + 淡出（is-open 时归位） */
     opacity: 0;
