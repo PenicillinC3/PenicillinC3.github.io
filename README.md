@@ -8,7 +8,7 @@ Apple 液态玻璃风格的静态个人站点。包含我的一些思考见解�
 
 ## 本地开发
 
-本项目由Claude Code搭配Deepseek-v4-flash-0731协助开发。
+本项目由Claude Code搭配Deepseek-v4-flash-0731协助开发。详细的工作过程请参见仓库中根目录的CLAUDE.md文件。
 
 ```bash
 npm install     # 首次
