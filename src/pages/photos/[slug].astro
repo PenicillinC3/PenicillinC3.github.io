@@ -2,8 +2,10 @@
 import { getImage } from 'astro:assets';
 import { render } from 'astro:content';
 import type { CollectionEntry } from 'astro:content';
+import { createMarkdownProcessor } from '@astrojs/markdown-remark';
 import Base from '../../layouts/Base.astro';
 import Rays from '../../components/Rays.astro';
+import ShotCard from '../../components/ShotCard.astro';
 import { seriesRolls } from '../../lib/collections';
 import { formatDate } from '../../lib/date';
 
@@ -17,7 +19,43 @@ interface Props {
 }
 const { roll } = Astro.props;
 const { entry: s, photos } = roll;
-const { Content } = await render(s);
+
+// —— §81 图文交错 ——
+// 卷 md 里独占一行的 ![[照片slug]] = 该照片卡片就地插入此处（照片说明由照片自己
+// 的 md 提供）；未被标记的照片按顺序自动补到正文之后再按日期排进底部网格。
+// 无任何标记时行为与旧版完全一致（正文块 + 底部照片网格）。
+const MARK_RE = /^!\[\[([a-z0-9-]+)\]\]$/gim;
+const marks = [...(s.body ?? '').matchAll(MARK_RE)];
+const photoBySlug = new Map(photos.map((p) => [p.slug, p]));
+for (const m of marks) {
+  if (!photoBySlug.has(m[1])) {
+    throw new Error(`[photos] 卷 ${s.slug} 的正文引用了不属于本卷的照片：${m[1]}`);
+  }
+}
+const marked = new Set(marks.map((m) => m[1]));
+
+// 正文切块：文字段渲染为 HTML，标记位置渲染为照片
+const rawBody = s.body ?? '';
+const md = await createMarkdownProcessor({ syntaxHighlight: 'prism' });
+const parts: Array<{ kind: 'md'; html: string } | { kind: 'shot'; slug: string }> = [];
+let cursor = 0;
+for (const m of marks) {
+  const before = rawBody.slice(cursor, m.index);
+  if (before.trim()) {
+    const r = await md.render(before);
+    parts.push({ kind: 'md', html: r.code });
+  }
+  parts.push({ kind: 'shot', slug: m[1] });
+  cursor = (m.index ?? 0) + m[0].length;
+}
+const tail = rawBody.slice(cursor);
+const pureProse = marks.length === 0; // 无标记 → 旧路径（astro 原生 Content 组件）
+if (!pureProse && tail.trim()) {
+  const r = await md.render(tail);
+  parts.push({ kind: 'md', html: r.code });
+}
+const restPhotos = photos.filter((p) => !marked.has(p.slug));
+const { Content } = pureProse ? await render(s) : { Content: null };
 
 // 每张照片的展示图（卷备忘页内最大宽度）
 const imgs = await Promise.all(
@@ -35,6 +73,7 @@ const imgs = await Promise.all(
     return { p, src: g.src, srcset: g.attributes.srcset, isPortrait };
   }),
 );
+const imgBySlug = new Map(imgs.map((it) => [it.p.slug, it]));
 ---
 <Base title={s.data.title} description={s.data.summary ?? `摄影备忘录：${s.data.title}`} dark>
   {/* 红色射线氛围（spec §26）：backdrop 沉于玻璃卡后方，随正文滚动 */}
@@ -50,21 +89,25 @@ const imgs = await Promise.all(
         <span class="sep">·</span>共 {photos.length} 张
       </p>
     </header>
-    {s.body && s.body.trim() !== '' && (
-      <div class="prose memobody"><Content /></div>
+    {/* §81：无 ![[slug]] 标记 → 旧路径（原生 Content）；有标记 → 文字段与照片按标记交错 */}
+    {pureProse ? (
+      s.body && s.body.trim() !== '' && <div class="prose memobody"><Content /></div>
+    ) : (
+      <div class="memoflow">
+        {parts.map((pt) =>
+          pt.kind === 'md' ? (
+            <div class="prose memobody" set:html={pt.html} />
+          ) : (
+            <ShotCard data={imgBySlug.get(pt.slug)!} />
+          ),
+        )}
+      </div>
     )}
-    <div class="photos">
-      {imgs.map(({ p, src, srcset, isPortrait }) => (
-        <figure class:list={['glass shot', isPortrait && 'portrait']}>
-          <img src={src} srcset={srcset} alt={p.data.alt} loading="lazy" decoding="async"
-               sizes="(min-width: 900px) min(88vw, 1200px), 100vw" />
-          <figcaption>
-            <h2 class="shot-title">{p.data.title}</h2>
-            {p.body && p.body.trim() !== '' && <div class="prose shot-body"><p>{p.body}</p></div>}
-          </figcaption>
-        </figure>
-      ))}
-    </div>
+    {restPhotos.length > 0 && (
+      <div class="photos">
+        {restPhotos.map((p) => <ShotCard data={imgBySlug.get(p.slug)!} />)}
+      </div>
+    )}
   </article>
 </Base>
 
@@ -90,41 +133,12 @@ const imgs = await Promise.all(
   .meta { margin: 6px 0 0; color: var(--text-3); font-size: 0.92rem; }
   .sep { padding: 0 6px; opacity: 0.6; }
   .memobody { margin-top: 2px; }
-  .photos { display: grid; gap: clamp(26px, 5vw, 44px); }
-
-  /* 横版：照片独占一行，正文在下方 */
-  .shot {
-    margin: 0;
-    padding: 10px;
-    border-radius: calc(var(--radius-m) + 6px);
+  /* §81：图文交错流（文字段与照片卡片同栅格间距，视觉节奏一致） */
+  .memoflow {
     display: grid;
-    gap: 14px;
+    gap: clamp(20px, 3.6vw, 34px);
   }
-  .shot img {
-    width: 100%;
-    height: auto;
-    max-height: 76vh;
-    object-fit: contain;
-    border-radius: calc(var(--radius-m) - 4px);
-  }
-  .shot figcaption { padding: 0 6px 4px; }
-  .shot-title { margin: 0 0 8px; font-size: 1.15rem; }
-  .shot-body {
-    color: var(--text-2);
-    font-size: 1.06rem; /* §80：说明文字略调大，缓解小字号毛边 */
-    line-height: 1.85;
-  }
-
-  /* 竖版：左图右文 */
-  .shot.portrait {
-    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
-    align-items: start;
-  }
-  .shot.portrait figcaption { padding-top: 6px; }
-
-  @media (max-width: 879px) {
-    .shot.portrait { grid-template-columns: 1fr; }
-  }
+  .photos { display: grid; gap: clamp(26px, 5vw, 44px); }
 
   /* 暗房点缀（spec §21.3）：页头红光发丝线 */
   .memohead { border-bottom: 1px solid rgba(255, 107, 107, 0.45); box-shadow: var(--glass-inset), var(--glass-shadow), 0 10px 40px -18px rgba(255, 77, 77, 0.5); }

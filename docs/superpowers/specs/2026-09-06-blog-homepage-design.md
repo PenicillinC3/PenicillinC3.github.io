@@ -774,3 +774,7 @@ setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160）
 2. **Canvas dpr 上限 1.75→1.5**（MAX_DPR 同步，网格纹理 1:1 设备像素约束保持）：像素量约 −26%，GPU 与合成更轻、跟手更稳。
 验证（无头）：DCL 时 island chunk 未加载、canvas=0、DOM 标题 opacity=1（立即可读）；约 1.45s 空闲水合完成 canvas=1、DOM 标题转 opacity=0。构建 0 警告。
 注：本地 dev 期间多次遇到 vite `504 Outdated Optimize Dep` 与 `.astro` content 缓存 EPERM（装依赖后残留句柄）——清 `.astro` + `node_modules/.vite` 重启 dev 即恢复，属开发环境伪影，不影响构建/线上。
+
+## §81（2026-09-08）备忘页图文交错（![[照片slug]] 标记）
+
+用户：想在卷备忘里让文字与照片交错，md 原生不支持。实现：卷 md 正文中**独占一行**的 `![[照片slug]]` 标记，构建期把该照片卡片（含标题与照片自身说明）就地把插进正文流；其余未标记照片按序自动补在正文之后（沿用底部网格）；**无标记时完全走旧路径**（astro 原生 `<Content/>` + 网格，渲染逐字节等价）。实现要点：`photos/[slug].astro` 用 `createMarkdownProcessor`（@astrojs/markdown-remark，syntaxHighlight prism 与全站一致）按标记切块渲染文字段，`set:html` 注入；抽取 `src/components/ShotCard.astro`（照片卡片样式随组件，横/竖版与 §76/§80 同源）供网格与内联共用；标记引用的 slug 不属本卷 → 抛错点名。验证：临时卷实测 `文字段 → figure(卡片+说明) → 文字段` 顺序精确、无标记卷渲染张数与旧版一致；构建 0 警告。
