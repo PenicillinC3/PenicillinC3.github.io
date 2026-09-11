@@ -11,6 +11,8 @@ const SRC = join(ROOT, 'src');
 const FONTS = [
   { in: join(ROOT, 'font/MapleMono-NF-CN-Medium.ttf'), out: join(ROOT, 'public/fonts/maple-mono.woff2') },
   { in: join(ROOT, 'font/MapleMono-NF-CN-MediumItalic.ttf'), out: join(ROOT, 'public/fonts/maple-mono-italic.woff2') },
+  // §98：真粗体（font/ 由用户放入 Bold 原件）——仅在页面实际使用 ≥600 字重时下载
+  { in: join(ROOT, 'font/MapleMono-NF-CN-Bold.ttf'), out: join(ROOT, 'public/fonts/maple-mono-bold.woff2') },
 ];
 
 async function walk(dir, acc = []) {
