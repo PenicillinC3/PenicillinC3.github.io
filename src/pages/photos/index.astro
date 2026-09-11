@@ -171,21 +171,52 @@ const n = covers.length;
       if (idx === i) enter();
       else { i = idx; applyMeta(); pan(); arena.focus({ preventScroll: true }); }
     });
-    // §93 移动端滑动翻卷（重写 §82）：滑动 > 48px 且横向占优 → 翻卷，并用
-    // 「时间窗」抑制随后的 click（原 pointercancel 方案在真机常不触发：滑动被
-    // 误判为点按进入备忘、且异常时吞掉下一次轻触）。映射 = 拖动胶片方向：
-    // 右滑（dx>0）拖出更老的卷，左滑拖回更新的卷；到首尾为边界、无操作。
+    // §93/§94 移动端滑动翻卷（§94：跟手拖动）—— 拖动过程中胶片实时跟随
+    // 手指位移（越界方向带阻尼系数），松手后按位移吸附：过阈值翻卷、未过弹回；
+    // 「时间窗」抑制随后的 click（§93 教训：pointercancel 方案不可靠）。
+    // 映射 = 拖动胶片方向：右滑拖出更老卷、左滑拖回更新卷；首尾为边界。
     let tx0 = 0, ty0 = 0, suppressUntil = 0;
+    let dragging = false, dragBaseTx = 0;
+    const txFor = (idx: number) => {
+      const W = arena.clientWidth;
+      return W / 2 - ((idx + 1) * geom.step + geom.fw / 2);
+    };
     arena.addEventListener('touchstart', (e) => {
       const t = e.touches[0];
       tx0 = t.clientX; ty0 = t.clientY;
+      dragging = false;
+    }, { passive: true });
+    arena.addEventListener('touchmove', (e) => {
+      const t = e.touches[0];
+      const dx = t.clientX - tx0;
+      const dy = t.clientY - ty0;
+      if (!dragging) {
+        if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) {
+          dragging = true;
+          dragBaseTx = txFor(i);
+          reel.style.transition = 'none'; // 拖动期间取消过渡，纯跟手
+        } else return; // 竖向滑动/微小移动：不接管
+      }
+      // 边缘阻尼：已到最新卷再向左拖 / 已到最老卷再向右拖 → 阻力 0.35
+      const atEdge = (i === covers.length - 1 && dx < 0) || (i === 0 && dx > 0);
+      reel.style.transform = `translateX(${dragBaseTx + (atEdge ? dx * 0.35 : dx)}px)`;
     }, { passive: true });
     arena.addEventListener('touchend', (e) => {
       const t = e.changedTouches[0];
       const dx = t.clientX - tx0;
       const dy = t.clientY - ty0;
+      if (dragging) {
+        dragging = false;
+        reel.style.transition = ''; // 交还 CSS 缓出过渡
+        reel.style.transform = ''; // 清内联位移：未翻卷则动画弹回原位
+        suppressUntil = Date.now() + 450; // 拖动收尾的 click 不算点按
+        if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy)) {
+          go(dx < 0 ? 1 : -1); // 过阈值 → 吸附到相邻卷
+        }
+        return;
+      }
       if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy)) {
-        suppressUntil = Date.now() + 450; // 滑动结束后的 click（若有）不算点按
+        suppressUntil = Date.now() + 450;
         go(dx < 0 ? 1 : -1);
       }
     }, { passive: true });

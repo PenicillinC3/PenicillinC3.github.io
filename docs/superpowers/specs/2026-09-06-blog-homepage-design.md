@@ -841,3 +841,7 @@ setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160）
 
 修复：`.arena { touch-action: none }` + `.arena img { -webkit-user-drag: none; user-select: none }`（画廊本就视口锁高无滚动，无副作用）——横向手势完全交由翻卷逻辑；点击抑制改为**时间窗**（swipe 后 450ms 内的 click 忽略），移除 pointercancel 依赖。
 验证（CDP 触摸模拟）：右滑 → 切到更老卷（NIGHT→2023.07.08）、页面不跳转；左滑 → 回到新卷；轻触 → 正常进入备忘；起止边缘（最新卷右端）滑动为无害边界。桌面点击逻辑不受影响。
+
+## §94（2026-09-08）滑动翻卷改「跟手拖动」
+
+用户：希望滑动过程中画面跟手（拖到一半、画面就在一半），而非松手才跳变。实现：touchmove 阶段（横向占优 >8px 起手）设 `reel.style.transition='none'` 并逐帧写内联 `translateX(基准 + 手指位移)`（1:1 跟手；越过首尾边界方向乘 0.35 阻尼）；touchend 恢复 CSS 缓出过渡并清除内联位移 —— 过阈值（48px）调 `go()` 吸附到相邻卷、未过则动画弹回原位；拖动收尾统一置时间窗抑制 click。调试插曲：清变量时漏删一行赋值致 touchmove 每次抛 ReferenceError（严格模式）而静默失效，已修。验证（CDP 触摸）：拖 +120px 跟手 +120px；过阈值翻卷；小拖 30px 跟手 +30、松手弹回、卷不变；双向往返正常。
