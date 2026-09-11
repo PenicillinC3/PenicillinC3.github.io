@@ -24,9 +24,9 @@ const { entry: s, photos } = roll;
 // 卷 md 里独占一行的 ![[照片slug]] = 该照片卡片就地插入此处（照片说明由照片自己
 // 的 md 提供）；未被标记的照片按顺序自动补到正文之后再按日期排进底部网格。
 // 无任何标记时行为与旧版完全一致（正文块 + 底部照片网格）。
-const MARK_RE = /^!\[\[([a-z0-9-]+)\]\]$/gim;
+const MARK_RE = /^!\[\[([a-z0-9\-/]+)\]\]$/gim; // §99：允许 卷名/文件名（glob 集合 id 形态）
 const marks = [...(s.body ?? '').matchAll(MARK_RE)];
-const photoBySlug = new Map(photos.map((p) => [p.slug, p]));
+const photoBySlug = new Map(photos.map((p) => [p.id, p])); // §99：id 为键
 for (const m of marks) {
   if (!photoBySlug.has(m[1])) {
     throw new Error(`[photos] 卷 ${s.slug} 的正文引用了不属于本卷的照片：${m[1]}`);
@@ -54,7 +54,7 @@ if (!pureProse && tail.trim()) {
   const r = await md.render(tail);
   parts.push({ kind: 'md', html: r.code });
 }
-const restPhotos = photos.filter((p) => !marked.has(p.slug));
+const restPhotos = photos.filter((p) => !marked.has(p.id));
 const { Content } = pureProse ? await render(s) : { Content: null };
 
 // 每张照片的展示图（卷备忘页内最大宽度）
@@ -73,7 +73,7 @@ const imgs = await Promise.all(
     return { p, src: g.src, srcset: g.attributes.srcset, isPortrait };
   }),
 );
-const imgBySlug = new Map(imgs.map((it) => [it.p.slug, it]));
+const imgBySlug = new Map(imgs.map((it) => [it.p.id, it]));
 ---
 <Base title={s.data.title} description={s.data.summary ?? `摄影备忘录：${s.data.title}`} dark>
   {/* 红色射线氛围（spec §26）：backdrop 沉于玻璃卡后方，随正文滚动 */}
@@ -105,7 +105,7 @@ const imgBySlug = new Map(imgs.map((it) => [it.p.slug, it]));
     )}
     {restPhotos.length > 0 && (
       <div class="photos">
-        {restPhotos.map((p) => <ShotCard data={imgBySlug.get(p.slug)!} />)}
+        {restPhotos.map((p) => <ShotCard data={imgBySlug.get(p.id)!} />)}
       </div>
     )}
   </article>

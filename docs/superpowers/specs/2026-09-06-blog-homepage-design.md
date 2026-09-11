@@ -868,3 +868,8 @@ setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160）
 3. 恢复 `strong, b, th { font-weight: 700 }`（含 markdown `**加粗**` 与表头）—— 回退期系统粗体 ≈ 最终真粗体，无字重跳变（与 §97 原则一致）；
 4. 其余 §97 归一为 500 的元素**不动**（标题/品牌/按钮等视觉与 §97 后一致）。
 **按需加载已验证**：含粗体的教程页加载 bold、无粗体的网站参考页不加载（不下载 = 不付 251KB）；同段内粗体段墨量 14.0% vs 整段 8.1%（+73%，真粗体生效）。
+
+## §99（2026-09-08）修复：摄影封面/内容张冠李戴 —— glob 集合主键是 id 非 slug
+
+用户：摄影作品集封面与内容乱了。排查（临时日志打点）：§95 把 photos 切到 content layer（glob loader）后，**条目主键从 `.slug` 变为 `.id`**，而代码仍读 `.slug` → 全为 `undefined`：① `seriesRolls` 封面对照 `p.slug === cover` 恒 false → 回退「卷内第一张」（Nikon 封面从 dsc0025 变成 dsc0015）；② `imgBySlug`/`photoBySlug` 映射全部撞在 `undefined` 键上、后写覆盖先写 → 每卷所有照片位置都渲染成同一张（Nikon 两处都是 dsc0025）；③ §81 标记正则 `[a-z0-9-]` 也不含 `/`，`![[卷名/文件名]]` 根本不匹配。
+修复：7 处改 `p.id`（collections.ts 封面对照与告警、[slug].astro 的三处映射/标记过滤、模板 restPhotos 渲染——最后这处首轮漏改曾致构建崩溃）+ 标记正则放宽为 `[a-z0-9\-/]+`。验证（干净构建 dist 断言）：Nikon = dsc0015+dsc0025 各一、field = dsc0007、画廊封面 郊野→dsc0007 / Nikon→dsc0025 对应正确、字幕正常。教训已写入 CLAUDE 内容层 bullet。
