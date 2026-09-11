@@ -828,3 +828,7 @@ setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160）
 
 复现（320px 宽 / 360·390px + 系统字体 125%）：① 版权行 `© 2026 PenicillinC3 Via Claude Code` 带 `white-space:nowrap`（36 字符 ≈286–357px）超出玻璃卡（248–318px）57–88px，溢出挤压；② `.name` 的 clamp 下限 3.2rem 在 320px 屏把「PenicillinC3」撑到 ≈324px > 视口，**整页横向可滚**（页脚等内容随之错位——「揉成一坨」的另一半）。
 修复：footer 去掉 nowrap、≤560px 改纵向堆叠（`flex-direction:column; align-items:flex-start; gap:6px`）；标题 `clamp(3.2rem,11vw,6.6rem) → clamp(1.9rem,11vw,6.6rem)`（11vw 主导后随屏收缩且不受系统大字体影响；桌面 1440 标题实测 667px 与改前一致）。验证矩阵：320/360/390 × 字体 100%/125% 全部 `docW==vw` 零溢出、页脚两行内完整容纳；桌面无变化。
+
+## §92（2026-09-08）暗色页抽屉激活项改黑色胶囊
+
+用户：手机端摄影作品集页开抽屉，「摄影作品集」激活项是白色底。原因：`.drawer-link.is-active` 用亮色页配方（`rgba(255,255,255,.95→.65)` 径向白玻璃），在暗色抽屉（`#0d0e13`）上形成白色亮块。修复：增 `body.page-dark .drawer-link.is-active` 覆写 —— 近黑半透 `rgba(9,10,14,.55)` + 发丝描边 `rgba(255,255,255,.14)` + 柔和暗投影；文字沿用暗色 token 浅色。验证：390px 实拍 + 计算样式断言（backgroundImage=none、bg=rgba(9,10,14,.55)）；亮色页抽屉不变。
