@@ -16,6 +16,16 @@
   font-weight: 100 900;
 }
 
+/* MapleUI（§90 首页提速）：站点框架文案（名称/标语/导航/页脚/按钮）的极小
+   字形子集，置于 --font-sans 栈首 —— 首页全部文本命中它，正文字体不下载；
+   其余汉字逐字回退到下一顺位的 MapleMono Web（渲染不丢字形） */
+@font-face {
+  font-family: "MapleUI Web";
+  src: url("/fonts/maple-ui.woff2") format("woff2");
+  font-display: swap;
+  font-weight: 100 900;
+}
+
 /* MapleMono（spec §29.1）：20.5MB TTF → 全站用字 200KB woff2，正文默认字体 */
 @font-face {
   font-family: "MapleMono Web";
