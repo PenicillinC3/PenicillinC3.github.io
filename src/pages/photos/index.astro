@@ -162,12 +162,8 @@ const n = covers.length;
     const enter = () => { window.location.href = `/photos/${covers[i].slug}/`; };
 
     arena.addEventListener('click', (e) => {
-      // §82：滑动手势后浏览器会先取消 pointer（pointercancel）再补一个 click，
-      // 那种 click 不算点按（避免滑到某卷就误进备忘）
-      if (sawCancel) {
-        sawCancel = false;
-        return;
-      }
+      // §93：滑动收尾补发的 click 不算点按（时间窗，避免滑到某卷就误进备忘）
+      if (Date.now() < suppressUntil) return;
       const f = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-frame]');
       if (!f) return;
       const idx = Number(f.dataset.idx);
@@ -175,17 +171,11 @@ const n = covers.length;
       if (idx === i) enter();
       else { i = idx; applyMeta(); pan(); arena.focus({ preventScroll: true }); }
     });
-    // §82 移动端：左右滑动手势翻卷（touch 专用）。滑动 > 48px 且横向占优才翻卷；
-    // 真滑动指针会在 touchend 前先行取消（pointercancel），据此抑制随后的 click
-    // 误入备忘 —— 单纯轻触（点按）不受影响。上下滑不拦截。
-    let tx0 = 0, ty0 = 0, sawCancel = false;
-    arena.addEventListener('pointerdown', (e) => {
-      if (e.pointerType !== 'touch') return;
-      sawCancel = false;
-    });
-    arena.addEventListener('pointercancel', () => {
-      sawCancel = true;
-    });
+    // §93 移动端滑动翻卷（重写 §82）：滑动 > 48px 且横向占优 → 翻卷，并用
+    // 「时间窗」抑制随后的 click（原 pointercancel 方案在真机常不触发：滑动被
+    // 误判为点按进入备忘、且异常时吞掉下一次轻触）。映射 = 拖动胶片方向：
+    // 右滑（dx>0）拖出更老的卷，左滑拖回更新的卷；到首尾为边界、无操作。
+    let tx0 = 0, ty0 = 0, suppressUntil = 0;
     arena.addEventListener('touchstart', (e) => {
       const t = e.touches[0];
       tx0 = t.clientX; ty0 = t.clientY;
@@ -195,7 +185,8 @@ const n = covers.length;
       const dx = t.clientX - tx0;
       const dy = t.clientY - ty0;
       if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy)) {
-        go(dx < 0 ? 1 : -1); // 左滑 = 下一卷（更老在左，故右滑 = 上一卷）
+        suppressUntil = Date.now() + 450; // 滑动结束后的 click（若有）不算点按
+        go(dx < 0 ? 1 : -1);
       }
     }, { passive: true });
     arena.addEventListener('keydown', (e) => {
@@ -227,6 +218,15 @@ const n = covers.length;
     min-height: 0;
     overflow: hidden; /* 长胶卷超出视口部分不可见（半露即由平移量控制） */
     outline: none;
+    /* §93：横向触摸手势归我们的滑动翻卷逻辑 —— 禁用浏览器原生手势接管
+       （否则拖到胶片图片上会触发原生拖拽/取消，页面失控跳转 about:blank）；
+       画廊页本就视口锁高无滚动，touch-action:none 无副作用 */
+    touch-action: none;
+  }
+  /* 防止胶片图触发原生图片拖拽（真机滑动翻卷的关键） */
+  .arena img {
+    -webkit-user-drag: none;
+    user-select: none;
   }
 
   /* —— 长胶卷（spec §30.1）：一条连续 135 底片，含上下贯穿齿孔带 —— */
