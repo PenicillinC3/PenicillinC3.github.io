@@ -86,11 +86,16 @@ body {
 
 h1, h2, h3, h4 {
   line-height: 1.3;
-  font-weight: 700;
+  /* §97：字重对齐字体实际档位（Maple 仅 Medium）。请求 700/800 时回退系统字体会渲染真粗体、网页字体加载后又变回 Medium —— 首访「先粗后细」跳变的根源 */
+  font-weight: 500;
   color: var(--text-1);
   margin: 0 0 0.5em;
 }
 p { margin: 0 0 1em; }
+
+/* §97：粗体统一 500 —— Maple 仅 Medium 一档，请求 700 时回退系统字会渲染真粗体、
+   网页字体加载后再变回 Medium（首访「先粗后细」跳变）；压到 500 后回退/最终一致 */
+strong, b, th { font-weight: 500; }
 
 a {
   color: var(--accent);
@@ -216,7 +221,7 @@ img { max-width: 100%; height: auto; display: block; }
   backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
   color: var(--text-1);
   font-size: 0.98rem;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.4;
   cursor: pointer;
   box-shadow: var(--glass-inset), var(--glass-shadow);
@@ -253,7 +258,7 @@ img { max-width: 100%; height: auto; display: block; }
 /* —— 页面标题 —— */
 .page-title {
   font-size: clamp(1.7rem, 4.2vw, 2.6rem);
-  font-weight: 800;
+  font-weight: 500;
   letter-spacing: -0.01em;
   margin: 0 0 0.2em;
   color: var(--text-1);
