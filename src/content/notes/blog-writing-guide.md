@@ -15,7 +15,7 @@ summary: 从落笔到上线全流程：选栏目、填 frontmatter、挂照片�
 | 个人迷思 `/musings` | `src/content/musings/` | 想法、随笔、长文 |
 | 网站参考 `/links` | `src/content/links/` | 外链收藏，一句话评注（卡片即链接） |
 | 项目集 `/projects` | `src/content/projects/` | 作品/项目卡片，附链接或仓库 |
-| 摄影作品 `/photos` + 胶卷 `/photos/卷slug` | `src/content/photos/` + `series/` | 照片与成卷故事（见下文「照片与胶卷」） |
+| 摄影作品 `/photos` + 胶卷 `/photos/卷slug` | `src/content/photos/<卷名>/` + `series/` | 照片与成卷故事（见下文「照片与胶卷」） |
 
 每个栏目目录里都有一个 `_xxx-template.md.example` 模板：把它复制一份改名，照着注释改即可。
 
@@ -61,7 +61,7 @@ summary: 从落笔到上线全流程：选栏目、填 frontmatter、挂照片�
 | links | `url`（必填） | 外链地址，卡片整张可点跳转 |
 | projects | `tech: []`（必填）；`url` 与 `repo` 至少其一 | `repo` 支持 `https://`、`ssh://`、`git@host:path` 三种写法 |
 | photos | `image`（必填）、`alt`（必填）；`location? series? album? camera?` | 见下文「照片与胶卷」 |
-| series | `cover`（必填）；`location?` | `cover` = 卷内某张照片的文件名（slug） |
+| series | `cover`（必填）；`location?` `workName?` | `cover` = 卷内某张照片的编号（卷名/文件名，如 `nikon-roll/dsc0025`） |
 
 ## 正文排版（本页就是活示例）
 
