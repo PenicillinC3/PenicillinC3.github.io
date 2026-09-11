@@ -110,7 +110,10 @@ import { site } from '../site.config';
   .name {
     margin: 0;
     font-family: var(--font-song);
-    font-size: clamp(3.2rem, 11vw, 6.6rem); /* §69.6：标题加大一档 */
+    /* §91：下限由 3.2rem 放宽到 1.9rem —— 窄屏（320px）时 clamp 下限把
+       「PenicillinC3」撑到 ~324px 溢出视口、连带整页横向可滚（页脚等内容
+       被推挤错位）。11vw 主导后文字随屏宽收缩、系统大字缩放也不受影响 */
+    font-size: clamp(1.9rem, 11vw, 6.6rem);
     font-weight: 600;
     line-height: 1.15;
     letter-spacing: 0.04em; /* 拉丁长站名，收紧字距比华文中宋习惯值更稳 */

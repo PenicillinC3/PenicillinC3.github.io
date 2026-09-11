@@ -30,5 +30,14 @@ import { site } from '../site.config';
     border-radius: var(--radius-lg);
   }
   .note { margin: 0; font-size: 0.85rem; color: var(--text-2); }
-  .copy { margin: 0; font-size: 0.85rem; color: var(--text-3); white-space: nowrap; }
+  /* §91：去掉 nowrap —— 窄屏/系统大字下版权行（36 字符）比卡片还宽，
+     会溢出撑破页面「揉成一坨」；窄屏改为纵向堆叠、两行都能自然换行 */
+  .copy { margin: 0; font-size: 0.85rem; color: var(--text-3); }
+  @media (max-width: 560px) {
+    .inner {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+    }
+  }
 </style>
