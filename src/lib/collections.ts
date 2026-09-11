@@ -107,10 +107,10 @@ export async function seriesRolls(): Promise<SeriesRoll[]> {
     const photos = allPhotos
       .filter((p) => p.data.series === s.slug)
       .sort((a, b) => a.data.date.localeCompare(b.data.date));
-    let cover = photos.find((p) => p.slug === s.data.cover);
+    let cover = photos.find((p) => p.id === s.data.cover); // §99：glob 集合条目主键为 id（非 slug）
     if (!cover && photos.length > 0) {
       cover = photos[0];
-      console.warn(`[series] ${s.slug} 封面 ${s.data.cover} 不在卷内，回退 ${cover.slug}`);
+      console.warn(`[series] ${s.slug} 封面 ${s.data.cover} 不在卷内，回退 ${cover.id}`);
     }
     if (!cover) {
       throw new Error(`[series] ${s.slug} 卷内无照片（photos 需带 series: ${s.slug}）`);
