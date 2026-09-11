@@ -1,7 +1,7 @@
 ---
 title: 郊野 · 七月
 date: 2023-07-08
-cover: dsc0007
+cover: field-roll/dsc0007
 summary: 第二卷示例：用来验证胶片画廊的「下一卷右侧半露 + 末卷灰黑底片占位」形态。
 ---
 第二卷示例。放在 `src/content/series/field-roll.md`：封面指到 `dsc0007`（超宽幅），照片在 `src/content/photos/dsc0007.md`。

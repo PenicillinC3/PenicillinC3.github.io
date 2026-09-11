@@ -57,14 +57,14 @@ export const collections = {
     }),
   }),
   photos: defineCollection({
-    // §95：照片按卷分子目录存放（photos/<卷slug>/xxx.jpg+md，便于管理）；
-    // generateId 取**文件名**（不含目录）→ slug 与旧目录结构完全一致，
-    // cover: dsc0025 / 正文 ![[dsc0025]] 等既有引用全部无需改动。
-    // 约定：照片文件名全站唯一（跨卷也不要重名）
+    // §96：照片按卷分子目录存放（photos/<卷名>/xxx.jpg+md），**slug = 文件夹名/文件名**
+    // （引用时带卷前缀：cover: nikon-roll/dsc0025、正文 ![[nikon-roll/dsc0025]]）。
+    // 相机文件名跨卷常重复，前缀隔离后只需「同一卷内文件名不重复」。不分子目录
+    // 的照片 slug 即文件名（兼容旧写法）。
     loader: glob({
       pattern: '**/*.md',
       base: './src/content/photos',
-      generateId: ({ entry }) => entry.split('/').pop()!.replace(/\.mdx?$/, ''),
+      generateId: ({ entry }) => entry.replace(/\.mdx?$/, ''), // 默认即带目录路径
     }),
     schema: ({ image }) =>
       z.object({

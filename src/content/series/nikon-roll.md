@@ -1,7 +1,7 @@
 ---
 title: Nikon D90 示例卷
 date: 2023-12-09
-cover: dsc0025
+cover: nikon-roll/dsc0025
 workName: NIGHT
 summary: 用两张实拍建立的示例卷：验证全屏暗房、卷备忘混排（横幅整行 / 竖幅左图右文）与真实 JPEG 构建期优化管线。
 ---
