@@ -859,3 +859,12 @@ setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160）
 用户：第一次进入时一些字体会加粗、不协调（怀疑与字体压缩有关）。排查：Maple/华文中宋子集**只有 Medium 一档**（font/ 亦无 Bold 原件），但 CSS 里 h1–h4=700、.page-title/.brand=800、.btn/.more=.yr=600、strong/th=700 —— 网页字体加载期间回退系统字（微软雅黑），这些元素渲染**真粗体**；字体就位后落回 Maple Medium 变细 → 首访约 1 秒的「先粗后细」跳变（§90 让 UI 子集秒载后对比更明显）。量化（标题区墨量）：Maple 稳定态 12.16% vs 雅黑 700 回退态 18.33%（+51%）vs 雅黑 500 回退态 11.29%（≈稳定态）。
 修复：全部 ≥600 字重归一为 **500**（11 处：base h1–h4/.btn/.page-title、LinkCard/Nav brand/PostList/ProjectCard/SectionHeader、404、首页 .name、画廊 .ts，另加全局 `strong, b, th { font-weight: 500 }`）—— Maple 单档下这些 700/800 本来就不产生任何视觉粗体，500 对**加载完成后的观感零影响**，只把回退期拉到与最终一致。保留 `font-display: swap`（曾试 optional：会让首访永远看不到 Maple，已回退）。附带发现：本机装有 Maple 系统字体，测试机回退态自动命中它——复现用户现象需强制指定雅黑（量化即如此测）。
 遗留说明：Maple 单 Medium 档，`**加粗**` 实际不显粗（现状如此）；若需真加粗，需往 font/ 放 Bold TTF 并扩展 subset 脚本。
+
+## §98（2026-09-08）接入 Maple 真粗体（Bold 原件由用户放入 font/）
+
+§97 遗留：字体仅 Medium 一档，`**加粗**`/表头实际不显粗。用户把 `font/MapleMono-NF-CN-Bold.ttf` 放好后接入：
+1. `subset-maple.mjs` 增出 `maple-mono-bold.woff2`（251KB，同全站字符集）；
+2. **字重分段**：Medium 面声明改 `font-weight: 100 599`，新增 Bold 面 `600 900`（此前 Medium 面写死 100 900，会把 ≥600 请求也吃掉、粗体字形永远用不上——§97 现象的深层原因）；Bold 面 `swap`；
+3. 恢复 `strong, b, th { font-weight: 700 }`（含 markdown `**加粗**` 与表头）—— 回退期系统粗体 ≈ 最终真粗体，无字重跳变（与 §97 原则一致）；
+4. 其余 §97 归一为 500 的元素**不动**（标题/品牌/按钮等视觉与 §97 后一致）。
+**按需加载已验证**：含粗体的教程页加载 bold、无粗体的网站参考页不加载（不下载 = 不付 251KB）；同段内粗体段墨量 14.0% vs 整段 8.1%（+73%，真粗体生效）。

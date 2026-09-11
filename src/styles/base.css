@@ -26,12 +26,21 @@
   font-weight: 100 900;
 }
 
-/* MapleMono（spec §29.1）：20.5MB TTF → 全站用字 200KB woff2，正文默认字体 */
+/* MapleMono（spec §29.1）：20.5MB TTF → 全站用字 200KB woff2，正文默认字体。
+   §98：字重分段 —— 本面声明 100–599，≥600 由 Bold 面承接（此前 100 900 会把
+   粗体请求也吃掉，真正的粗体字形永远用不上） */
 @font-face {
   font-family: "MapleMono Web";
   src: url("/fonts/maple-mono.woff2") format("woff2");
   font-display: swap;
-  font-weight: 100 900;
+  font-weight: 100 599;
+}
+/* MapleMono Bold（§98）：真粗体，仅页面实际用到 ≥600 字重时才下载（strong/表头） */
+@font-face {
+  font-family: "MapleMono Web";
+  src: url("/fonts/maple-mono-bold.woff2") format("woff2");
+  font-display: swap;
+  font-weight: 600 900;
 }
 /* MapleMono 斜体（spec §32）：代码注释栈的第二顺位 —— JetBrains 缺中文字形时
    中文注释逐字落到斜体 Maple，英文注释仍 JetBrains Italic */
@@ -93,9 +102,8 @@ h1, h2, h3, h4 {
 }
 p { margin: 0 0 1em; }
 
-/* §97：粗体统一 500 —— Maple 仅 Medium 一档，请求 700 时回退系统字会渲染真粗体、
-   网页字体加载后再变回 Medium（首访「先粗后细」跳变）；压到 500 后回退/最终一致 */
-strong, b, th { font-weight: 500; }
+/* §98：Bold 面接入后，粗体走真粗体字形（回退期系统粗体 ≈ 最终粗体，无字重跳变） */
+strong, b, th { font-weight: 700; }
 
 a {
   color: var(--accent);
