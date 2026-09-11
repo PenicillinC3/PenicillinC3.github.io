@@ -13,6 +13,6 @@ const { e } = Astro.props;
 const { Content } = await render(e);
 const summary = e.data.summary ?? excerpt(e.body ?? '', 150);
 ---
-<Post label="个人迷思" backHref="/musings" title={e.data.title} date={e.data.date} summary={summary}>
+<Post label="个人迷思" backHref="/musings/" title={e.data.title} date={e.data.date} summary={summary}>
   <Content />
 </Post>
