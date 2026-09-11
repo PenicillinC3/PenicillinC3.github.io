@@ -455,6 +455,13 @@ const isActive = (href: string) =>
     border: 1px solid rgba(15, 23, 42, 0.08);
     box-shadow: var(--glass-shadow);
   }
+  /* §92：暗色页（摄影栏目）抽屉激活项 —— 亮白玻璃底在暗色抽屉上刺眼，
+     改暗色玻璃胶囊（近黑半透 + 发丝描边），文字沿用暗色 token 的浅色 */
+  body.page-dark .drawer-link.is-active {
+    background: rgba(9, 10, 14, 0.55);
+    border-color: rgba(255, 255, 255, 0.14);
+    box-shadow: var(--glass-shadow), 0 0 18px -6px rgba(0, 0, 0, 0.6);
+  }
 
   @media (max-width: 880px) {
     .links { display: none; }
