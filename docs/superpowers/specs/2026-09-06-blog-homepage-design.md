@@ -823,3 +823,8 @@ setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160）
 
 测量（4G + 4× CPU 节流，构建产物）：首页传输 617KB，其中**正文 Maple 子集 238KB 是最大单项且阻塞文字**（> 玻璃球 chunk 308KB 的空闲加载）。方案：**字体分片** —— `subset-maple.mjs` 增出 `maple-ui.woff2`（站点框架文案字形：site.config.ts 全部字符串（名称/标语/导航/页脚）+ ASCII + 少量组件级固定文案，共 136 字形 / 41KB），`@font-face "MapleUI Web"` + 置于 `--font-sans` 栈首。首页全部文本命中它 → 238KB 正文子集**不下载**；内容页正文汉字自然逐字回退到 MapleMono Web（渲染无损，仅多一次字体请求）。任何子集遗漏都会安全回退（只损失速度不丢字形）。
 结果：首页传输 **617→420KB（−32%）**，字体阻塞项 238→41KB（字体下载 2852ms→680ms），玻璃球就绪 4051→3046ms、DCL 680→624ms（弱网+节流下）。内容页验证：`/notes/` 按需加载 ui+full 两件、代码页再加 JetBrains —— 各取所需无回归。
+
+## §91（2026-09-08）修复：移动端首页页脚「揉成一坨」+ 大标题窄屏溢出
+
+复现（320px 宽 / 360·390px + 系统字体 125%）：① 版权行 `© 2026 PenicillinC3 Via Claude Code` 带 `white-space:nowrap`（36 字符 ≈286–357px）超出玻璃卡（248–318px）57–88px，溢出挤压；② `.name` 的 clamp 下限 3.2rem 在 320px 屏把「PenicillinC3」撑到 ≈324px > 视口，**整页横向可滚**（页脚等内容随之错位——「揉成一坨」的另一半）。
+修复：footer 去掉 nowrap、≤560px 改纵向堆叠（`flex-direction:column; align-items:flex-start; gap:6px`）；标题 `clamp(3.2rem,11vw,6.6rem) → clamp(1.9rem,11vw,6.6rem)`（11vw 主导后随屏收缩且不受系统大字体影响；桌面 1440 标题实测 667px 与改前一致）。验证矩阵：320/360/390 × 字体 100%/125% 全部 `docW==vw` 零溢出、页脚两行内完整容纳；桌面无变化。
