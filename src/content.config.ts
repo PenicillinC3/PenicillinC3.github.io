@@ -1,4 +1,5 @@
 import { defineCollection, z } from 'astro:content';
+import { glob } from 'astro/loaders';
 
 const base = {
   title: z.string(),
@@ -56,7 +57,15 @@ export const collections = {
     }),
   }),
   photos: defineCollection({
-    type: 'content',
+    // §95：照片按卷分子目录存放（photos/<卷slug>/xxx.jpg+md，便于管理）；
+    // generateId 取**文件名**（不含目录）→ slug 与旧目录结构完全一致，
+    // cover: dsc0025 / 正文 ![[dsc0025]] 等既有引用全部无需改动。
+    // 约定：照片文件名全站唯一（跨卷也不要重名）
+    loader: glob({
+      pattern: '**/*.md',
+      base: './src/content/photos',
+      generateId: ({ entry }) => entry.split('/').pop()!.replace(/\.mdx?$/, ''),
+    }),
     schema: ({ image }) =>
       z.object({
         ...base,
