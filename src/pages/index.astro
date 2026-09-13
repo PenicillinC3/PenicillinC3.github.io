@@ -20,8 +20,9 @@ import { site } from '../site.config';
       <h1 class="name" data-scene-title={site.title} aria-label={site.title}>{site.title}</h1>
       <p class="tagline" data-scene-tagline={site.tagline}>{site.tagline}</p>
       <div class="acts">
-        <a class="btn prism" href="/notes/">个人笔记</a>
-        <a class="btn prism" href="/photos/">摄影作品集</a>
+        <!-- §100：两枚主入口在加载时即预取目标页，点击后立刻换页（不再有等待） -->
+        <a class="btn prism" href="/notes/" data-astro-prefetch="load">个人笔记</a>
+        <a class="btn prism" href="/photos/" data-astro-prefetch="load">摄影作品集</a>
       </div>
     </div>
   </section>
