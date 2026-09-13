@@ -10,6 +10,13 @@ export default defineConfig({
   // island）。§34 液态玻璃镜头 §35 已删、§68 全撤 —— §69 与历史不同：官方组件
   // 机制、不折射 DOM。其余页面仍零框架（ogl 供 Rays）。
   integrations: [react()],
+  // §100：链接点击「像没反应」的根治 —— 客户端路由点击后要先取回目标页 HTML
+  // 才换页，这段等待期 URL 不变、页面不动。Astro 预取默认只在 hover（悬停 80ms）
+  // 时触发，移动端没有 hover = 完全不预取 → 点一下干等一整轮网络往返。
+  // 改为 viewport：链接进入视口 300ms 即预取（触屏同样生效），点击时命中缓存
+  // 立刻换页；关键入口（导航/首页两枚按钮）另在标签上写 data-astro-prefetch="load"
+  // 于页面加载即预取。慢连接（saveData/2G）Astro 自动跳过，不占流量。
+  prefetch: { prefetchAll: true, defaultStrategy: 'viewport' },
   markdown: {
     // prism：token 类名稳定（token.comment 等），spec §29.2 注释斜体字体依赖它
     syntaxHighlight: 'prism',

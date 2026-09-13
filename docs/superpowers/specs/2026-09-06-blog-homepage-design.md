@@ -873,3 +873,10 @@ setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160）
 
 用户：摄影作品集封面与内容乱了。排查（临时日志打点）：§95 把 photos 切到 content layer（glob loader）后，**条目主键从 `.slug` 变为 `.id`**，而代码仍读 `.slug` → 全为 `undefined`：① `seriesRolls` 封面对照 `p.slug === cover` 恒 false → 回退「卷内第一张」（Nikon 封面从 dsc0025 变成 dsc0015）；② `imgBySlug`/`photoBySlug` 映射全部撞在 `undefined` 键上、后写覆盖先写 → 每卷所有照片位置都渲染成同一张（Nikon 两处都是 dsc0025）；③ §81 标记正则 `[a-z0-9-]` 也不含 `/`，`![[卷名/文件名]]` 根本不匹配。
 修复：7 处改 `p.id`（collections.ts 封面对照与告警、[slug].astro 的三处映射/标记过滤、模板 restPhotos 渲染——最后这处首轮漏改曾致构建崩溃）+ 标记正则放宽为 `[a-z0-9\-/]+`。验证（干净构建 dist 断言）：Nikon = dsc0015+dsc0025 各一、field = dsc0007、画廊封面 郊野→dsc0007 / Nikon→dsc0025 对应正确、字幕正常。教训已写入 CLAUDE 内容层 bullet。
+
+## §100（2026-09-13）点击链接「像没反应」—— 全站预取前移（viewport + 关键入口 load）
+
+用户：记得「点击对应链接之后没反应」的老问题（§89 遗留第 2 条），希望等待发生在点开的那个页面上、而不是当前页面。
+排查：全站 `<ViewTransitions />` 客户端路由 —— 点击后**要先取回目标页 HTML 才换页**，这段等待期 URL 不变、页面不动，观感即「点了没反应」。而 Astro 预取默认 `defaultStrategy: 'hover'`：桌面悬停 80ms 才预取，**触屏没有 hover = 完全不预取**（`tap` 策略只在 saveData/2G 时兜底）；移动端导航又藏在抽屉里（隐藏元素不进视口观察器），双重失效 → 点一下干等一整轮网络往返。
+修复：① `astro.config.mjs` 开 `prefetch: { prefetchAll: true, defaultStrategy: 'viewport' }` —— 链接进视口 300ms 即预取，触屏同样生效；② 导航 5 项（顶栏 + 抽屉两处）、站名、首页两枚主入口标 `data-astro-prefetch="load"` —— 页面加载即预取，隐藏容器内的链接也覆盖。预取命中后路由的 fetch 直接读浏览器缓存（已核线上 HTML `cache-control: max-age=600`）。
+验证（无头 Edge + 本地静态服务模拟 GitHub Pages 缓存头，弱网 400ms RTT / 200KB/s，同脚本 A/B）：首页 → 「个人笔记」**594ms → 48ms**；笔记页 → 导航「摄影作品集」**564ms → 81ms**（点击前目标页均已预取，剩余耗时 = 换页本身）；移动端抽屉路径改前结构性无预取（A/B 数字受同浏览器缓存串扰，不计），改后点击前已预取、点击 67ms。慢连接（saveData / 2G）Astro 自动跳过预取，不耗用户流量。

@@ -7,7 +7,9 @@ const isActive = (href: string) =>
 ---
 <header class="topbar" data-topbar>
   <div class="inner">
-    <a class="brand" href="/" data-nav-item-home>{site.title}</a>
+    <!-- §100：关键入口用 load 策略（页面加载即预取）——导航在移动端藏在抽屉里
+         （隐藏元素不进视口观察器），靠 viewport 策略预取不到；load 保证点下即换页 -->
+    <a class="brand" href="/" data-nav-item-home data-astro-prefetch="load">{site.title}</a>
 
     <nav class="links" data-nav aria-label="主导航">
       <span class="slider" data-slider aria-hidden="true" transition:persist></span>
@@ -17,6 +19,7 @@ const isActive = (href: string) =>
             class:list={['navlink', isActive(n.href) && 'is-active']}
             data-nav-item
             data-nav-href={n.href}
+            data-astro-prefetch="load"
             href={n.href}
             aria-current={isActive(n.href) ? 'page' : undefined}
           >{n.label}</a>
@@ -41,6 +44,7 @@ const isActive = (href: string) =>
           class:list={['drawer-link', isActive(n.href) && 'is-active']}
           href={n.href}
           data-drawer-link
+          data-astro-prefetch="load"
         >{n.label}</a>
       ))
     }

@@ -30,6 +30,7 @@ npm run fonts:subset # 新增内容后重建 woff2 子集（song §28 + maple §
   - 404 页有搜索框？没有 —— 搜索已全链路删除（fuse.js、SearchBox、/search 均不存在）。
 - **视觉系统**：token 全在 `src/styles/tokens.css`（单一 `:root` 亮色；`body.page-dark` 在 base.css 覆写为暗房 token：`--accent #ff6b6b` 红光，并将**正文字体切为 `--font-song`**（spec §28：华文中宋子集嵌入，@font-face "Song Web" local 优先、无系统字体才下载 51KB woff2））。玻璃配方 v3.1：**面板全透**（`--glass-bg: rgba(255,255,255,0)`）+ `--glass-inset` 内外影对仗 + 右下重投阴影 + **§31 边缘色差线**（±1px 红/青）；`--glass-blur: 1px`。`--grid-line/--grid-size` 是方格背景。`base.css` 提供 `.glass/.btn(12px 圆角)/.pill/.prism/.prose`。
 - **交互脚本**（均无框架）：Nav 水滴滑块 = **鼠标跟随液态吸附**（spec §25：pointermove 现量 + rAF 指数阻尼 τ90ms，离开回激活栏，点击跳页；落位刷新 = document/window 双挂 astro:page-load + MutationObserver 兜底；垂直居中 `translateY(-50%)` 常驻 CSS、JS 只写 `--sx`/width；暗色页覆写为暗红辉光；边缘色差层 ::before 左红右青，§31）；PostList 过滤（spec §54：is-out 快速淡出 + FLIP 上浮填位；卡只平移不形变，勿退回 §37 display:none 直切/§53 占位保留两版）；photos reel 平移翻卷（几何变量 setGeom + CSS 缓出 --tx，无逐帧动画）。
+- **链接预取**（spec §100）：`astro.config.mjs` 开 `prefetch: { prefetchAll: true, defaultStrategy: 'viewport' }` + 导航（顶栏与抽屉两处）、站名、首页两枚主入口标 `data-astro-prefetch="load"`。原因：客户端路由点击后要**先取回目标页 HTML 才换页**（等待期 URL 不变 = 「点了没反应」，§89/§100），而 Astro 预取默认只在 hover 触发、触屏等于没有，藏在抽屉里的链接又不进视口观察器。**新增导航/入口链接时补 `data-astro-prefetch="load"`**，否则移动端退回干等。
 
 ## 关键坑（踩过并验证，改动前必读）
 
