@@ -165,7 +165,6 @@ const urlsJson = JSON.stringify(await prefetchUrls()).replace(/</g, '\\u003c');
     var off = document.createElement('canvas');
     var octx = off.getContext('2d');
 
-    var LOW = 18;      // 起步内部高度（行）—— 越小，第一帧像素块越大
     var K = 0.16;      // 曲率：正 = 枕形（画面四角内收）/ 负 = 桶形（边缘外凸顶到边框）
     var INSET = 0.98;  // 画面整体内缩，露出周围边框色（管面嵌在外壳里的感觉）
     var FONT = '"MapleUI Web", "MapleMono Web", ui-monospace, monospace';
@@ -173,7 +172,7 @@ const urlsJson = JSON.stringify(await prefetchUrls()).replace(/</g, '\\u003c');
     // 进度 → 内部分辨率：按**像素块尺寸**线性收窄（26px → 1px），而不是按分辨率
     // 线性爬升 —— 后者块大小按 1/res 曲线下降，前 1/4 进度就把大色块跑完了
     // （§101 实测：p=0.18 时块只剩 2.5px，等于没有像素感）。
-    var BLOCK_BIG = 26; // 起步块尺寸（设备像素）—— 也是 LOW 的另一种写法
+    var BLOCK_BIG = 26; // 起步像素块尺寸（设备像素）：越大越糊，18~30 之间调
     function resFor(p) {
       if (reduce) return H;                      // 减动效：直接锐利版
       var t = Math.min(1, Math.max(0, (p - 0.08) / 0.82));
