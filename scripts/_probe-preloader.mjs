@@ -122,14 +122,14 @@ const check = (name, pass, extra = '') =>
         runSum += cur; runCount++;
       }
       const meanRun = runCount ? runSum / runCount : 0;
-      // ② 内容左右边界：画布填充是 #6d6d6d(109)，管面内容是 #868686(134)
+      // ② 内容左右边界：机壳是深色（#242424），管面内容是亮灰
       const edge = (fy) => {
         const y = Math.min(H - 1, Math.round(H * fy));
         const r = ctx.getImageData(0, y, W, 1).data;
         let left = -1, right = -1;
         for (let x = 0; x < W; x++) {
           const i = x * 4;
-          const isFill = Math.abs(r[i] - 109) < 8 && Math.abs(r[i + 1] - 109) < 8;
+          const isFill = r[i] < 70; // 机壳/边框（深色）vs 管面内容（亮灰）
           if (!isFill) { if (left < 0) left = x; right = x; }
         }
         return right - left;
@@ -149,9 +149,9 @@ const check = (name, pass, extra = '') =>
     return analyze();
   };
 
-  const s1 = await at(1200, 'pl-t1.png');   // 约 1.2s：大色块
-  const s2 = await at(5000, 'pl-t5.png');   // 约 5s：中等
-  const s3 = await at(9500, 'pl-t9.png');   // 约 9.5s：接近原生
+  const s1 = await at(900, 'pl-t1.png');    // 约 0.9s：大色块
+  const s2 = await at(2600, 'pl-t5.png');   // 约 2.6s：中等
+  const s3 = await at(4700, 'pl-t9.png');   // 约 4.7s：接近原生
   check(
     '⑥ 内部分辨率随进度抬升（像素块变小）',
     s1.res < s2.res && s2.res < s3.res && s3.res > s3.H * 0.95,
@@ -183,7 +183,7 @@ const check = (name, pass, extra = '') =>
   page.on('request', (r) => reqs.push(r.url()));
   await page.goto(`${B}/`, { waitUntil: 'domcontentloaded' });
   const t0 = Date.now();
-  await page.waitForFunction(() => window.__plState && window.__plState.finished, { timeout: 25000 });
+  await page.waitForFunction(() => window.__plState && window.__plState.finished, { timeout: 20000 });
   const el = Date.now() - t0;
   await new Promise((r) => setTimeout(r, 500));
   const after = await page.evaluate(() => ({
@@ -192,7 +192,7 @@ const check = (name, pass, extra = '') =>
     st: window.__plState,
     urls: (window.__pl && window.__pl.urls) || [],
   }));
-  check('⑨ 预取跑完、摘 DOM、恢复滚动（且不短于 10s）', !after.pl && after.overflow === '' && el >= 9800,
+  check('⑨ 预取跑完、摘 DOM、恢复滚动（且不短于 5s）', !after.pl && after.overflow === '' && el >= 4800,
     `耗时 ${el}ms，下载 ${(after.st.bytes / 1048576).toFixed(2)} MB / ${after.st.done} 项`);
   // ⑩ 清单里每一项都必须真的发出过请求（含路由 HTML 与全部展示图）
   const missing = after.urls.filter((u) => !reqs.some((r) => r.endsWith(u)));

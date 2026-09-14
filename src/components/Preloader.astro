@@ -28,7 +28,7 @@ const bootJs = `
   } catch (e) { /* 隐私模式：照样播 */ }
 
   var URLS = ${urlsJson};      // 预取清单（构建期注入）
-  var MIN_MS = 10000;          // 要让观众看满的时长（像素→清晰整段铺开）
+  var MIN_MS = 5000;           // 要让观众看满的时长（像素→清晰整段铺开）
   var HARD_BAIL_MS = 60000;    // 网络僵死时的唯一逃生口（不想要就设成 Infinity）
   var IDLE_MS = 10000;         // 单个请求「多久没收到字节」算卡死（慢但在动的不会中招）
   var CONC = 5;                // 并发数
@@ -38,6 +38,9 @@ const bootJs = `
   el.id = 'pl';
   el.innerHTML =
     '<canvas id="pl-canvas" aria-hidden="true"></canvas>' +
+    '<i class="pl-scan" aria-hidden="true"></i>' +      // 扫描线（漂移）
+    '<i class="pl-roll" aria-hidden="true"></i>' +      // 回扫亮带
+    '<i class="pl-vig" aria-hidden="true"></i>' +       // 多段渐变暗角 + 玻璃高光
     '<p class="pl-fallback" aria-hidden="true">LOADING</p>';
   document.body.appendChild(el);
   document.body.style.overflow = 'hidden';
@@ -77,18 +80,89 @@ const bootJs = `
 
   var off = document.createElement('canvas');
   var octx = off.getContext('2d');
-  var K = 0.16;      // 曲率：正 = 枕形（四角内收）/ 负 = 桶形（边缘外凸顶到边框）
-  var INSET = 0.98;  // 画面整体内缩，露出周围边框色
+  var K = 0.18;      // 曲率：正 = 枕形（四角内收）/ 负 = 桶形（边缘外凸顶到边框）
+  var INSET = 0.94;  // 画面整体内缩，露出周围机壳（管面嵌在壳里的立体感）
   var FONT = '"MapleUI Web", "MapleMono Web", ui-monospace, monospace';
   var BLOCK_BIG = 26; // 起步像素块尺寸（设备像素）：越大越糊
 
-  // 进度 → 内部分辨率：按**像素块尺寸**线性收窄（26px → 1px），不是按分辨率线性
-  // 爬升 —— 后者块大小按 1/res 掉，前 1/4 进度就把大色块跑完了（§101 实测）
+  // 块尺寸**阶梯**：内部分辨率只在档位之间跳，不在帧间连续变 —— 连续变会让
+  // 字号/字距每帧被 Math.round 重新量化，画面就「抽搐」（§101 用户反馈）。
+  // 吸附到档位后：同一档内完全静止，跳档 = 一次干净的分辨率提升。
+  var BLOCKS = [26, 21, 17, 13.5, 11, 8.5, 6.5, 5, 3.8, 2.9, 2.2, 1.6, 1];
+
   function resFor(p) {
     if (reduce) return H;                      // 减动效：直接锐利版
     var t = Math.min(1, Math.max(0, (p - 0.08) / 0.82));
-    var block = BLOCK_BIG + (1 - BLOCK_BIG) * Math.pow(t, 0.85);
-    return H / block;
+    var want = BLOCK_BIG + (1 - BLOCK_BIG) * Math.pow(t, 0.85);   // 连续目标块尺寸
+    var b = 1;
+    for (var i = 0; i < BLOCKS.length; i++) { if (want >= BLOCKS[i]) { b = BLOCKS[i]; break; } }
+    return H / b;
+  }
+
+  // —— 左下角终端文字：先在固定小画布上画，再做 1-bit 阈值化（真像素字），
+  //    最后以最近邻贴到**屏幕空间**（不随主分辨率抽搐），位置对齐管面左下角 ——
+  var termC = document.createElement('canvas');
+  var tctx = termC.getContext('2d');
+  var TERM_W = 158, TERM_H = 38;
+  var termKey = '';
+  function drawTerm() {
+    var key = doneCount + '/' + urls.length + '/' + Math.round(received / 262144) + '/' + ended;
+    if (key === termKey) return;
+    termKey = key;
+    termC.width = TERM_W; termC.height = TERM_H;
+    tctx.clearRect(0, 0, TERM_W, TERM_H);
+    tctx.font = '600 7px ' + FONT;
+    tctx.textBaseline = 'top';
+    var mb = (received / 1048576).toFixed(1);
+    var lines = [
+      'PENICILLINC3 // CRT-9000',
+      'CACHE ' + doneCount + '/' + urls.length + '   ' + mb + 'MB',
+      'SIGNAL ' + (doneCount >= urls.length ? 'READY' : 'SYNCING'),
+      'PHOSPHOR P4 MONOCHROME',
+    ];
+    for (var i = 0; i < lines.length; i++) {
+      tctx.fillStyle = i === 0 ? '#ffffff' : '#d8d8d8';
+      tctx.fillText(lines[i], 1, 1 + i * 9);
+    }
+    // 阈值化：抗锯齿的灰边一律削掉 -> 硬边像素字
+    try {
+      var im = tctx.getImageData(0, 0, TERM_W, TERM_H);
+      var d = im.data;
+      for (var k = 0; k < d.length; k += 4) {
+        if (d[k + 3] > 70) { d[k] = 236; d[k + 1] = 236; d[k + 2] = 236; d[k + 3] = 255; }
+        else { d[k + 3] = 0; }
+      }
+      tctx.putImageData(im, 0, 0);
+    } catch (e) { /* 取不到像素就算了，字还是有 */ }
+  }
+
+  function drawTermOnScreen() {
+    drawTerm();
+    var s = Math.max(2, Math.round(H / 300));      // 每个「像素字像素」占几个设备像素
+    var dw = TERM_W * s, dh = TERM_H * s;
+    var ny = ((H - dh * 0.86) / H) * 2 - 1;
+    var sx = reduce ? INSET : (1 - K * ny * ny) * INSET;
+    var tubeLeft = (W - W * sx) / 2;               // 贴合变形后的管面左缘
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(termC, tubeLeft + W * 0.03, H - dh - H * 0.055, dw, dh);
+  }
+
+  // —— 荧光柔光：缩到 1/4 模糊后以 lighter 叠回（显像管的光晕）——
+  var bloom = document.createElement('canvas');
+  var bctx = bloom.getContext('2d');
+  function applyBloom() {
+    var bw = Math.max(8, Math.round(W / 4)), bh = Math.max(8, Math.round(H / 4));
+    if (bloom.width !== bw || bloom.height !== bh) { bloom.width = bw; bloom.height = bh; }
+    bctx.setTransform(1, 0, 0, 1, 0, 0);
+    bctx.clearRect(0, 0, bw, bh);
+    bctx.drawImage(canvas, 0, 0, bw, bh);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.26;
+    ctx.imageSmoothingEnabled = true;
+    try { ctx.filter = 'blur(4px)'; } catch (e) { /* 不支持就少一点柔光 */ }
+    ctx.drawImage(bloom, 0, 0, W, H);
+    ctx.restore();
   }
 
   function drawOff(p) {
@@ -97,7 +171,7 @@ const bootJs = `
     if (off.width !== w || off.height !== h) { off.width = w; off.height = h; }
     var o = octx;
     o.setTransform(1, 0, 0, 1, 0, 0);
-    o.fillStyle = '#868686';
+    o.fillStyle = '#8c8c8c';   // 荧光屏底色（比外壳亮，衬出管面）
     o.fillRect(0, 0, w, h);
 
     // —— LOADING（逐字手排字距；字号按画幅宽度收敛，让整词占 62%）——
@@ -165,7 +239,7 @@ const bootJs = `
   function blit() {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.imageSmoothingEnabled = false;
-    ctx.fillStyle = '#6d6d6d';
+    ctx.fillStyle = '#242424';   // 外壳/边框（深色，管面外圈）
     ctx.fillRect(0, 0, W, H);
     var strip = Math.max(1, Math.round(2 * DPR));
     for (var y = 0; y < H; y += strip) {
@@ -262,6 +336,9 @@ const bootJs = `
     var p = shown;
     var res = drawOff(p);
     blit();
+    drawTermOnScreen();   // 先画一遍：让它参与柔光（有辉光）
+    applyBloom();
+    drawTermOnScreen();   // 再画一遍：压回锐利的 1-bit 像素字
     window.__plProgress = p;
     window.__plRes = res;
     // 画布出第一帧后才撤掉 DOM 兜底文字（脚本半死时屏幕上一直有东西）
@@ -272,6 +349,9 @@ const bootJs = `
       window.__plReal = 1;
       drawOff(1);
       blit();
+      drawTermOnScreen();
+      applyBloom();
+      drawTermOnScreen();
       return done();
     }
     if (el_ms >= HARD_BAIL_MS) {                    // 逃生口：网络僵死
@@ -288,63 +368,82 @@ const bootJs = `
 `;
 ---
 <style is:inline>
-  /* 兜底优先级最高：脚本任何异常都不能留下灰屏 —— 8.5s 后无条件自行淡出。
-     （脚本正常时 10s 内自己收尾；这道兜底只管「脚本半死」的情况） */
+  /* 兜底：脚本任何异常都不能留下灰屏 —— 14s 后无条件淡出（脚本正常时 5s 内自己收尾） */
   #pl {
     position: fixed;
     inset: 0;
     z-index: 9999;
     display: grid;
     place-items: center;
-    background: radial-gradient(ellipse at 50% 46%, #949494 0%, #7c7c7c 52%, #5f5f5f 100%);
+    background: #1c1c1c; /* 机壳（画布铺满后基本被盖住，作兜底底色） */
     animation: pl-failsafe-out 0.5s ease 14s forwards;
   }
   @keyframes pl-failsafe-out { to { opacity: 0; visibility: hidden; } }
-  /* CRT 叠加层（不参与逐帧重绘，纯 CSS 叠在画布上）：
-     ::before 四角压暗 · ::after 扫描线 + 极轻闪烁 */
-  #pl::before,
-  #pl::after {
+
+  #pl-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+  /* —— 扫描线：2px 暗 / 2px 亮（比先前粗一倍），整体缓慢上下漂移 —— */
+  .pl-scan {
+    position: absolute;
+    inset: -4px 0; /* 留出一屏扫描线周期，位移时不露边 */
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.26) 0 2px,
+      rgba(255, 255, 255, 0.035) 2px 4px
+    );
+    animation: pl-drift 2.6s linear infinite, pl-flicker 0.42s steps(2, end) infinite;
+  }
+  @keyframes pl-drift { from { transform: translateY(0); } to { transform: translateY(4px); } }
+  @keyframes pl-flicker { 0% { opacity: 1; } 50% { opacity: 0.93; } 100% { opacity: 1; } }
+
+  /* —— 回扫亮带：CRT 的 flyback，一条柔亮带缓慢扫过（每轮 7.5s）—— */
+  .pl-roll { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+  .pl-roll::before {
     content: '';
+    position: absolute;
+    left: 0; right: 0; height: 26%;
+    background: linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 0.05) 45%,
+      rgba(255, 255, 255, 0.075) 50%,
+      rgba(255, 255, 255, 0.05) 55%,
+      rgba(255, 255, 255, 0) 100%
+    );
+    animation: pl-roll 7.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  @keyframes pl-roll { from { transform: translateY(-30%); } to { transform: translateY(420%); } }
+
+  /* —— 暗角：多段渐变（不是一圈死黑）+ 顶部玻璃高光 + 管面中央微亮 —— */
+  .pl-vig {
     position: absolute;
     inset: 0;
     pointer-events: none;
+    background:
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.055) 0%, rgba(255, 255, 255, 0) 16%),
+      radial-gradient(ellipse 62% 48% at 50% 44%, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 62%),
+      radial-gradient(ellipse 118% 104% at 50% 50%,
+        rgba(0, 0, 0, 0) 40%,
+        rgba(0, 0, 0, 0.06) 58%,
+        rgba(0, 0, 0, 0.18) 74%,
+        rgba(0, 0, 0, 0.36) 87%,
+        rgba(0, 0, 0, 0.58) 95%,
+        rgba(0, 0, 0, 0.74) 100%);
   }
-  #pl::before {
-    background: radial-gradient(ellipse at 50% 50%, rgba(0, 0, 0, 0) 52%, rgba(0, 0, 0, 0.42) 100%);
-  }
-  #pl::after {
-    background: repeating-linear-gradient(
-      to bottom,
-      rgba(0, 0, 0, 0.16) 0 1px,
-      rgba(255, 255, 255, 0.03) 1px 3px
-    );
-    animation: pl-flicker 0.42s steps(2, end) infinite;
-  }
-  @keyframes pl-flicker {
-    0% { opacity: 1; }
-    50% { opacity: 0.94; }
-    100% { opacity: 1; }
-  }
+
   @media (prefers-reduced-motion: reduce) {
-    #pl::after { animation: none; }   /* 静态版：不闪 */
+    .pl-scan, .pl-roll::before { animation: none; } /* 静态版：不闪、不漂 */
   }
-  /* 收尾：白闪（荧光屏消磁）→ 灰幕纵向内收（关机塌成一条亮线） */
+
+  /* 收尾：白闪（消磁）→ 灰幕纵向内收（关机塌成一条亮线） */
   @keyframes pl-out {
     0% { filter: brightness(1); }
     14% { filter: brightness(2.8); }
     100% { filter: brightness(0.15); opacity: 0; transform: scaleY(0.004); }
   }
-  #pl.pl-out {
-    animation: pl-out 0.34s ease-out forwards;
-    pointer-events: none;
-  }
-  #pl-canvas {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    display: block;
-  }
+  #pl.pl-out { animation: pl-out 0.34s ease-out forwards; pointer-events: none; }
+
   #pl.pl-drawn .pl-fallback { display: none; }
   .pl-fallback {
     margin: 0;
