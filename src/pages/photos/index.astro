@@ -1,8 +1,8 @@
 ---
-import { getImage } from 'astro:assets';
 import Base from '../../layouts/Base.astro';
 import Rays from '../../components/Rays.astro';
 import { seriesRolls } from '../../lib/collections';
+import { coverImage } from '../../lib/photo-images'; // §101：参数集中（预取清单同源）
 
 // §77：最新的卷放默认位置（最右、居中进入），老卷依次往左 —— seriesRolls 原为
 // 日期降序，这里反转为升序（左→右 = 老→新，最新卷在最右端，初始索引取其）
@@ -10,7 +10,7 @@ const rolls = (await seriesRolls()).reverse();
 const covers = await Promise.all(
   rolls.map(async (r) => {
     // §76：压缩 —— q88→80，档位 900/1600→640/1000/1600（46vw@1440≈660 由 640/1000 覆盖）
-    const big = await getImage({ src: r.cover.data.image, widths: [640, 1000, 1600], sizes: '(min-width: 900px) 46vw, 90vw', format: 'webp', quality: 80 });
+    const big = await coverImage(r.cover.data.image);
     const w = r.cover.data.image.width ?? 1;
     const h = r.cover.data.image.height ?? 1;
     return {
