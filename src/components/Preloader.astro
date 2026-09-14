@@ -1,19 +1,295 @@
 ---
 // §101 进站加载页（CRT 灰屏 / 像素→清晰 / 真实预取）。
-// 自包含：内联 style + 内联 script + noscript —— 首屏关键 CSS/JS 必须内联，
-// 否则会先闪一帧无样式或白屏（本仓踩过：模块脚本是 deferred）。
-// 只在首页渲染（Base.astro 判断 isHome），且只在**本会话首次整页加载**播放：
-//   会话内刷新首页、从内页返回、直接进内页 → 由下方内联脚本当场移除。
+//
+// **整套 DOM 由内联脚本自己创建，组件不渲染任何可见标记** —— 这是 §101 修的关键：
+// 客户端路由（点站名回首页等）会把目标页 body 换进来，但换入的内联脚本**不执行**，
+// 于是被换进来的 `#pl` 标记会以「无动画的灰屏 + 兜底 LOADING 文字」形式卡在屏幕上
+// 等 CSS 兜底淡出（实测复现）。不渲染标记 = 换页时根本没有东西可显示。
+//
+// 另外两道闸：① `document.readyState !== 'loading'` 直接返回（真·首次解析才会是
+// loading；换页塞进来的副本此时文档早已 complete）；② sessionStorage `plPlayed`
+// 保证一个标签页只播一次。样式仍是内联且**必须排在脚本之前**（脚本要量覆盖层尺寸）。
 import { prefetchUrls } from '../lib/prefetch-manifest';
 
-// 清单在构建期算好；`<` 转义防 `</script>` 逃逸（CLAUDE.md 坑 2）
+// 清单在构建期算好注入脚本；`<` 转义防 `</script>` 逃逸（CLAUDE.md 坑 2）
 const urlsJson = JSON.stringify(await prefetchUrls()).replace(/</g, '\\u003c');
+
+// 注意：下面这段是**拼进 HTML 的 JS 字符串**，内部一律用字符串拼接，
+// 不得出现模板字面量或 `${`（会被这里提前求值）。
+const bootJs = `
+(function () {
+  // ① 只在真正的首次解析里播：换页塞进来的副本此刻 readyState 已是 complete
+  if (document.readyState !== 'loading') return;
+  // ② 一个标签页只播一次
+  var KEY = 'plPlayed';
+  try {
+    if (sessionStorage.getItem(KEY) === '1') return;
+    sessionStorage.setItem(KEY, '1');
+  } catch (e) { /* 隐私模式：照样播 */ }
+
+  var URLS = ${urlsJson};      // 预取清单（构建期注入）
+  var MIN_MS = 10000;          // 要让观众看满的时长（像素→清晰整段铺开）
+  var HARD_BAIL_MS = 60000;    // 网络僵死时的唯一逃生口（不想要就设成 Infinity）
+  var IDLE_MS = 10000;         // 单个请求「多久没收到字节」算卡死（慢但在动的不会中招）
+  var CONC = 5;                // 并发数
+
+  // —— 建 DOM（首帧即它：脚本在 body 最前面同步执行，解析尚未走到可视内容）——
+  var el = document.createElement('div');
+  el.id = 'pl';
+  el.innerHTML =
+    '<canvas id="pl-canvas" aria-hidden="true"></canvas>' +
+    '<p class="pl-fallback" aria-hidden="true">LOADING</p>';
+  document.body.appendChild(el);
+  document.body.style.overflow = 'hidden';
+  window.__pl = { el: el, urls: URLS }; // 验收探针/调试用（无副作用）
+
+  var canvas = el.querySelector('#pl-canvas');
+  var ctx = canvas.getContext('2d');
+  var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var t0 = Date.now();
+  var ended = false;
+
+  function done() {
+    if (ended) return;
+    ended = true;
+    el.classList.add('pl-out');
+    setTimeout(function () {
+      if (el.isConnected) el.remove();
+      document.body.style.overflow = '';
+    }, 360); // 等收尾动画（白闪 + 灰幕内收）播完再摘
+  }
+
+  // ================= 渲染器：像素阶梯 + CRT 管面 =================
+  var DPR = Math.min(window.devicePixelRatio || 1, 1.5); // §69：DPR 上限 1.5
+  var W = 0, H = 0;
+  function resize() {
+    // 以覆盖层自身为准（其次文档视口），不是画布 —— 画布 display:none 时
+    // clientWidth 会返回 canvas 默认内在宽度 300（§101 实测踩过的坑）
+    var cw = el.clientWidth || document.documentElement.clientWidth || innerWidth;
+    var ch = el.clientHeight || document.documentElement.clientHeight || innerHeight;
+    W = Math.round(cw * DPR);
+    H = Math.round(ch * DPR);
+    canvas.width = W;
+    canvas.height = H;
+  }
+  resize();
+  addEventListener('resize', resize);
+
+  var off = document.createElement('canvas');
+  var octx = off.getContext('2d');
+  var K = 0.16;      // 曲率：正 = 枕形（四角内收）/ 负 = 桶形（边缘外凸顶到边框）
+  var INSET = 0.98;  // 画面整体内缩，露出周围边框色
+  var FONT = '"MapleUI Web", "MapleMono Web", ui-monospace, monospace';
+  var BLOCK_BIG = 26; // 起步像素块尺寸（设备像素）：越大越糊
+
+  // 进度 → 内部分辨率：按**像素块尺寸**线性收窄（26px → 1px），不是按分辨率线性
+  // 爬升 —— 后者块大小按 1/res 掉，前 1/4 进度就把大色块跑完了（§101 实测）
+  function resFor(p) {
+    if (reduce) return H;                      // 减动效：直接锐利版
+    var t = Math.min(1, Math.max(0, (p - 0.08) / 0.82));
+    var block = BLOCK_BIG + (1 - BLOCK_BIG) * Math.pow(t, 0.85);
+    return H / block;
+  }
+
+  function drawOff(p) {
+    var h = Math.max(8, Math.round(resFor(p)));
+    var w = Math.max(8, Math.round(h * (W / H)));
+    if (off.width !== w || off.height !== h) { off.width = w; off.height = h; }
+    var o = octx;
+    o.setTransform(1, 0, 0, 1, 0, 0);
+    o.fillStyle = '#868686';
+    o.fillRect(0, 0, w, h);
+
+    // —— LOADING（逐字手排字距；字号按画幅宽度收敛，让整词占 62%）——
+    var word = 'LOADING';
+    var SP_RATIO = 0.24;
+    o.textAlign = 'center';
+    o.textBaseline = 'middle';
+    o.font = '600 100px ' + FONT;
+    var at100 = 0, i, cw;
+    for (i = 0; i < word.length; i++) at100 += o.measureText(word[i]).width;
+    at100 += SP_RATIO * 100 * (word.length - 1);
+    var fs = Math.max(3, Math.round((w * 0.62) / at100 * 100));
+    o.font = '600 ' + fs + 'px ' + FONT;
+    var sp = fs * SP_RATIO, full = 0;
+    for (i = 0; i < word.length; i++) full += o.measureText(word[i]).width + sp;
+    full -= sp;
+    var y = h * 0.44, x0 = w / 2 - full / 2;
+
+    // 红/青微色差：偏移按内部像素折算 ≈2 设备像素，且随清晰度淡入 ——
+    // 大色块阶段偏移会跨块变成彩色噪点，故按锐度门控（呼应 §31 的边沿色差）
+    var sharp = h / H;
+    var fringeA = Math.max(0, (sharp - 0.15) / 0.85) * 0.55;
+    if (fringeA > 0.03) {
+      var dx = 2 * (h / H) * DPR;
+      var cols = ['rgba(255,70,70,' + fringeA.toFixed(2) + ')', 'rgba(70,150,255,' + fringeA.toFixed(2) + ')'];
+      for (var c = 0; c < 2; c++) {
+        var xc = x0 + (c ? dx : -dx);
+        o.fillStyle = cols[c];
+        for (i = 0; i < word.length; i++) {
+          cw = o.measureText(word[i]).width;
+          o.fillText(word[i], xc + cw / 2, y);
+          xc += cw + sp;
+        }
+      }
+    }
+    o.fillStyle = '#ededed';
+    var xw = x0;
+    for (i = 0; i < word.length; i++) {
+      cw = o.measureText(word[i]).width;
+      o.fillText(word[i], xw + cw / 2, y);
+      xw += cw + sp;
+    }
+
+    // —— 分段格子进度条 ——
+    var bars = 20;
+    var bw = w * 0.62, bx = (w - bw) / 2;
+    var bh = Math.max(2, h * 0.035), by = h * 0.62;
+    var gap = (bw / bars) * 0.22;
+    var cell = (bw - gap * (bars - 1)) / bars;
+    o.fillStyle = 'rgba(255,255,255,0.20)';
+    o.fillRect(bx, by, bw, bh);
+    o.fillStyle = '#f4f4f4';
+    var pc = Math.min(1, Math.max(0, p));
+    var lit = Math.round(pc * bars);
+    for (i = 0; i < lit; i++) o.fillRect(bx + i * (cell + gap), by, cell, bh);
+
+    // —— 百分比读数（内部字号下限 6px：再小就糊成一块看不出数字）——
+    o.font = '600 ' + Math.max(6, Math.round(h * 0.055)) + 'px ' + FONT;
+    o.fillStyle = '#e2e2e2';
+    o.fillText(Math.round(pc * 100) + '%', w / 2, h * 0.73);
+    return h;
+  }
+
+  // 上屏：最近邻放大 + 逐行条带变形（水平收缩 ∝ 距中心距离² → 四角内收）
+  function blit() {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    ctx.fillStyle = '#6d6d6d';
+    ctx.fillRect(0, 0, W, H);
+    var strip = Math.max(1, Math.round(2 * DPR));
+    for (var y = 0; y < H; y += strip) {
+      var ny = ((y + strip / 2) / H) * 2 - 1;
+      var sx = reduce ? INSET : (1 - K * ny * ny) * INSET;
+      var sy0 = (y / H) * off.height;
+      ctx.drawImage(
+        off,
+        0, sy0, off.width, (strip / H) * off.height,
+        (W - W * sx) / 2, y, W * sx, strip
+      );
+    }
+  }
+
+  // ================= 预取引擎：真实字节驱动 =================
+  var conn = navigator.connection || {};
+  var frugal = !!conn.saveData || /(^|-)2g$/.test(conn.effectiveType || '');
+  var urls = URLS.filter(function (u) {
+    return !frugal || u.charAt(u.length - 1) === '/';   // 省流量/2G 只取 HTML
+  });
+
+  var state = (window.__plState = {
+    done: 0, total: urls.length, bytes: 0, frugal: frugal, finished: false,
+  });
+  var received = 0, seenBytes = 0, seenCount = 0, doneCount = 0;
+  var realP = 0, shown = 0;
+
+  function estimate() {
+    var avg = seenCount ? seenBytes / seenCount : 20000;
+    return seenBytes + (urls.length - seenCount) * avg;
+  }
+  function addBytes(n) {
+    received += n;
+    state.bytes = received;
+    var total = estimate();
+    var p = total > 0 ? Math.min(1, received / total) : 0;
+    if (p > realP) realP = p;
+  }
+
+  function grab(u) {
+    var idle = null, aborted = false;
+    function arm(rd) {
+      clearTimeout(idle);
+      idle = setTimeout(function () {
+        aborted = true;
+        try { rd.cancel(); } catch (e) {}
+      }, IDLE_MS);
+    }
+    return fetch(u, { priority: 'low', cache: 'force-cache' }).then(function (r) {
+      var len = Number(r.headers.get('content-length')) || 0;
+      seenCount++;
+      seenBytes += len || 12000;
+      if (!r.body || !r.body.getReader) {
+        return r.arrayBuffer().then(function (b) { addBytes(b.byteLength || len); });
+      }
+      var rd = r.body.getReader();
+      arm(rd);
+      function pump() {
+        return rd.read().then(function (res) {
+          if (res.done) { clearTimeout(idle); return; }
+          arm(rd);
+          addBytes(res.value ? res.value.length : 0);
+          return pump();
+        }, function () { clearTimeout(idle); });
+      }
+      return pump().then(function () { clearTimeout(idle); });
+    }).catch(function () { clearTimeout(idle); });
+  }
+
+  var idx = 0;
+  function worker() {
+    if (idx >= urls.length) return Promise.resolve();
+    var u = urls[idx++];
+    return grab(u).then(function () { state.done = ++doneCount; }).then(worker);
+  }
+  for (var i = 0; i < CONC && i < urls.length; i++) worker();
+
+  // ================= 帧循环：时间轴主导 + 未下完封顶 99% =================
+  // 显示进度 = 时间轴（MIN_MS 内平滑走满），未下完时封顶 99%：
+  //   · 资源快 → 10s 内平顺走完，像素→清晰铺满全程
+  //   · 10s 到点还没下完 → 停在 99%（像素已到原生分辨率），直到全部到手才补满放行
+  // 真实字节进度仍在跑（estimate/done/state 都在用它），只是不再压住显示值 ——
+  // 10s 内那根条是给「效果」定节奏的，10s 之后才代表「还在等」。
+  function drive() {
+    if (ended || !el.isConnected) return;
+    var el_ms = Date.now() - t0;
+    var tt = Math.min(1, el_ms / MIN_MS);
+    var target = tt * tt * (3 - 2 * tt);                   // smoothstep，起步收尾都不突
+    if (doneCount < urls.length) target = Math.min(target, 0.99);
+    if (target > shown) shown += (target - shown) * 0.12;   // 只升不降
+    else if (target < shown) shown = target;
+    window.__plReal = shown;
+
+    var p = shown;
+    var res = drawOff(p);
+    blit();
+    window.__plProgress = p;
+    window.__plRes = res;
+    // 画布出第一帧后才撤掉 DOM 兜底文字（脚本半死时屏幕上一直有东西）
+    if (!el.classList.contains('pl-drawn')) el.classList.add('pl-drawn');
+
+    if (doneCount >= urls.length && el_ms >= MIN_MS && shown >= 0.995) {
+      state.finished = true;
+      window.__plReal = 1;
+      drawOff(1);
+      blit();
+      return done();
+    }
+    if (el_ms >= HARD_BAIL_MS) {                    // 逃生口：网络僵死
+      state.finished = true;
+      return done();
+    }
+    requestAnimationFrame(drive);
+  }
+  requestAnimationFrame(drive);
+
+  // 预加载 MapleUI（画布文字用它；没就绪时前几帧走兜底字链，看不出来）
+  try { document.fonts.load('600 40px "MapleUI Web"'); } catch (e) { /* 忽略 */ }
+})();
+`;
 ---
-{/* 样式必须在标记与脚本之前：脚本要量视口尺寸，且首帧就得是带样式的灰屏。
-    顺序错了会踩坑（§101 实测）：脚本先跑时画布还没吃到任何 CSS，clientWidth
-    返回的是 canvas 默认内在宽度 300px，背板被定死成 300×150 再被拉伸显示。 */}
 <style is:inline>
-  /* 兜底优先级最高：脚本任何异常都不能留下灰屏 —— 8.5s 后无条件自行淡出 */
+  /* 兜底优先级最高：脚本任何异常都不能留下灰屏 —— 8.5s 后无条件自行淡出。
+     （脚本正常时 10s 内自己收尾；这道兜底只管「脚本半死」的情况） */
   #pl {
     position: fixed;
     inset: 0;
@@ -21,11 +297,11 @@ const urlsJson = JSON.stringify(await prefetchUrls()).replace(/</g, '\\u003c');
     display: grid;
     place-items: center;
     background: radial-gradient(ellipse at 50% 46%, #949494 0%, #7c7c7c 52%, #5f5f5f 100%);
-    animation: pl-failsafe-out 0.5s ease 8.5s forwards;
+    animation: pl-failsafe-out 0.5s ease 14s forwards;
   }
   @keyframes pl-failsafe-out { to { opacity: 0; visibility: hidden; } }
   /* CRT 叠加层（不参与逐帧重绘，纯 CSS 叠在画布上）：
-     ::before 四角压暗（管面玻璃的暗角） · ::after 扫描线 + 极轻闪烁 */
+     ::before 四角压暗 · ::after 扫描线 + 极轻闪烁 */
   #pl::before,
   #pl::after {
     content: '';
@@ -49,6 +325,9 @@ const urlsJson = JSON.stringify(await prefetchUrls()).replace(/</g, '\\u003c');
     50% { opacity: 0.94; }
     100% { opacity: 1; }
   }
+  @media (prefers-reduced-motion: reduce) {
+    #pl::after { animation: none; }   /* 静态版：不闪 */
+  }
   /* 收尾：白闪（荧光屏消磁）→ 灰幕纵向内收（关机塌成一条亮线） */
   @keyframes pl-out {
     0% { filter: brightness(1); }
@@ -59,18 +338,13 @@ const urlsJson = JSON.stringify(await prefetchUrls()).replace(/</g, '\\u003c');
     animation: pl-out 0.34s ease-out forwards;
     pointer-events: none;
   }
-  @media (prefers-reduced-motion: reduce) {
-    /* 静态版：不闪、不抖（像素爬升也由脚本跳过） */
-    #pl::after { animation: none; }
-  }
   #pl-canvas {
     position: absolute;
     inset: 0;
     width: 100%;
     height: 100%;
-    display: none; /* 由脚本画第一帧后打开 */
+    display: block;
   }
-  #pl.pl-drawn #pl-canvas { display: block; }
   #pl.pl-drawn .pl-fallback { display: none; }
   .pl-fallback {
     margin: 0;
@@ -83,320 +357,4 @@ const urlsJson = JSON.stringify(await prefetchUrls()).replace(/</g, '\\u003c');
   }
 </style>
 
-<noscript><style>#pl { display: none !important; }</style></noscript>
-
-<div id="pl">
-  <canvas id="pl-canvas" aria-hidden="true"></canvas>
-  <!-- 画布画出第一帧（或脚本半死）时兜底：保证屏幕上永远有东西 -->
-  <p class="pl-fallback" aria-hidden="true">LOADING</p>
-  <script type="application/json" id="pl-urls" is:inline set:html={urlsJson}></script>
-</div>
-
-<script is:inline>
-  // 播放判定 —— 必须在解析到这里的当下同步执行（此刻尚未首次绘制，
-  // 已播过就直接摘掉，用户看不到任何闪烁）。
-  (function () {
-    var el = document.getElementById('pl');
-    if (!el) return;
-    var seen = null;
-    try { seen = sessionStorage.getItem('plPlayed'); } catch (e) { /* 隐私模式等 */ }
-    if (seen === '1') { el.remove(); return; }
-
-    try { sessionStorage.setItem('plPlayed', '1'); } catch (e) {}
-    document.body.style.overflow = 'hidden'; // 播放期间锁滚动
-    document.documentElement.setAttribute('data-pl', 'on');
-
-    // 给后续脚本（渲染 / 预取 / 收尾）用的统一出口
-    var t0 = Date.now();
-    window.__pl = {
-      el: el,
-      urls: (function () {
-        try { return JSON.parse(document.getElementById('pl-urls').textContent || '[]'); }
-        catch (e) { return []; }
-      })(),
-      done: function () {
-        if (!el.isConnected) return;
-        el.remove();
-        document.body.style.overflow = '';
-        document.documentElement.removeAttribute('data-pl');
-      },
-      // 进度源：接上真实字节进度后由预取引擎写 __plReal（0..1）；
-      // 未接上时走本地假进度（3s 走满的 smoothstep），保证渲染器永远有数可用。
-      progress: function () {
-        if (typeof window.__plReal === 'number') return window.__plReal;
-        var t = (Date.now() - t0) / 3000;
-        if (t <= 0) return 0;
-        if (t >= 1) return 1;
-        return t * t * (3 - 2 * t);
-      },
-    };
-  })();
-</script>
-
-<script is:inline>
-  // §101 渲染器：像素阶梯 + CRT 管面变形。
-  // 离屏画布用**极低内部分辨率**画 LOADING/进度条，再以最近邻放大上屏（大色块）；
-  // 随进度抬升内部分辨率，像素块越来越小，末档 = 原生分辨率（完全锐利）。
-  // 关键：这不是模糊或交叉淡化 —— 格子是真的在变小。
-  (function () {
-    var pl = window.__pl;
-    if (!pl || !pl.el.isConnected) return;
-    var canvas = document.getElementById('pl-canvas');
-    if (!canvas || !canvas.getContext) return;
-    var ctx = canvas.getContext('2d');
-    var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-    var DPR = Math.min(window.devicePixelRatio || 1, 1.5); // §69：DPR 上限 1.5
-    var W = 0, H = 0;
-    function resize() {
-      // 尺寸以**覆盖层自身**为准（其次文档视口），而不是画布 —— 画布在首帧前是
-      // display:none，量它只会拿到 canvas 默认内在宽度 300px（§101 实测踩过）；
-      // 用覆盖层还能避开滚动条槽那 ~15px 的横向拉伸
-      var cw = pl.el.clientWidth || document.documentElement.clientWidth || innerWidth;
-      var ch = pl.el.clientHeight || document.documentElement.clientHeight || innerHeight;
-      W = Math.round(cw * DPR);
-      H = Math.round(ch * DPR);
-      canvas.width = W;
-      canvas.height = H;
-    }
-    resize();
-    addEventListener('resize', resize);
-
-    var off = document.createElement('canvas');
-    var octx = off.getContext('2d');
-
-    var K = 0.16;      // 曲率：正 = 枕形（画面四角内收）/ 负 = 桶形（边缘外凸顶到边框）
-    var INSET = 0.98;  // 画面整体内缩，露出周围边框色（管面嵌在外壳里的感觉）
-    var FONT = '"MapleUI Web", "MapleMono Web", ui-monospace, monospace';
-
-    // 进度 → 内部分辨率：按**像素块尺寸**线性收窄（26px → 1px），而不是按分辨率
-    // 线性爬升 —— 后者块大小按 1/res 曲线下降，前 1/4 进度就把大色块跑完了
-    // （§101 实测：p=0.18 时块只剩 2.5px，等于没有像素感）。
-    var BLOCK_BIG = 26; // 起步像素块尺寸（设备像素）：越大越糊，18~30 之间调
-    function resFor(p) {
-      if (reduce) return H;                      // 减动效：直接锐利版
-      var t = Math.min(1, Math.max(0, (p - 0.08) / 0.82));
-      var block = BLOCK_BIG + (1 - BLOCK_BIG) * Math.pow(t, 0.85);
-      return H / block;
-    }
-
-    function drawOff(p) {
-      var h = Math.max(8, Math.round(resFor(p)));
-      var w = Math.max(8, Math.round(h * (W / H)));
-      if (off.width !== w || off.height !== h) { off.width = w; off.height = h; }
-      var o = octx;
-      o.setTransform(1, 0, 0, 1, 0, 0);
-      o.fillStyle = '#868686';
-      o.fillRect(0, 0, w, h);
-
-      // —— LOADING（逐字手排字距；字号按**画幅宽度**收敛，让整词占 62%，
-      //    否则 7 个宽字距字母会顶破画面）——
-      var word = 'LOADING';
-      var SP_RATIO = 0.24;
-      o.textAlign = 'center';
-      o.textBaseline = 'middle';
-      o.font = '600 100px ' + FONT;
-      var at100 = 0, i, cw;
-      for (i = 0; i < word.length; i++) at100 += o.measureText(word[i]).width;
-      at100 += SP_RATIO * 100 * (word.length - 1);
-      var fs = Math.max(3, Math.round((w * 0.62) / at100 * 100));
-      o.font = '600 ' + fs + 'px ' + FONT;
-      var sp = fs * SP_RATIO, full = 0;
-      for (i = 0; i < word.length; i++) full += o.measureText(word[i]).width + sp;
-      full -= sp;
-      var y = h * 0.44, x0 = w / 2 - full / 2;
-
-      // 红/青微色差：偏移按**内部像素**折算 ≈2 设备像素，且随清晰度淡入 ——
-      // 大色块阶段偏移会跨块，直接变成彩色噪点（§101 实测），故按锐度门控
-      // （呼应 §31 的边沿色差语言，只在画面够清晰之后显出来）
-      var sharp = h / H;
-      var fringeA = Math.max(0, (sharp - 0.15) / 0.85) * 0.55;
-      if (fringeA > 0.03) {
-        var dx = 2 * (h / H) * DPR;
-        var cols = ['rgba(255,70,70,' + fringeA.toFixed(2) + ')', 'rgba(70,150,255,' + fringeA.toFixed(2) + ')'];
-        for (var c = 0; c < 2; c++) {
-          var xc = x0 + (c ? dx : -dx);
-          o.fillStyle = cols[c];
-          for (i = 0; i < word.length; i++) {
-            cw = o.measureText(word[i]).width;
-            o.fillText(word[i], xc + cw / 2, y);
-            xc += cw + sp;
-          }
-        }
-      }
-      o.fillStyle = '#ededed';
-      var xw = x0;
-      for (i = 0; i < word.length; i++) {
-        cw = o.measureText(word[i]).width;
-        o.fillText(word[i], xw + cw / 2, y);
-        xw += cw + sp;
-      }
-
-      // —— 分段格子进度条 ——
-      var bars = 20;
-      var bw = w * 0.62, bx = (w - bw) / 2;
-      var bh = Math.max(2, h * 0.035), by = h * 0.62;
-      var gap = (bw / bars) * 0.22;
-      var cell = (bw - gap * (bars - 1)) / bars;
-      o.fillStyle = 'rgba(255,255,255,0.20)';
-      o.fillRect(bx, by, bw, bh);
-      o.fillStyle = '#f4f4f4';
-      var lit = Math.round(Math.min(1, Math.max(0, p)) * bars);
-      for (i = 0; i < lit; i++) o.fillRect(bx + i * (cell + gap), by, cell, bh);
-
-      // —— 百分比读数（内部字号下限 6px：再小就糊成一块看不出数字）——
-      o.font = '600 ' + Math.max(6, Math.round(h * 0.055)) + 'px ' + FONT;
-      o.fillStyle = '#e2e2e2';
-      o.fillText(Math.round(Math.min(1, Math.max(0, p)) * 100) + '%', w / 2, h * 0.73);
-      return h;
-    }
-
-    // 上屏：最近邻放大 + 逐行条带变形（水平收缩 ∝ 距中心的距离² → 边缘外弓、四角内收）
-    function blit() {
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.imageSmoothingEnabled = false;
-      ctx.fillStyle = '#6d6d6d';
-      ctx.fillRect(0, 0, W, H);
-      var strip = Math.max(1, Math.round(2 * DPR));
-      for (var y = 0; y < H; y += strip) {
-        var ny = ((y + strip / 2) / H) * 2 - 1;      // -1..1
-        var sx = reduce ? INSET : (1 - K * ny * ny) * INSET; // 该行水平缩放（两端收窄）
-        var sy0 = (y / H) * off.height;
-        ctx.drawImage(
-          off,
-          0, sy0, off.width, (strip / H) * off.height,
-          (W - W * sx) / 2, y, W * sx, strip
-        );
-      }
-    }
-
-    var last = 0;
-    function tick(now) {
-      if (!pl.el.isConnected) return;                // 已被移除 → 停帧
-      if (now - last >= 33) {                        // 帧率封顶 ~30fps
-        last = now;
-        var p = pl.progress();
-        var res = drawOff(p);
-        blit();
-        window.__plProgress = p;
-        window.__plRes = res; // 当前内部分辨率（验收探针断言用：越小 = 像素块越大）
-        if (!pl.el.classList.contains('pl-drawn')) pl.el.classList.add('pl-drawn');
-      }
-      requestAnimationFrame(tick);
-    }
-
-    // 等字体就绪再起帧（拿不到也不阻塞：最多等 400ms）
-    var started = false;
-    function start() {
-      if (started) return;
-      started = true;
-      requestAnimationFrame(tick);
-    }
-    try {
-      var timer = setTimeout(start, 400);
-      document.fonts.load('600 40px "MapleUI Web"').then(
-        function () { clearTimeout(timer); start(); },
-        function () { clearTimeout(timer); start(); }
-      );
-    } catch (e) {
-      start();
-    }
-  })();
-</script>
-
-<script is:inline>
-  // §101 预取引擎：动画期间把清单里的资源拉进浏览器缓存，进度条走**已下载字节**
-  // （不是假条）。三条硬约束：单个失败不卡、最小 1.2s（让像素爬升看得见）、
-  // 最大 6s（到点无条件放行 —— 宁可进度不满也不让加载页变成挡路的墙）。
-  (function () {
-    var pl = window.__pl;
-    if (!pl || !pl.el.isConnected) return;
-
-    var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    var MIN_MS = reduce ? 400 : 1200;
-    var MAX_MS = 6000;
-    var CONC = 5;
-    var t0 = Date.now();
-
-    // 省流量 / 2G：与站内 Astro 预取同策略 —— 只预取 HTML（以 / 结尾的那些）
-    var conn = navigator.connection || {};
-    var frugal = !!conn.saveData || /(^|-)2g$/.test(conn.effectiveType || '');
-    var urls = pl.urls.filter(function (u) {
-      return !frugal || u.charAt(u.length - 1) === '/';
-    });
-
-    var state = (window.__plState = {
-      done: 0, total: urls.length, bytes: 0, frugal: frugal, finished: false,
-    });
-    var received = 0, seenBytes = 0, seenCount = 0, doneCount = 0;
-    var realP = 0, shown = 0, ended = false;
-
-    // 总量估算：已响应过的按 content-length 累加，未响应的按均值估 ——
-    // 比「按个数」平滑得多，也不会因为后到的大文件让进度条倒退
-    function estimate() {
-      var avg = seenCount ? seenBytes / seenCount : 20000;
-      return seenBytes + (urls.length - seenCount) * avg;
-    }
-    function addBytes(n) {
-      received += n;
-      state.bytes = received;
-      var total = estimate();
-      var p = total > 0 ? Math.min(0.995, received / total) : 0;
-      if (p > realP) realP = p;                 // 只升不降
-    }
-
-    function grab(u) {
-      return fetch(u, { priority: 'low', cache: 'force-cache' }).then(function (r) {
-        var len = Number(r.headers.get('content-length')) || 0;
-        seenCount++;
-        seenBytes += len || 12000;
-        if (!r.body || !r.body.getReader) {
-          return r.arrayBuffer().then(function (b) { addBytes(b.byteLength || len); });
-        }
-        var rd = r.body.getReader();
-        function pump() {
-          return rd.read().then(function (res) {
-            if (res.done) return;
-            addBytes(res.value ? res.value.length : 0);
-            return pump();
-          });
-        }
-        return pump();
-      });
-    }
-
-    var idx = 0;
-    function worker() {
-      if (idx >= urls.length) return Promise.resolve();
-      var u = urls[idx++];
-      // 单个失败（含 404 / 超时）计入完成，绝不阻塞
-      return grab(u).catch(function () {}).then(function () {
-        state.done = ++doneCount;
-      }).then(worker);
-    }
-    for (var i = 0; i < CONC && i < urls.length; i++) worker();
-
-    function finish() {
-      if (ended) return;
-      ended = true;
-      state.finished = true;
-      window.__plReal = 1;
-      pl.el.classList.add('pl-out');
-      setTimeout(function () { pl.done(); }, 360); // 等收尾动画播完再摘 DOM
-    }
-
-    function drive() {
-      if (!pl.el.isConnected || ended) return;
-      var el = Date.now() - t0;
-      var target = realP;
-      if (doneCount >= urls.length && el >= MIN_MS) target = 1;  // 全部到手
-      if (el >= MAX_MS) target = 1;                               // 上限兜底
-      shown += (target - shown) * 0.08;                           // 缓动，避免跳变
-      if (target >= 1 && shown > 0.994) shown = 1;
-      window.__plReal = shown;
-      if (shown >= 1 && el >= MIN_MS) return finish();
-      requestAnimationFrame(drive);
-    }
-    requestAnimationFrame(drive);
-  })();
-</script>
+<script is:inline set:html={bootJs}></script>
