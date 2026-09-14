@@ -28,3 +28,13 @@ export const coverImage = (src: ImageMetadata) =>
     format: 'webp',
     quality: 80,
   });
+
+// §101 修正：Astro 5 的响应式档位在 `srcSet.values`（`{ url, descriptor }[]`），
+// **`attributes.srcset` 根本不存在** —— 此前两处调用点照旧写法取值，恒为 undefined，
+// 于是 `<img>` 只带 src + 一个孤零零的 sizes：照片全程不响应式（各设备都下同一档），
+// 而多出来的档位构建完就躺在 dist 里没人引用。凡渲染 `<img srcset>` 一律走这里。
+type ImgResult = { srcSet: { values: Array<{ url: string; descriptor?: string }> } };
+
+/** 取 getImage 结果的 srcset 串（`url 900w, url2 1600w`） */
+export const srcsetOf = (g: ImgResult) =>
+  g.srcSet.values.map((v) => `${v.url} ${v.descriptor ?? ''}`.trim()).join(', ');

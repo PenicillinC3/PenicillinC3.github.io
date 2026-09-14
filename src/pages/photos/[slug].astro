@@ -6,7 +6,7 @@ import Base from '../../layouts/Base.astro';
 import Rays from '../../components/Rays.astro';
 import ShotCard from '../../components/ShotCard.astro';
 import { seriesRolls } from '../../lib/collections';
-import { memoImage } from '../../lib/photo-images'; // §101：参数集中（预取清单同源）
+import { memoImage, srcsetOf } from '../../lib/photo-images'; // §101：参数集中（预取清单同源）
 import { formatDate } from '../../lib/date';
 
 export async function getStaticPaths() {
@@ -64,7 +64,7 @@ const imgs = await Promise.all(
     //   由 1600 上采样可接受），quality 86→80
     const g = await memoImage(p.data.image);
     const isPortrait = (p.data.image.height ?? 0) > (p.data.image.width ?? 0);
-    return { p, src: g.src, srcset: g.attributes.srcset, isPortrait };
+    return { p, src: g.src, srcset: srcsetOf(g), isPortrait }; // §101 修：同照片页
   }),
 );
 const imgBySlug = new Map(imgs.map((it) => [it.p.id, it]));
