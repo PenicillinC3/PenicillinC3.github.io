@@ -1,0 +1,82 @@
+---
+// §101 进站加载页（CRT 灰屏 / 像素→清晰 / 真实预取）。
+// 自包含：内联 style + 内联 script + noscript —— 首屏关键 CSS/JS 必须内联，
+// 否则会先闪一帧无样式或白屏（本仓踩过：模块脚本是 deferred）。
+// 只在首页渲染（Base.astro 判断 isHome），且只在**本会话首次整页加载**播放：
+//   会话内刷新首页、从内页返回、直接进内页 → 由下方内联脚本当场移除。
+import { prefetchUrls } from '../lib/prefetch-manifest';
+
+// 清单在构建期算好；`<` 转义防 `</script>` 逃逸（CLAUDE.md 坑 2）
+const urlsJson = JSON.stringify(await prefetchUrls()).replace(/</g, '\\u003c');
+---
+<div id="pl">
+  <canvas id="pl-canvas" aria-hidden="true"></canvas>
+  <!-- 画布画出第一帧（或脚本半死）时兜底：保证屏幕上永远有东西 -->
+  <p class="pl-fallback" aria-hidden="true">LOADING</p>
+  <script type="application/json" id="pl-urls" is:inline set:html={urlsJson}></script>
+</div>
+
+<script is:inline>
+  // 播放判定 —— 必须在解析到这里的当下同步执行（此刻尚未首次绘制，
+  // 已播过就直接摘掉，用户看不到任何闪烁）。
+  (function () {
+    var el = document.getElementById('pl');
+    if (!el) return;
+    var seen = null;
+    try { seen = sessionStorage.getItem('plPlayed'); } catch (e) { /* 隐私模式等 */ }
+    if (seen === '1') { el.remove(); return; }
+
+    try { sessionStorage.setItem('plPlayed', '1'); } catch (e) {}
+    document.body.style.overflow = 'hidden'; // 播放期间锁滚动
+    document.documentElement.setAttribute('data-pl', 'on');
+
+    // 给后续脚本（渲染 / 预取 / 收尾）用的统一出口
+    window.__pl = {
+      el: el,
+      urls: (function () {
+        try { return JSON.parse(document.getElementById('pl-urls').textContent || '[]'); }
+        catch (e) { return []; }
+      })(),
+      done: function () {
+        if (!el.isConnected) return;
+        el.remove();
+        document.body.style.overflow = '';
+        document.documentElement.removeAttribute('data-pl');
+      },
+    };
+  })();
+</script>
+
+<noscript><style>#pl { display: none !important; }</style></noscript>
+
+<style is:inline>
+  /* 兜底优先级最高：脚本任何异常都不能留下灰屏 —— 8.5s 后无条件自行淡出 */
+  #pl {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: grid;
+    place-items: center;
+    background: radial-gradient(ellipse at 50% 46%, #949494 0%, #7c7c7c 52%, #5f5f5f 100%);
+    animation: pl-failsafe-out 0.5s ease 8.5s forwards;
+  }
+  @keyframes pl-failsafe-out { to { opacity: 0; visibility: hidden; } }
+  #pl-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: none; /* 由脚本画第一帧后打开 */
+  }
+  #pl.pl-drawn #pl-canvas { display: block; }
+  #pl.pl-drawn .pl-fallback { display: none; }
+  .pl-fallback {
+    margin: 0;
+    font-family: var(--font-sans);
+    font-size: clamp(1.6rem, 7vw, 3.4rem);
+    font-weight: 500;
+    letter-spacing: 0.22em;
+    color: #e9e9e9;
+    text-shadow: -1px 0 rgba(255, 60, 60, 0.18), 1px 0 rgba(60, 130, 255, 0.18);
+  }
+</style>
