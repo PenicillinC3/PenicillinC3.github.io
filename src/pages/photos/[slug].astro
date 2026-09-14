@@ -1,5 +1,4 @@
 ---
-import { getImage } from 'astro:assets';
 import { render } from 'astro:content';
 import type { CollectionEntry } from 'astro:content';
 import { createMarkdownProcessor } from '@astrojs/markdown-remark';
@@ -7,6 +6,7 @@ import Base from '../../layouts/Base.astro';
 import Rays from '../../components/Rays.astro';
 import ShotCard from '../../components/ShotCard.astro';
 import { seriesRolls } from '../../lib/collections';
+import { memoImage } from '../../lib/photo-images'; // §101：参数集中（预取清单同源）
 import { formatDate } from '../../lib/date';
 
 export async function getStaticPaths() {
@@ -62,13 +62,7 @@ const imgs = await Promise.all(
   photos.map(async (p) => {
     // §76：压缩 —— 去掉 2400 档（展示宽 ≤1200px，1600 已覆盖 1.33x DPR，2x 场景
     //   由 1600 上采样可接受），quality 86→80
-    const g = await getImage({
-      src: p.data.image,
-      widths: [900, 1600],
-      sizes: '(min-width: 900px) min(88vw, 1200px), 100vw',
-      format: 'webp',
-      quality: 80,
-    });
+    const g = await memoImage(p.data.image);
     const isPortrait = (p.data.image.height ?? 0) > (p.data.image.width ?? 0);
     return { p, src: g.src, srcset: g.attributes.srcset, isPortrait };
   }),
