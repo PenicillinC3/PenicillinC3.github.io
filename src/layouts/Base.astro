@@ -4,6 +4,7 @@ import '../styles/base.css';
 import { ViewTransitions } from 'astro:transitions';
 import Nav from '../components/Nav.astro';
 import Footer from '../components/Footer.astro';
+import Preloader from '../components/Preloader.astro';
 import { site } from '../site.config';
 
 interface Props {
@@ -35,6 +36,9 @@ const isHome = Astro.url.pathname === '/';
     <ViewTransitions />
   </head>
   <body class:list={['base-body', dark && 'page-dark', immersive && 'page-immersive', gallery && 'page-gallery']}>
+    {/* §101：进站加载页 —— 仅首页、仅本会话首次整页加载；必须是 body 首个元素
+        （首帧即它，不会先闪一下网站）。内页直接进入不渲染（isHome 判断）。 */}
+    {isHome && <Preloader />}
     <Nav />
     <main class="wrap main"><slot /></main>
     {isHome && <Footer />}
