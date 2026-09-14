@@ -13,6 +13,9 @@ npm install          # 首次
 npm run dev          # 开发服务器（:4321，热更新；dev 工具栏已在 astro.config 关闭）
 npm run build        # 产物到 dist/（验收标准：0 error / 0 warning，当前 14 页）
 npm run preview      # 本地预览构建产物（旧 dev/preview 进程会占端口，先 taskkill node）
+# dev 里首页玻璃球/光效突然不出现（控制台 504 Outdated Optimize Dep / Failed to fetch
+# dynamically imported module）：vite 依赖预打包过期（§88）→ 停 dev → rm -rf .astro
+# node_modules/.vite → 重启。装依赖后、切分支后、长时间没开都容易触发
 npm run fonts:subset # 新增内容后重建 woff2 子集（song §28 + maple §29）
 ```
 
