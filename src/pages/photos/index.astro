@@ -2,7 +2,7 @@
 import Base from '../../layouts/Base.astro';
 import Rays from '../../components/Rays.astro';
 import { seriesRolls } from '../../lib/collections';
-import { coverImage } from '../../lib/photo-images'; // §101：参数集中（预取清单同源）
+import { coverImage, srcsetOf } from '../../lib/photo-images'; // §101：参数集中（预取清单同源）
 
 // §77：最新的卷放默认位置（最右、居中进入），老卷依次往左 —— seriesRolls 原为
 // 日期降序，这里反转为升序（左→右 = 老→新，最新卷在最右端，初始索引取其）
@@ -22,7 +22,7 @@ const covers = await Promise.all(
       count: r.photos.length,
       wide: w / h > 1.55,
       src: big.src,
-      srcset: big.attributes.srcset,
+      srcset: srcsetOf(big), // §101 修：此前读 attributes.srcset（不存在）→ 恒 undefined
     };
   }),
 );
