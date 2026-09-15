@@ -152,30 +152,15 @@ const Lens = memo(function Lens({ follow }) {
   const geoWidthRef = useRef(1);
   const framesRef = useRef(0);
   const matRef = useRef();
-  const holeRef = useRef(null);   // §102：中心镂空的 uniform
-
-  /* §102 中心镂空 —— 过渡到后半程时把球「掏空」，让中间的首页完整显出来。
-     做法是给材质注入一个片元丢弃：局部半径（几何的圆柱截面在局部 XZ 平面）
-     小于 uHole 的片元直接 discard，于是球从实体变成一圈**环**。
-     __lensHole 0 = 实心（常态），0～1 = 镂空半径（相对几何半径）。
-     用 onBeforeCompile 注入而不是改 drei 源码：材质版本升级也不会被冲掉。 */
-  useEffect(() => {
-    const m = matRef.current;
-    if (!m) return;
-    m.onBeforeCompile = (shader) => {
-      shader.uniforms.uHole = { value: 0 };
-      holeRef.current = shader.uniforms.uHole;
-      shader.vertexShader = 'varying vec3 vLoc;\n' + shader.vertexShader.replace(
-        '#include <begin_vertex>',
-        '#include <begin_vertex>\n  vLoc = position;',
-      );
-      shader.fragmentShader = 'uniform float uHole;\nvarying vec3 vLoc;\n' + shader.fragmentShader.replace(
-        'void main() {',
-        'void main() {\n  if (uHole > 0.0 && length(vLoc.xz) < uHole) discard;',
-      );
-    };
-    m.needsUpdate = true;
-  }, []);
+  /* §102 中心镂空 —— ⚠ **不要用 onBeforeCompile 往 MeshTransmissionMaterial 里注入 discard**。
+     试过并已回退：球会发黑 / 炸开。原因是那个材质由 drei 深度定制（多趟渲染 +
+     屏幕空间折射），注入片元丢弃会破坏它的渲染管线；更糟的是补丁**是永久的**，
+     过渡结束后仍留在材质上，于是首页那颗球跟着一起坏（用户实测：「首页玻璃球炸了，
+     跟加载页那颗一样」）。
+     「中间露出完整首页」现在由两条**不改 shader** 的途径达成：
+       ① 光学衰减到中性（ior→1、thickness→0、色差→0）→ 球在视觉上变清，透出背后的首页；
+       ② 加载层的 mask 中心本就是透明核心（宽羽化）→ 镂空由 DOM 侧负责。
+     若将来确实需要几何镂空：换一个车削好的**环形几何**，而不是改 shader。 */
   const { scale, ior, thickness, anisotropy, chromaticAberration, ...extraMat } = LENS_PROPS;
 
   useEffect(() => {
@@ -248,14 +233,10 @@ const Lens = memo(function Lens({ follow }) {
         if (u.uChromaticAberration) u.uChromaticAberration.value = tgt.chromaticAberration;
         if (u.uAnisotropy) u.uAnisotropy.value = tgt.anisotropy;
       }
-      // §102 中心镂空：过渡后半程把球掏空，中间的首页就完整露出来
-      const hole = typeof window.__lensHole === "number" ? window.__lensHole : 0;
-      if (holeRef.current) holeRef.current.value = hole;
-
       // 验收探针用：把材质当前实际值摊出来（无副作用）
       window.__lensMat = {
         opt, ior: m.ior, thickness: m.thickness, ca: m.chromaticAberration,
-        hasUni: !!u, hole, hasHole: !!holeRef.current,
+        hasUni: !!u,
       };
     }
 
