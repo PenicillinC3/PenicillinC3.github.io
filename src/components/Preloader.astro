@@ -394,8 +394,6 @@ const bootJs = `
         var eu = u * u * (3 - 2 * u);
         window.__lensOptics = 1 - eu;
         window.__lensScene = eu;
-        // 中心镂空同步打开：球变大 + 掏空 → 中间的首页完整显出来
-        window.__lensHole = eu * 0.82;
         if (u < 1) { requestAnimationFrame(step); return; }
         handoff();
       }
