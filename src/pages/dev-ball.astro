@@ -1,0 +1,302 @@
+---
+// §102 迭代预览：**加载页 → 3D 场景 → 中央呼出玻璃球**。
+//
+// 与首页无关。球折射的是**加载页自己**：
+//   加载完成后把加载页版面烘成一张 canvas（window.__plPlate），塞进 FluidGlass 的场景
+//   （LoadingPlate 那块 z=5 的平面），再把 DOM 加载层撤下 —— 屏幕上还是同一张版面，
+//   但它此刻是 WebGL 画出来的，于是**球的折射够得着它**。
+//   （DOM 在 WebGL 之上，球的 shader 只采样自己的离屏 buffer，碰不到 DOM ——
+//    这就是为什么非得「把加载页变成 3D 场景」不可。）
+//
+// 球的光学走 FluidGlass 原生路径：scale = LENS_PROPS.scale (0.10)、材质参数原样。
+// 访问 /dev-ball
+import FluidGlass from '../components/FluidGlass.jsx';
+---
+
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>加载页 → 3D 场景 → 球</title>
+  <style is:inline>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body { margin: 0; background: #f7f7f6; }
+    /* 组件不自带定位：漏了这条 canvas 会掉进页面流、跑到视口外，球静默消失 */
+    .glass-scene { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+    .glass-scene canvas, .glass-scene > div { pointer-events: auto; display: block; }
+
+    .ui { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 10001;
+      display: flex; align-items: center; gap: 14px; padding: 11px 17px;
+      background: rgba(18,18,22,.92); color: #e8e8ea; border-radius: 11px;
+      font: 12px/1 system-ui, sans-serif; letter-spacing: .06em; }
+    .ui label { color: #8b8b95; text-transform: uppercase; letter-spacing: .14em; font-size: 10px; }
+    .ui input[type=range] { -webkit-appearance: none; appearance: none; width: 240px; height: 3px; background: #3a3a44; border-radius: 2px; outline: none; }
+    .ui input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 15px; height: 15px; border-radius: 50%; background: #7dff3d; cursor: grab; }
+    .ui b { min-width: 70px; text-align: right; font-variant-numeric: tabular-nums; font-size: 13px; }
+    .ui button { background: #2a2a32; color: #e8e8ea; border: 0; border-radius: 7px; padding: 7px 12px; font: inherit; cursor: pointer; }
+    .ui .rd { color: #7a7a84; font-variant-numeric: tabular-nums; }
+    .scrub { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10002;
+      display: flex; align-items: center; gap: 10px; padding: 8px 16px 10px;
+      background: rgba(18,18,22,.92); color: #8b8b95;
+      font: 10px/1 system-ui, sans-serif; letter-spacing: .14em; text-transform: uppercase; }
+    .scrub input { flex: 1; -webkit-appearance: none; appearance: none; height: 4px;
+      background: #3a3a44; border-radius: 2px; outline: none; }
+    .scrub input::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px;
+      border-radius: 50%; background: #fff; cursor: grab; }
+    .scrub b { min-width: 46px; text-align: right; color: #e8e8ea;
+      font-variant-numeric: tabular-nums; letter-spacing: .04em; }
+
+    /* ---------- 加载页 ---------- */
+    #pl { position: fixed; inset: 0; z-index: 9999; overflow: hidden;
+      background: #f7f7f6; color: #1a1a1a;
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; --p: 0; }
+    #pl.gone { display: none; }          /* 交班给 3D 场景后撤下 DOM 层 */
+    .pl-scene { position: absolute; inset: 0; z-index: 1; }
+    .pl-grid { position: absolute; left: 4.5%; right: 4.5%; top: 10%; bottom: 16%; z-index: 1; display: flex; pointer-events: none; }
+    .pl-grid i { flex: 1; position: relative; }
+    .pl-grid i::before { content: ''; position: absolute; left: 0; top: 0; width: 1px;
+      background: rgba(26,26,26,.09); height: calc(var(--gh,0) * 100%); }
+    .pl-grid i:last-child { flex: 0; }
+    .pl-rule { position: absolute; height: 1px; background: rgba(26,26,26,.3); z-index: 2;
+      transform-origin: left center; transform: scaleX(var(--rw,0)); }
+    .pl-rule-t { left: 4.5%; width: calc(91% / 12 * 6); top: 10%; }
+    .pl-rule-b { left: 4.5%; right: 4.5%; bottom: 16%; }
+    .pl-res { position: absolute; inset: 0; z-index: 4; }
+    .pl-lbl { position: absolute; font-weight: 700; font-size: clamp(10px,1.55vw,20px);
+      letter-spacing: .13em; text-transform: uppercase; font-variant-numeric: tabular-nums; }
+    .pl-tl { top: 5%; left: 4.5%; } .pl-tr { top: 5%; right: 4.5%; display: flex; align-items: center; gap: .62em; }
+    .pl-bl { bottom: 5.6%; left: 4.5%; color: #8a8a88; } .pl-br { bottom: 5.6%; right: 4.5%; color: #8a8a88; }
+    .pl-dot { width: .56em; height: .56em; border-radius: 50%; background: #1a1a1a; display: inline-block; }
+    .pl-stage { position: absolute; left: 4.5%; right: 4.5%; top: 10%; bottom: 16%;
+      display: flex; align-items: flex-end; justify-content: space-between; }
+    .pl-left { display: flex; flex-direction: column; gap: calc(.55vh + 14px); align-items: flex-start; }
+    .pl-eyebrow { font-weight: 700; font-size: clamp(13px,2.6vh,26px); letter-spacing: .3em; text-transform: uppercase; }
+    .pl-hero { display: flex; align-items: baseline; line-height: .71; margin-left: -.035em; }
+    .pl-num { font-weight: 700; letter-spacing: -.042em; font-size: 22vh; font-variant-numeric: tabular-nums; }
+    .pl-pct { font-weight: 700; font-size: 6.6vh; color: #8a8a88; }
+    .pl-data { display: grid; grid-template-columns: auto auto; gap: .42em .7em;
+      font-weight: 700; font-size: clamp(11px,1.62vw,21px); letter-spacing: .15em; text-transform: uppercase; }
+    .pl-data span { grid-column: 1; color: #8a8a88; text-align: right; }
+    .pl-data s { grid-column: 2; text-decoration: none; font-variant-numeric: tabular-nums; text-align: right; }
+    .pl-prog { position: absolute; left: 4.5%; right: 4.5%; bottom: calc(16% - 1px); height: 2px;
+      background: rgba(26,26,26,.12); z-index: 5; }
+    .pl-prog b { display: block; height: 2px; width: 100%;
+      background: linear-gradient(90deg,#ff2d9b,#a24bff 22%,#00d4ff 44%,#7dff3d 64%,#ffe600 82%,#ff6b1a);
+      clip-path: inset(0 calc((1 - var(--p,0)) * 100%) 0 0); }
+    .pl-mist { position: absolute; inset: 0; z-index: 6; pointer-events: none;
+      background: linear-gradient(180deg, rgba(180,180,186,.30), rgba(156,156,164,.36));
+      opacity: var(--mist,1);
+      -webkit-backdrop-filter: blur(7px) saturate(.55); backdrop-filter: blur(7px) saturate(.55); }
+  </style>
+</head>
+<body>
+  <div class="ui">
+    <button id="play">暂停</button>
+    <label for="spd">速度</label>
+    <input id="spd" type="range" min="0.1" max="4" step="0.05" value="1" />
+    <b id="spdv">1.00×</b>
+    <span class="rd">阶段 <em id="stg">加载</em> · 球半径 <em id="rad">—</em> px</span>
+  </div>
+
+  <div id="pl">
+    <div class="pl-scene">
+      <div class="pl-grid"></div>
+      <div class="pl-rule pl-rule-t"></div>
+      <div class="pl-rule pl-rule-b"></div>
+      <div class="pl-res">
+        <span class="pl-lbl pl-tl">Penicillinc3</span>
+        <span class="pl-lbl pl-tr"><i class="pl-dot"></i>Syncing</span>
+        <div class="pl-stage">
+          <div class="pl-left">
+            <span class="pl-eyebrow">///Loading</span>
+            <div class="pl-hero"><span class="pl-num">000</span><span class="pl-pct">%</span></div>
+          </div>
+          <div class="pl-data">
+            <span>Routes</span><s>00 / 13</s>
+            <span>Assets</span><s>00 / 34</s>
+            <span>Bytes</span><s>0.0 MB</s>
+            <span>Fonts</span><s>0 / 8</s>
+          </div>
+        </div>
+        <span class="pl-lbl pl-bl">Site Index</span>
+        <span class="pl-lbl pl-br">Ingest 01</span>
+      </div>
+      <div class="pl-prog"><b></b></div>
+      <div class="pl-mist"></div>
+    </div>
+  </div>
+
+  <div class="scrub">
+    <span>进度</span>
+    <input id="scrub" type="range" min="0" max="1000" step="1" value="0" />
+    <b id="scrubv">0%</b>
+  </div>
+
+  <div class="glass-scene" aria-hidden="true">
+    <FluidGlass client:only="react" />
+  </div>
+
+  <script is:inline>
+    var CAM_Z = 20, FOV = 15, BALL_Z = 15, BALL_SCALE = 0.10; // 与 FluidGlass 一致
+    function worldPerPx() { return 2 * Math.tan((FOV * Math.PI) / 360) * (CAM_Z - BALL_Z) / innerHeight; }
+    function ballRadiusPx() { return BALL_SCALE / worldPerPx(); }
+
+    var el = document.getElementById('pl');
+    var sceneEl = el.querySelector('.pl-scene');
+    el.querySelector('.pl-grid').innerHTML = new Array(12).fill('<i></i>').join('');
+    var gcols = el.querySelectorAll('.pl-grid i');
+    var numEl = el.querySelector('.pl-num');
+    var vels = el.querySelectorAll('.pl-data s');
+    var spd = document.getElementById('spd'), spdv = document.getElementById('spdv');
+    var radEl = document.getElementById('rad'), stgEl = document.getElementById('stg');
+    var btn = document.getElementById('play');
+    var scrub = document.getElementById('scrub'), scrubv = document.getElementById('scrubv');
+    var speed = 1, playing = true, clock = 0, last = performance.now();
+    var T_LOAD = 5.0, T_HOLD = 0.5, T_CALL = 1.2, T_END = 1.6;
+    var TOTAL = T_LOAD + T_HOLD + T_CALL + T_END;
+    var swapped = false;
+
+    spd.addEventListener('input', function () { speed = parseFloat(spd.value); spdv.textContent = speed.toFixed(2) + '×'; });
+    btn.addEventListener('click', function () { playing = !playing; btn.textContent = playing ? '暂停' : '播放'; });
+    // 进度滑块：直接拖时间轴，能停在任意一帧（拖回交班点之前会自动复位）
+    scrub.addEventListener('input', function () {
+      playing = false; btn.textContent = '播放';
+      var target = (parseFloat(scrub.value) / 1000) * TOTAL;
+      if (target < clock) reset();
+      clock = target;
+    });
+
+    function ease(t) { return t * t * (3 - 2 * t); }
+    function pad(v, w) { var s = String(v); while (s.length < w) s = '0' + s; return s; }
+
+    // 把加载页版面烘成 canvas 交给球 —— 只在交班那一刻画一次（进度恒 100%、画面静止）。
+    // ⚠ 每处的百分比都必须与上面的 CSS 对齐，否则交班瞬间会跳一下。
+    function makePlate() {
+      var dpr = Math.min(devicePixelRatio || 1, 1.5);
+      var CW = innerWidth, CH = innerHeight;
+      var c = document.createElement('canvas');
+      c.width = Math.round(CW * dpr); c.height = Math.round(CH * dpr);
+      var o = c.getContext('2d'); o.scale(dpr, dpr);
+      var L = CW * 0.045, R = CW * 0.955, T = CH * 0.10, B = CH * 0.84;
+      var FONT = 'Helvetica Neue, Helvetica, Arial, sans-serif';
+      var vw = function (n) { return CW * n / 100; }, vh = function (n) { return CH * n / 100; };
+      o.fillStyle = '#f7f7f6'; o.fillRect(0, 0, CW, CH);
+      o.fillStyle = 'rgba(26,26,26,.09)';
+      // 线距 = 版心/11 而不是 /12：DOM 的网格是 12 个子元素、最后一个 flex:0，
+      // 前 11 个平分版心，所以最右那条线正好压在版心右缘。用 /12 会整体错位。
+      for (var i = 0; i < 12; i++) o.fillRect(L + (R - L) * i / 11, T, 1, B - T);
+      o.fillStyle = 'rgba(26,26,26,.3)';
+      o.fillRect(L, T, (R - L) / 2, 1); o.fillRect(L, B, R - L, 1);
+      function txt(s, x, y, size, ls, color, align, baseline) {
+        o.font = '700 ' + size.toFixed(1) + 'px ' + FONT;
+        o.letterSpacing = ls.toFixed(2) + 'px';
+        o.fillStyle = color; o.textAlign = align || 'left'; o.textBaseline = baseline || 'top';
+        o.fillText(s, x, y);
+      }
+      // ⚠ 画布字号**必须与 CSS 的 clamp() 一致**。少了 clamp，1280 宽时看不出差别
+      //   （1.55vw=19.84 正好在 [10,20] 内），但 1920 宽时 DOM 卡在 20px、画布却画到 29.8px
+      //   —— 交班瞬间整页文字「莫名其妙变大」。用户实测，我的 1280 探针复现不出。
+      var clamp = function (lo, v, hi) { return Math.min(hi, Math.max(lo, v)); };
+      var fsLbl = clamp(10, vw(1.55), 20);
+      var fsData = clamp(11, vw(1.62), 21);
+      var fsEye = clamp(13, vh(2.6), 26);
+      var ls1 = fsLbl * 0.13;
+      txt('PENICILLINC3', L, vh(5), fsLbl, ls1, '#1a1a1a');
+      txt('SYNCING', R, vh(5), fsLbl, ls1, '#1a1a1a', 'right');
+      txt('SITE INDEX', L, CH - vh(5.6), fsLbl, ls1, '#8a8a88', 'left', 'bottom');
+      txt('INGEST 01', R, CH - vh(5.6), fsLbl, ls1, '#8a8a88', 'right', 'bottom');
+      var numSize = vh(22);
+      o.textAlign = 'left';   // ⚠ 必须复位：上面 txt() 最后一次调用把它留成了 right
+      var boxTop = B - 0.71 * numSize, baseY = boxTop + 0.625 * numSize;
+      o.textBaseline = 'alphabetic';
+      o.font = '700 ' + numSize.toFixed(1) + 'px ' + FONT;
+      o.letterSpacing = (numSize * -0.042).toFixed(2) + 'px';
+      var numX = L - numSize * 0.035, numW = o.measureText('100').width;
+      o.fillStyle = '#1a1a1a'; o.fillText('100', numX, baseY);
+      o.letterSpacing = '0px';
+      o.font = '700 ' + (numSize * 0.3).toFixed(1) + 'px ' + FONT;
+      o.fillStyle = '#8a8a88'; o.fillText('%', numX + numW + numSize * 0.07, baseY);
+      var eyeSize = fsEye;
+      txt('///LOADING', L, boxTop - (vh(0.55) + 14) - 0.23 * eyeSize, eyeSize, eyeSize * 0.3, '#1a1a1a', 'left', 'alphabetic');
+      var dSize = fsData, rowH = dSize * 1.42;
+      var rows = [['ROUTES', '13 / 13'], ['ASSETS', '34 / 34'], ['BYTES', '1.9 MB'], ['FONTS', '8 / 8']];
+      for (var r = 0; r < rows.length; r++) {
+        var y = baseY - (rows.length - 1 - r) * rowH;
+        o.font = '700 ' + dSize.toFixed(1) + 'px ' + FONT;
+        o.letterSpacing = (dSize * 0.15).toFixed(2) + 'px';
+        o.textBaseline = 'alphabetic';
+        o.fillStyle = '#8a8a88'; o.textAlign = 'right';
+        o.fillText(rows[r][0], R - o.measureText(rows[r][1]).width - dSize * 0.7, y);
+        o.fillStyle = '#1a1a1a'; o.fillText(rows[r][1], R, y);
+      }
+      o.letterSpacing = '0px';
+      var g = o.createLinearGradient(L, 0, R, 0);
+      g.addColorStop(0, '#ff2d9b'); g.addColorStop(.22, '#a24bff'); g.addColorStop(.44, '#00d4ff');
+      g.addColorStop(.64, '#7dff3d'); g.addColorStop(.82, '#ffe600'); g.addColorStop(1, '#ff6b1a');
+      o.fillStyle = g; o.fillRect(L, B - 1, R - L, 2);
+      return c;
+    }
+
+    function paint(p) {
+      el.style.setProperty('--p', p.toFixed(4));
+      numEl.textContent = String(Math.round(p * 100)).padStart(3, '0');
+      for (var i = 0; i < gcols.length; i++) {
+        var gh = (p - i * 0.012) / 0.10;
+        gcols[i].style.setProperty('--gh', (gh < 0 ? 0 : gh > 1 ? 1 : gh).toFixed(3));
+      }
+      el.style.setProperty('--rw', Math.min(1, p / 0.16).toFixed(3));
+      var bv = 6.5 * Math.max(0, 1 - p / 0.55);
+      sceneEl.style.filter = bv > 0.06 ? 'blur(' + bv.toFixed(2) + 'px)' : 'none';
+      el.style.setProperty('--mist', Math.max(0, 1 - p / 0.70).toFixed(3));
+      vels[0].textContent = pad(Math.floor(13 * p), 2) + ' / 13';
+      vels[1].textContent = pad(Math.floor(34 * p), 2) + ' / 34';
+      vels[2].textContent = (1.9 * p).toFixed(1) + ' MB';
+      vels[3].textContent = pad(Math.floor(8 * p), 1) + ' / 8';
+    }
+
+    function reset() {
+      swapped = false;
+      el.classList.remove('gone');
+      window.__plPlate = null;
+      window.__lensScene = 0;
+      window.__lensScale = 0;
+    }
+
+    function frame(now) {
+      var dt = (now - last) / 1000; last = now;
+      if (playing) { clock += dt * speed; if (clock >= TOTAL) { clock -= TOTAL; reset(); } }
+
+      var t = clock;
+      if (t < T_LOAD) {
+        paint(ease(t / T_LOAD));
+        stgEl.textContent = '加载';
+        if (swapped) reset();
+      } else if (t < T_LOAD + T_HOLD) {
+        paint(1);
+        stgEl.textContent = '100%';
+      } else {
+        // 交班：加载页版面烘进 3D 场景 → 撤下 DOM 层 → 中央呼出球
+        if (!swapped) {
+          swapped = true;
+          window.__plPlate = makePlate();   // 球从此折的是加载页
+          window.__lensScene = 0;           // 底板不透明 = 场景里就是加载页
+          window.__lensScale = 0;
+          el.classList.add('gone');
+        }
+        var u = ease(Math.min(1, (t - T_LOAD - T_HOLD) / T_CALL));
+        window.__lensScale = BALL_SCALE * u;   // 由零长起
+        stgEl.textContent = t < T_LOAD + T_HOLD + T_CALL ? '呼出球' : '落定';
+      }
+      radEl.textContent = (ballRadiusPx() * (typeof window.__lensScale === 'number' ? window.__lensScale / BALL_SCALE : 1)).toFixed(0);
+      scrubv.textContent = Math.round((t / TOTAL) * 100) + '%';
+      if (playing) scrub.value = String(Math.round((t / TOTAL) * 1000));
+      requestAnimationFrame(frame);
+    }
+    reset();
+    paint(0);
+    requestAnimationFrame(frame);
+  </script>
+</body>
+</html>
