@@ -116,6 +116,11 @@ const bootCss = `
     background:linear-gradient(90deg,#ff2d9b,#a24bff 22%,#00d4ff 44%,#7dff3d 64%,#ffe600 82%,#ff6b1a);
     clip-path:inset(0 calc((1 - var(--p,0)) * 100%) 0 0); }
 
+.pl-mist{ position:absolute; inset:0; z-index:6; pointer-events:none;
+  background:linear-gradient(180deg, rgba(180,180,186,.30), rgba(156,156,164,.36));
+  opacity:var(--mist,1);
+  -webkit-backdrop-filter:blur(7px) saturate(.55);
+  backdrop-filter:blur(7px) saturate(.55); }
   .pl-grain{ position:absolute; inset:-60%; pointer-events:none; z-index:8;
     background-image:url("${GRAIN_URI}"); background-size:140px;
     opacity:.32; animation:pl-grain .55s steps(1) infinite; }
@@ -230,6 +235,7 @@ const bootJs = `
       '<div class="pl-prog"><b></b></div>' +
     '</div>' +
     '<i class="pl-rim" aria-hidden="true"></i>' +
+    '<div class="pl-mist" aria-hidden="true"></div>' +
     '<div class="pl-grain" aria-hidden="true"></div>' +
     '<p class="pl-fallback" aria-hidden="true">LOADING</p>';
   document.body.appendChild(el);
@@ -287,7 +293,9 @@ const bootJs = `
 
     o.fillStyle = '#f7f7f6'; o.fillRect(0, 0, CW, CH);
     o.fillStyle = 'rgba(26,26,26,.09)';
-    for (var i = 0; i < 12; i++) o.fillRect(L + (R - L) * i / 12, T, 1, B - T);
+    // 线距 = 版心/11：DOM 网格是 12 个子元素、最后一个 flex:0，前 11 个平分版心，
+    // 最右那条正好压版心右缘。用 /12 会与 DOM 错位（交班瞬间网格跳一下）。
+    for (var i = 0; i < 12; i++) o.fillRect(L + (R - L) * i / 11, T, 1, B - T);
     o.fillStyle = 'rgba(26,26,26,.3)';
     o.fillRect(L, T, (R - L) / 2, 1);        // 上横线只跨 6 栏
     o.fillRect(L, B, R - L, 1);
@@ -300,11 +308,16 @@ const bootJs = `
       o.textBaseline = baseline || 'top';
       o.fillText(s, x, y);
     }
-    var ls1 = vw(1.55) * 0.13;
-    txt('PENICILLINC3', L, vh(5), vw(1.55), ls1, '#1a1a1a');
-    txt('SYNCING', R, vh(5), vw(1.55), ls1, '#1a1a1a', 'right');
-    txt('SITE INDEX', L, CH - vh(5.6), vw(1.55), ls1, '#8a8a88', 'left', 'bottom');
-    txt('INGEST 01', R, CH - vh(5.6), vw(1.55), ls1, '#8a8a88', 'right', 'bottom');
+    // ⚠ 画布字号必须与 CSS 的 clamp() 一致，否则宽屏下交班时文字会「变大」
+    var clamp = function (lo, v, hi) { return Math.min(hi, Math.max(lo, v)); };
+    var fsLbl = clamp(10, vw(1.55), 20);
+    var fsData = clamp(11, vw(1.62), 21);
+    var fsEye = clamp(13, vh(2.6), 26);
+    var ls1 = fsLbl * 0.13;
+    txt('PENICILLINC3', L, vh(5), fsLbl, ls1, '#1a1a1a');
+    txt('SYNCING', R, vh(5), fsLbl, ls1, '#1a1a1a', 'right');
+    txt('SITE INDEX', L, CH - vh(5.6), fsLbl, ls1, '#8a8a88', 'left', 'bottom');
+    txt('INGEST 01', R, CH - vh(5.6), fsLbl, ls1, '#8a8a88', 'right', 'bottom');
 
     // 巨数 + %（过渡时进度恒为 100）。基线位置与 DOM 同源推算：
     // 行框底 = B；内容框顶 = 行框顶 − 0.145em；基线 = 行框顶 + 0.625em。
@@ -326,12 +339,12 @@ const bootJs = `
     o.fillText('%', numX + numW + numSize * 0.07, baseY);
 
     // 眉标：基线 = 巨数行框顶 − gap − 0.23em
-    var eyeSize = vh(2.6);
+    var eyeSize = fsEye;
     txt('///LOADING', L, boxTop - (vh(0.55) + 14) - 0.23 * eyeSize,
         eyeSize, eyeSize * 0.3, '#1a1a1a', 'left', 'alphabetic');
 
     // 数据表：标签与数值都右对齐、两列贴拢
-    var dSize = vw(1.62), rowH = dSize * 1.42;
+    var dSize = fsData, rowH = dSize * 1.42;
     var rows = [['ROUTES', '13 / 13'], ['ASSETS', '34 / 34'], ['BYTES', '1.9 MB'], ['FONTS', '8 / 8']];
     for (var r2 = 0; r2 < rows.length; r2++) {
       var y2 = baseY - (rows.length - 1 - r2) * rowH;
@@ -539,8 +552,10 @@ const bootJs = `
     // 模糊单独走一条更快的斜坡（前 55% 内收干）—— 否则 p=0.6 时还剩 ~1px，字一直是毛的。
     // 归零时直接 filter:none 而不是 blur(0px)：后者依然会强制生成合成层、
     // 关掉次像素抗锯齿，大字会发毛。
-    var bv = reduce ? 0 : 2.6 * Math.max(0, 1 - p / 0.55);
+    var bv = reduce ? 0 : 6.5 * Math.max(0, 1 - p / 0.55);
     scene.style.filter = bv > 0.06 ? 'blur(' + bv.toFixed(2) + 'px)' : 'none';
+    // 灰雾：开场最浓，前 70% 内散尽
+    el.style.setProperty('--mist', (reduce ? 0 : Math.max(0, 1 - p / 0.70)).toFixed(3));
 
     // 颗粒：起点重、终点留一档（不降到 0，留住质感）
     if (grain) grain.style.opacity = reduce ? 0.08 : (0.07 + 0.25 * (1 - p)).toFixed(3);
