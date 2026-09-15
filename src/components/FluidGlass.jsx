@@ -150,6 +150,32 @@ const Lens = memo(function Lens({ follow }) {
   const { viewport: vp } = useThree();
   const [scene] = useState(() => new THREE.Scene());
   const geoWidthRef = useRef(1);
+  const framesRef = useRef(0);
+  const matRef = useRef();
+  const holeRef = useRef(null);   // §102：中心镂空的 uniform
+
+  /* §102 中心镂空 —— 过渡到后半程时把球「掏空」，让中间的首页完整显出来。
+     做法是给材质注入一个片元丢弃：局部半径（几何的圆柱截面在局部 XZ 平面）
+     小于 uHole 的片元直接 discard，于是球从实体变成一圈**环**。
+     __lensHole 0 = 实心（常态），0～1 = 镂空半径（相对几何半径）。
+     用 onBeforeCompile 注入而不是改 drei 源码：材质版本升级也不会被冲掉。 */
+  useEffect(() => {
+    const m = matRef.current;
+    if (!m) return;
+    m.onBeforeCompile = (shader) => {
+      shader.uniforms.uHole = { value: 0 };
+      holeRef.current = shader.uniforms.uHole;
+      shader.vertexShader = 'varying vec3 vLoc;\n' + shader.vertexShader.replace(
+        '#include <begin_vertex>',
+        '#include <begin_vertex>\n  vLoc = position;',
+      );
+      shader.fragmentShader = 'uniform float uHole;\nvarying vec3 vLoc;\n' + shader.fragmentShader.replace(
+        'void main() {',
+        'void main() {\n  if (uHole > 0.0 && length(vLoc.xz) < uHole) discard;',
+      );
+    };
+    m.needsUpdate = true;
+  }, []);
   const { scale, ior, thickness, anisotropy, chromaticAberration, ...extraMat } = LENS_PROPS;
 
   useEffect(() => {
@@ -159,18 +185,78 @@ const Lens = memo(function Lens({ follow }) {
     geoWidthRef.current = geo ? geo.boundingBox.max.x - geo.boundingBox.min.x || 1 : 1;
   }, [nodes]);
 
+  /* ── 进站过渡接口（spec §102）────────────────────────────────────────
+     加载页是普通内联脚本，这里是 React island，两者没有现成通道。用**只读全局量**
+     通信：useFrame 本来就按帧跑，读全局天然同步、不会错过事件。没有加载页时
+     这些量都不存在，整段逻辑退化成原样（球照常用 LENS_PROPS.scale）。
+
+       window.__plPending      加载页在场（球先藏起来，scale = 0）
+       window.__lensScale      加载页在驱动球的大小时写这里（数值）
+       window.__lensTransition true = 过渡中：球锁在视口中心、不跟手
+       window.__lensCoverScale 本帧写入：球「铺满视口」所需的 scale（加载页读它对齐洞口）
+       window.__ballReady      本组件写：折射管线已出帧，球可用
+     ─────────────────────────────────────────────────────────────────── */
   useFrame((state, delta) => {
     const { gl, viewport, camera } = state;
     const v = viewport.getCurrentViewport(camera, [0, 0, 15]);
-    const destX = (follow.current.x * v.width) / 2;
-    const destY = (follow.current.y * v.height) / 2;
-    // 跟手阻尼（官方阻尼系数 0.15）
-    easing.damp3(ref.current.position, [destX, destY, 15], 0.15, delta);
+
+    const inTransit = window.__lensTransition === true;
+    const destX = inTransit ? 0 : (follow.current.x * v.width) / 2;
+    const destY = inTransit ? 0 : (follow.current.y * v.height) / 2;
+    // 跟手阻尼（官方阻尼系数 0.15）；过渡期锁视口中心，阻尼略快一点
+    easing.damp3(ref.current.position, [destX, destY, 15], inTransit ? 0.3 : 0.15, delta);
+
+    // 球在 z=15 处的投影要盖住视口对角线 —— 加载页把这值与洞口半径同步，
+    // 球轮廓才会和洞沿重合（差一点就会看到「洞比球大」的白圈）。
+    // 系数 1.5 而不是 1.06：模型是**圆柱透镜**（不是正球），且包围盒宽度包含了
+    // 非光学部分，1.06 的余量实测盖不住四角。宁可多盖 —— 多盖只是留白多一点，
+    // 盖不住则会露出接缝。
+    const dia = Math.hypot(v.width, v.height);
+    window.__lensCoverScale = (dia * 2.6) / (geoWidthRef.current || 2);
 
     if (scale == null) {
       const maxWorld = viewport.width * 0.9;
       const desired = maxWorld / geoWidthRef.current;
       ref.current.scale.setScalar(Math.min(0.15, desired));
+    } else if (typeof window.__lensScale === 'number') {
+      ref.current.scale.setScalar(window.__lensScale); // 加载页在驱动
+    } else if (ref.current.scale.x !== scale) {
+      ref.current.scale.setScalar(scale); // 过渡交还后回到常态
+    }
+
+    // §102：过渡收尾时把光学性能「减弱」到中性 —— 球铺满视口后逐渐变成一块
+    // 无色、无畸变的玻璃，视觉上等同消失；此时换回首页那颗球的光学是无感的。
+    // __lensOptics 1 = 原样，0 = 中性。没有加载页时该全局量不存在 → 恒为 1。
+    const opt = typeof window.__lensOptics === 'number' ? window.__lensOptics : 1;
+    const m = matRef.current;
+    if (m) {
+      const tgt = {
+        ior: 1 + (ior - 1) * opt,                 // 1.15 → 1.0（不折）
+        thickness: thickness * opt,               // 2 → 0（无厚度 = 无畸变）
+        chromaticAberration: chromaticAberration * opt,
+        anisotropy: anisotropy * opt,
+      };
+      // 逐项「存在才写」：drei 不同版本可能把它挂成实例属性、也可能只挂 uniform，
+      // 两条路都试，缺哪条都不至于抛错。
+      for (const k in tgt) {
+        if (k in m) m[k] = tgt[k];
+      }
+      const u = m.uniforms;
+      if (u) {
+        if (u.uIor) u.uIor.value = tgt.ior;
+        if (u.uThickness) u.uThickness.value = tgt.thickness;
+        if (u.uChromaticAberration) u.uChromaticAberration.value = tgt.chromaticAberration;
+        if (u.uAnisotropy) u.uAnisotropy.value = tgt.anisotropy;
+      }
+      // §102 中心镂空：过渡后半程把球掏空，中间的首页就完整露出来
+      const hole = typeof window.__lensHole === "number" ? window.__lensHole : 0;
+      if (holeRef.current) holeRef.current.value = hole;
+
+      // 验收探针用：把材质当前实际值摊出来（无副作用）
+      window.__lensMat = {
+        opt, ior: m.ior, thickness: m.thickness, ca: m.chromaticAberration,
+        hasUni: !!u, hole, hasHole: !!holeRef.current,
+      };
     }
 
     // 后台渲染折射场景 → buffer
@@ -179,6 +265,9 @@ const Lens = memo(function Lens({ follow }) {
     gl.setRenderTarget(null);
 
     gl.setClearColor(0xffffff, 1); // 官方紫底 #5227ff → 定制白底
+
+    // 折射管线确实出过帧了 —— 加载页等这个信号才放行（§102）
+    if (++framesRef.current === 3) window.__ballReady = true;
   });
 
   return (
@@ -187,6 +276,8 @@ const Lens = memo(function Lens({ follow }) {
         <>
           <Backdrop />
           <SceneTexts />
+          {/* §102：加载页底板，盖在最前；过渡时淡出，球里就由加载页换成首页场景 */}
+          <LoadingPlate />
         </>,
         scene,
       )}
@@ -203,6 +294,7 @@ const Lens = memo(function Lens({ follow }) {
         geometry={nodes.Cylinder?.geometry}
       >
         <MeshTransmissionMaterial
+          ref={matRef}
           buffer={buffer.texture}
           ior={ior ?? 1.15}
           thickness={thickness ?? 5}
@@ -214,6 +306,44 @@ const Lens = memo(function Lens({ follow }) {
     </>
   );
 });
+
+/* §102 加载页「底板」—— 过渡期球要折的是**加载页**，不是首页场景。
+   加载页是 DOM，而球的 shader 只采样自己的离屏 buffer（§69：折射场景副本、不折射 DOM），
+   所以由加载页那一侧把自身版面画成一张 canvas 交过来（window.__plPlate），这里当一张
+   平面放进场景、盖在首页场景前面（z=5，位于网格 z=0 与 3D 文字 z=3 之前）。
+   过渡时按 window.__lensScene 0→1 淡出 → 球里的内容就由「加载页」变成「首页场景」。
+   这张 canvas 只在过渡开始时画一次：那时进度恒为 100%，画面是静止的。 */
+function LoadingPlate() {
+  const mesh = useRef();
+  const mat = useRef();
+  const texRef = useRef(null);
+
+  useFrame((state) => {
+    const { viewport: vp } = state;
+    const src = window.__plPlate;
+    if (src && !texRef.current) {
+      const t = new THREE.CanvasTexture(src);
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.minFilter = THREE.LinearFilter;   // 非 2 次幂尺寸 → 不能上 mipmap
+      t.generateMipmaps = false;
+      texRef.current = t;
+      if (mat.current) { mat.current.map = t; mat.current.needsUpdate = true; }
+    }
+    if (mesh.current) mesh.current.scale.set(vp.width, vp.height, 1);
+    if (mat.current && mesh.current) {
+      const s = typeof window.__lensScene === 'number' ? window.__lensScene : 0;
+      mat.current.opacity = 1 - s;
+      mesh.current.visible = !!texRef.current && s < 0.995;
+    }
+  });
+
+  return (
+    <mesh ref={mesh} position={[0, 0, 5]} visible={false}>
+      <planeGeometry />
+      <meshBasicMaterial ref={mat} transparent depthWrite={false} toneMapped={false} />
+    </mesh>
+  );
+}
 
 /* 折射内容：1:1 像素 CanvasTexture 方格铺满视口（z=0 平面，与球同相机）。
    纹理同步创建于首帧（§69.11：曾用 effect 异步 setState → 首帧 mesh 未挂载，
@@ -342,7 +472,17 @@ export default function FluidGlass() {
   useEffect(() => {
     const small = matchMedia('(max-width: 899px)');
     const rm = matchMedia('(prefers-reduced-motion: reduce)');
-    const upd = () => setOk(!small.matches && !rm.matches);
+    const upd = () => {
+      const on = !small.matches && !rm.matches;
+      setOk(on);
+      // §102：把「挂不挂」明确告诉加载页 —— 窄屏/减动效时它不该傻等球就绪，
+      // 否则白等满 BALL_WAIT_MS 才放行。
+      window.__ballDecided = true;
+      window.__ballNA = !on;
+      // 加载页在场：球先藏起来（scale 0），等它的过渡把 scale 推上去。
+      // 无加载页时 __plPending 不存在 —— 同会话二次进入 / 历史返回都照常显示。
+      if (window.__plPending && typeof window.__lensScale !== 'number') window.__lensScale = 0;
+    };
     upd();
     small.addEventListener?.('change', upd);
     rm.addEventListener?.('change', upd);
