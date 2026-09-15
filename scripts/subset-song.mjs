@@ -1,4 +1,4 @@
-// 华文中宋子集化（spec §28）：把 font/STZHONGS.TTF（~12MB）按「摄影作品集
+// 华文中宋子集化（spec §28）：把 _font/STZHONGS.TTF（~12MB）按「摄影作品集
 // 首页及其分页实际用到的字形」子集 → public/fonts/stzhongsong.woff2。
 // 新增照片/卷文案后重新执行：npm run fonts:subset
 import { readFile, readdir, writeFile, stat } from 'node:fs/promises';
@@ -8,7 +8,7 @@ import subsetFont from 'subset-font';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url)).replace(/\\/g, '/');
 const SRC = join(ROOT, 'src');
-const FONT_IN = join(ROOT, 'font/STZHONGS.TTF');
+const FONT_IN = join(ROOT, '_font/STZHONGS.TTF');
 const FONT_OUT = join(ROOT, 'public/fonts/stzhongsong.woff2');
 
 // 摄影栏目页面上的固定 UI 文案（不在 md 里的字也纳入，避免缺形回退）

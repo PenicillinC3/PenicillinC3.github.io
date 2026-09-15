@@ -334,14 +334,14 @@ src/content/
 
 ## 28. 华文中宋子集嵌入（2026-09-07，用户放行字体文件并指定范围）
 
-1. **子集管线**：`font/STZHONGS.TTF`（12MB 原件）→ `scripts/subset-song.mjs`（subset-font，harfbuzz wasm）按「摄影首页及其分页实际用字」抽字形 → `public/fonts/stzhongsong.woff2`（当前 51KB，0.4%）。新增照片/卷文案后执行 `npm run fonts:subset` 重新生成并提交。devDependencies 增 `subset-font`（构建期工具，例外同 §26 ogl）。
+1. **子集管线**：`_font/STZHONGS.TTF`（12MB 原件）→ `scripts/subset-song.mjs`（subset-font，harfbuzz wasm）按「摄影首页及其分页实际用字」抽字形 → `public/fonts/stzhongsong.woff2`（当前 51KB，0.4%）。新增照片/卷文案后执行 `npm run fonts:subset` 重新生成并提交。devDependencies 增 `subset-font`（构建期工具，例外同 §26 ogl）。
 2. **@font-face「Song Web」**（base.css）：src 顺序 local 华文中宋 → local STZhongsong → woff2 —— 系统已装则零下载；未装则拉 51KB 子集；子集外字形沿 `--font-song` 栈逐字回退系统宋体。`font-display: swap`。
 3. **应用范围**：`--font-song` 首项改为 "Song Web"（欢迎页站名等既有宋体处自动受益）；`body.page-dark { font-family: var(--font-song) }` —— 摄影作品集首页（画廊）及其分页（卷备忘页）正文/时间戳/标题统一华文中宋书卷感。数字/域名等 mono 覆写不受影响。
 
 ## 29. 全站字体切换（2026-09-07，用户提供字体文件；冲突处以此节为准）
 
-1. **正文 = MapleMono（除摄影栏目）**：`font/MapleMono-NF-CN-Medium.ttf`（20.5MB）→ `scripts/subset-maple.mjs` 全站内容字形子集 → `public/fonts/maple-mono.woff2`（199KB）。`@font-face "MapleMono Web"`；`--font-sans` 首项 = "MapleMono Web"。摄影页及其子页除外（`body.page-dark` 已覆写为华文中宋 §28）。
-2. **代码 = JetBrains Mono**：用户已转 `JetBrainsMono-Medium.woff2` / `-MediumItalic.woff2`（font/ 原件入仓、public/fonts 直发），同一 family "JetBrains Mono Web" 两个 face（normal/italic）。
+1. **正文 = MapleMono（除摄影栏目）**：`_font/MapleMono-NF-CN-Medium.ttf`（20.5MB）→ `scripts/subset-maple.mjs` 全站内容字形子集 → `public/fonts/maple-mono.woff2`（199KB）。`@font-face "MapleMono Web"`；`--font-sans` 首项 = "MapleMono Web"。摄影页及其子页除外（`body.page-dark` 已覆写为华文中宋 §28）。
+2. **代码 = JetBrains Mono**：用户已转 `JetBrainsMono-Medium.woff2` / `-MediumItalic.woff2`（_font/ 原件入仓、public/fonts 直发），同一 family "JetBrains Mono Web" 两个 face（normal/italic）。
 3. **注释斜体**：astro.config 切 `markdown.syntaxHighlight: 'prism'`（token 类名稳定），`.token.comment/.prolog/.doctype/.cdata { font-style: italic }` 命中斜体面；`.prose pre code` 必须直击设置 family（UA 对 code 的默认 monospace 会压过继承值——实测注释曾落回 monospace）。附轻量 token 配色。
 4. 重新生成命令：`npm run fonts:subset`（song + maple 链式）。
 
@@ -362,7 +362,7 @@ src/content/
 ## 32. 射线新配方 + 中文注释斜体（2026-09-07，用户选定；冲突处以此节为准，§30.5 的 overlay 增强配方作废）
 
 1. **SideRays 全栏目统一配方**（Rays.astro DEFAULTS，overlay 与 backdrop 同用；首页不再单独增强）：speed 2.5 · `#ff0000` / `#ffffff` · intensity 1.7 · spread 2 · top-right · tilt 0 · saturation 1.5 · blend 0.75 · falloff 1.6 · opacity 1 —— 白+红双色，右上角实测呈粉白射线（R≈178），远场因 falloff 1.6 衰减较暗属预期。微调入口：`src/components/Rays.astro` DEFAULTS（或页面 `config` 覆盖）。
-2. **中文注释 = MapleMono 斜体**：`font/MapleMono-NF-CN-MediumItalic.ttf`（21MB）→ 与常规同字形集子集 → `public/fonts/maple-mono-italic.woff2`（217KB）。`@font-face "MapleMono Italic Web"`（font-style: italic）。新 `--font-comment: "JetBrains Mono Web", "MapleMono Italic Web", ...`；`.token.comment` 等用此栈 —— 按字形逐字回退：英文注释 = JetBrains Italic，**中文字符落到斜体 Maple**（JetBrains woff2 无 CJK）。`npm run fonts:subset` 现产出 song/maple/maple-italic 三件。
+2. **中文注释 = MapleMono 斜体**：`_font/MapleMono-NF-CN-MediumItalic.ttf`（21MB）→ 与常规同字形集子集 → `public/fonts/maple-mono-italic.woff2`（217KB）。`@font-face "MapleMono Italic Web"`（font-style: italic）。新 `--font-comment: "JetBrains Mono Web", "MapleMono Italic Web", ...`；`.token.comment` 等用此栈 —— 按字形逐字回退：英文注释 = JetBrains Italic，**中文字符落到斜体 Maple**（JetBrains woff2 无 CJK）。`npm run fonts:subset` 现产出 song/maple/maple-italic 三件。
 
 ## 33. 首页整理 + 液态玻璃圆（2026-09-07，用户逐点指定）
 
@@ -856,13 +856,13 @@ setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160）
 
 ## §97（2026-09-08）修复首访「字重跳变」（先粗后细）—— CSS 字重对齐字体实际档位
 
-用户：第一次进入时一些字体会加粗、不协调（怀疑与字体压缩有关）。排查：Maple/华文中宋子集**只有 Medium 一档**（font/ 亦无 Bold 原件），但 CSS 里 h1–h4=700、.page-title/.brand=800、.btn/.more=.yr=600、strong/th=700 —— 网页字体加载期间回退系统字（微软雅黑），这些元素渲染**真粗体**；字体就位后落回 Maple Medium 变细 → 首访约 1 秒的「先粗后细」跳变（§90 让 UI 子集秒载后对比更明显）。量化（标题区墨量）：Maple 稳定态 12.16% vs 雅黑 700 回退态 18.33%（+51%）vs 雅黑 500 回退态 11.29%（≈稳定态）。
+用户：第一次进入时一些字体会加粗、不协调（怀疑与字体压缩有关）。排查：Maple/华文中宋子集**只有 Medium 一档**（_font/ 亦无 Bold 原件），但 CSS 里 h1–h4=700、.page-title/.brand=800、.btn/.more=.yr=600、strong/th=700 —— 网页字体加载期间回退系统字（微软雅黑），这些元素渲染**真粗体**；字体就位后落回 Maple Medium 变细 → 首访约 1 秒的「先粗后细」跳变（§90 让 UI 子集秒载后对比更明显）。量化（标题区墨量）：Maple 稳定态 12.16% vs 雅黑 700 回退态 18.33%（+51%）vs 雅黑 500 回退态 11.29%（≈稳定态）。
 修复：全部 ≥600 字重归一为 **500**（11 处：base h1–h4/.btn/.page-title、LinkCard/Nav brand/PostList/ProjectCard/SectionHeader、404、首页 .name、画廊 .ts，另加全局 `strong, b, th { font-weight: 500 }`）—— Maple 单档下这些 700/800 本来就不产生任何视觉粗体，500 对**加载完成后的观感零影响**，只把回退期拉到与最终一致。保留 `font-display: swap`（曾试 optional：会让首访永远看不到 Maple，已回退）。附带发现：本机装有 Maple 系统字体，测试机回退态自动命中它——复现用户现象需强制指定雅黑（量化即如此测）。
-遗留说明：Maple 单 Medium 档，`**加粗**` 实际不显粗（现状如此）；若需真加粗，需往 font/ 放 Bold TTF 并扩展 subset 脚本。
+遗留说明：Maple 单 Medium 档，`**加粗**` 实际不显粗（现状如此）；若需真加粗，需往 _font/ 放 Bold TTF 并扩展 subset 脚本。
 
-## §98（2026-09-08）接入 Maple 真粗体（Bold 原件由用户放入 font/）
+## §98（2026-09-08）接入 Maple 真粗体（Bold 原件由用户放入 _font/）
 
-§97 遗留：字体仅 Medium 一档，`**加粗**`/表头实际不显粗。用户把 `font/MapleMono-NF-CN-Bold.ttf` 放好后接入：
+§97 遗留：字体仅 Medium 一档，`**加粗**`/表头实际不显粗。用户把 `_font/MapleMono-NF-CN-Bold.ttf` 放好后接入：
 1. `subset-maple.mjs` 增出 `maple-mono-bold.woff2`（251KB，同全站字符集）；
 2. **字重分段**：Medium 面声明改 `font-weight: 100 599`，新增 Bold 面 `600 900`（此前 Medium 面写死 100 900，会把 ≥600 请求也吃掉、粗体字形永远用不上——§97 现象的深层原因）；Bold 面 `swap`；
 3. 恢复 `strong, b, th { font-weight: 700 }`（含 markdown `**加粗**` 与表头）—— 回退期系统粗体 ≈ 最终真粗体，无字重跳变（与 §97 原则一致）；
