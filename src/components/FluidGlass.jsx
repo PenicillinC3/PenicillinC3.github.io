@@ -294,13 +294,19 @@ const Lens = memo(function Lens({ follow }) {
    平面放进场景、盖在首页场景前面（z=5，位于网格 z=0 与 3D 文字 z=3 之前）。
    过渡时按 window.__lensScene 0→1 淡出 → 球里的内容就由「加载页」变成「首页场景」。
    这张 canvas 只在过渡开始时画一次：那时进度恒为 100%，画面是静止的。 */
+const PLATE_Z = 5;   // 底板平面所在深度（网格 z0 与 3D 文字 z3 之前、球 z15 之后）
+
 function LoadingPlate() {
   const mesh = useRef();
   const mat = useRef();
   const texRef = useRef(null);
 
   useFrame((state) => {
-    const { viewport: vp } = state;
+    const { viewport, camera } = state;
+    // ⚠ 必须用**本平面所在深度**的视口，不能用 useThree 的 viewport（那是 z=0 处的）。
+    // 透视下越靠近相机可视世界范围越小：z=0 高 5.27，z=5 只有 3.95（0.75 倍）。
+    // 拿 z=0 的尺寸去铺 z=5 的平面 → 大 1.333 倍，交班瞬间整页「莫名放大」。
+    const vp = viewport.getCurrentViewport(camera, [0, 0, PLATE_Z]);
     const src = window.__plPlate;
     if (src && !texRef.current) {
       const t = new THREE.CanvasTexture(src);
@@ -319,7 +325,7 @@ function LoadingPlate() {
   });
 
   return (
-    <mesh ref={mesh} position={[0, 0, 5]} visible={false}>
+    <mesh ref={mesh} position={[0, 0, PLATE_Z]} visible={false}>
       <planeGeometry />
       <meshBasicMaterial ref={mat} transparent depthWrite={false} toneMapped={false} />
     </mesh>
