@@ -1,18 +1,169 @@
 ---
-// §101 进站加载页（CRT 灰屏 / 像素→清晰 / 真实预取）。
+// §102 进站加载页 —— 瑞士版（新瑞士 / 国际主义排版 + 酸性装饰），玻璃球过渡收尾。
 //
 // **整套 DOM 由内联脚本自己创建，组件不渲染任何可见标记** —— 这是 §101 修的关键：
 // 客户端路由（点站名回首页等）会把目标页 body 换进来，但换入的内联脚本**不执行**，
-// 于是被换进来的 `#pl` 标记会以「无动画的灰屏 + 兜底 LOADING 文字」形式卡在屏幕上
-// 等 CSS 兜底淡出（实测复现）。不渲染标记 = 换页时根本没有东西可显示。
+// 于是被换进来的 `#pl` 标记会以「无动画的灰屏」形式卡在屏幕上等 CSS 兜底淡出。
+// 不渲染标记 = 换页时根本没有东西可显示。
 //
 // 另外两道闸：① `document.readyState !== 'loading'` 直接返回（真·首次解析才会是
 // loading；换页塞进来的副本此时文档早已 complete）；② sessionStorage `plPlayed`
 // 保证一个标签页只播一次。样式仍是内联且**必须排在脚本之前**（脚本要量覆盖层尺寸）。
+//
+// 视觉层历史：§101 是 CRT 灰屏 + 像素阶梯 + 管面变形；§102 整体换成瑞士版，
+// 旧的 Canvas 渲染器（BLOCKS / blit / drawTerm / applyBloom / 枕形条带）已全部移除。
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { prefetchUrls } from '../lib/prefetch-manifest';
 
 // 清单在构建期算好注入脚本；`<` 转义防 `</script>` 逃逸（CLAUDE.md 坑 2）
 const urlsJson = JSON.stringify(await prefetchUrls()).replace(/</g, '\\u003c');
+
+// 构建期内联 Helvetica 子集（7020 B → base64 9360 B）。
+// **加载页首帧就要有字**，不能等一次网络往返 —— 否则数字和 LOADING 会先以回退字体
+// 闪一下（回退到 Arial，字形骨架都不同）。9.4KB 换掉一次 FOUT，很划算。
+const fontB64 =
+  'data:font/woff2;base64,' +
+  readFileSync(resolve(process.cwd(), 'public/fonts/helv-swiss.woff2')).toString('base64');
+
+// 噪点：阈值化 alpha 的黑斑点（feColorMatrix 把噪声红通道映射成 alpha，A' = 3R − 2.1）。
+// RGB 全置 0 = 纯黑点 —— 是「撒颗粒」而不是「整体压灰」。color-interpolation-filters
+// 必须显式写 sRGB：SVG 滤镜默认走 linearRGB，会把阈值算歪。
+const GRAIN_URI =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E" +
+  "%3Cfilter id='n' color-interpolation-filters='sRGB'%3E" +
+  "%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E" +
+  "%3CfeColorMatrix type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 -2.1'/%3E" +
+  "%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E";
+
+const bootCss = `
+  @font-face{
+    font-family:'HelvSwiss';
+    src:url("${fontB64}") format('woff2');
+    font-weight:100 900;
+    font-display:block;
+  }
+
+  /* 兜底：脚本任何异常都不能留下白屏 —— 无条件淡出。
+     最坏路径 = MIN_MS 5s + BALL_WAIT_MS 6s + GROW 1.4s + SETTLE 1s ≈ 13.4s，取 18s。 */
+  #pl{
+    position:fixed; inset:0; z-index:9999; overflow:hidden;
+    background:#f7f7f6; color:#1a1a1a;
+    font-family:'HelvSwiss','Helvetica Neue',Helvetica,Arial,sans-serif;
+    animation:pl-failsafe-out .5s ease 18s forwards;
+  }
+  @keyframes pl-failsafe-out{ to{ opacity:0; visibility:hidden; } }
+
+  /* 收尾淡出。**这条不能省**：done() 会加 .pl-out，没有对应规则就是硬切。
+     （这里用 animation 简写会覆盖上面的兜底动画 —— 正是想要的，兜底到此已无意义）*/
+  #pl.pl-out{ animation:pl-out .34s ease-out forwards; }
+  @keyframes pl-out{ to{ opacity:0; visibility:hidden; } }
+
+  .pl-scene{ position:absolute; inset:0; z-index:1; }
+
+  /* 12 栏网格（版心内）。竖线高度由「构建」动效驱动：自上而下逐一落下。 */
+  .pl-grid{ position:absolute; left:4.5%; right:4.5%; top:10%; bottom:16%;
+    z-index:1; display:flex; pointer-events:none; }
+  .pl-grid i{ flex:1; position:relative; }
+  .pl-grid i::before{ content:''; position:absolute; left:0; top:0; width:1px;
+    background:rgba(26,26,26,.09); height:calc(var(--gh,0) * 100%); }
+  .pl-grid i:last-child{ flex:0; }
+
+  /* 上横线只跨 6 栏（瑞士的非对称手法），下横线通栏；都自左向右拉开 */
+  .pl-rule{ position:absolute; height:1px; background:rgba(26,26,26,.3); z-index:2;
+    transform-origin:left center; transform:scaleX(var(--rw,0)); }
+  .pl-rule-t{ left:4.5%; width:calc(91% / 12 * 6); top:10%; }
+  .pl-rule-b{ left:4.5%; right:4.5%; bottom:16%; }
+
+  .pl-res{ position:absolute; inset:0; z-index:4; }
+
+  .pl-lbl{ position:absolute; font-weight:700; font-size:clamp(10px,1.55vw,20px);
+    letter-spacing:.13em; text-transform:uppercase; font-variant-numeric:tabular-nums; }
+  .pl-tl{ top:5%; left:4.5%; }
+  .pl-tr{ top:5%; right:4.5%; display:flex; align-items:center; gap:.62em; }
+  .pl-bl{ bottom:5.6%; left:4.5%; color:#8a8a88; }
+  .pl-br{ bottom:5.6%; right:4.5%; color:#8a8a88; }
+  .pl-dot{ width:.56em; height:.56em; border-radius:50%; background:#1a1a1a;
+    display:inline-block; animation:pl-blip 1.1s ease-in-out infinite; }
+  @keyframes pl-blip{ 0%,100%{opacity:1} 50%{opacity:.15} }
+
+  .pl-stage{ position:absolute; left:4.5%; right:4.5%; top:10%; bottom:16%;
+    display:flex; align-items:flex-end; justify-content:space-between; }
+  /* +14px 不是随手写的：巨数的 line-height:.71 < 1，按 hhea 度量字形墨迹会溢出到
+     行框上方 0.092em（22vh 字号下 ≈10.7px）。只给 5px 的话可见空隙只剩 0.4px，等于贴上。 */
+  .pl-left{ display:flex; flex-direction:column; gap:calc(.55vh + 14px); align-items:flex-start; }
+  .pl-eyebrow{ font-weight:700; font-size:clamp(13px,2.6vh,26px); letter-spacing:.3em;
+    text-transform:uppercase; }
+  /* 悬挂左对齐：大字号自带左侧边距，不悬挂会看着内缩、与上方小字对不齐 */
+  .pl-hero{ display:flex; align-items:baseline; line-height:.71; margin-left:-.035em; }
+  .pl-num{ font-weight:700; letter-spacing:-.042em; font-size:22vh; color:#1a1a1a;
+    font-variant-numeric:tabular-nums; }
+  .pl-pct{ font-weight:700; font-size:6.6vh; color:#8a8a88; letter-spacing:0; }
+
+  /* 数据表：两列贴拢，标签右对齐紧贴数值；整块靠右 */
+  .pl-data{ display:grid; grid-template-columns:auto auto; gap:.42em .7em; width:auto;
+    font-weight:700; font-size:clamp(11px,1.62vw,21px); letter-spacing:.15em;
+    text-transform:uppercase; }
+  .pl-data span{ grid-column:1; color:#8a8a88; text-align:right; }
+  .pl-data s{ grid-column:2; text-decoration:none; color:#1a1a1a;
+    font-variant-numeric:tabular-nums; text-align:right; }
+
+  /* 加载条：全画面唯一的彩色。渐变铺满整条轨道，由进度用 clip-path 揭开 ——
+     渐变若长在填充元素上，渐变宽度会等于填充宽度，进度 10% 时一小截里塞着整条彩虹。 */
+  .pl-prog{ position:absolute; left:4.5%; right:4.5%; bottom:calc(16% - 1px);
+    height:2px; background:rgba(26,26,26,.12); z-index:5; }
+  .pl-prog b{ display:block; height:2px; width:100%;
+    background:linear-gradient(90deg,#ff2d9b,#a24bff 22%,#00d4ff 44%,#7dff3d 64%,#ffe600 82%,#ff6b1a);
+    clip-path:inset(0 calc((1 - var(--p,0)) * 100%) 0 0); }
+
+  .pl-grain{ position:absolute; inset:-60%; pointer-events:none; z-index:8;
+    background-image:url("${GRAIN_URI}"); background-size:140px;
+    opacity:.32; animation:pl-grain .55s steps(1) infinite; }
+  @keyframes pl-grain{
+    0%{transform:translate(0,0)}      20%{transform:translate(-7%,3%)}
+    40%{transform:translate(4%,-6%)}  60%{transform:translate(-3%,-5%)}
+    80%{transform:translate(6%,2%)}   100%{transform:translate(0,0)} }
+
+  /* 脚本半死时的兜底文字（画布/场景出第一帧后撤掉） */
+  .pl-fallback{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    margin:0; font-size:clamp(1.6rem,7vw,3.4rem); font-weight:700; letter-spacing:.22em; }
+  #pl.pl-drawn .pl-fallback{ display:none; }
+
+  @media (prefers-reduced-motion: reduce){
+    .pl-grain,.pl-dot{ animation:none; }
+  }
+
+  /* §102 过渡：在加载层上开一个圆洞，露出下面**已经渲染好的真首页**。
+     --pl-r 由脚本按 smoothstep 推大，洞沿与玻璃球轮廓同步长大（同一个量的两个面）。
+     max(0px, …) 是必需的：--pl-r 为 0 时 calc 会算出负值，负的色标位置会让整条渐变
+     失效 → mask 直接不渲染。留 1.5px 羽化，避免硬边锯齿。 */
+  #pl.pl-open{
+    -webkit-mask-image:radial-gradient(circle at 50% 50%,
+      transparent 0 calc(var(--pl-r,0px) * .72), #000 var(--pl-r,0px));
+    mask-image:radial-gradient(circle at 50% 50%,
+      transparent 0 calc(var(--pl-r,0px) * .72), #000 var(--pl-r,0px));
+  }
+
+  /* 玻璃边缘环：贴着洞口外侧，给一圈「光线被玻璃弯折」的痕迹。
+     ⚠ **这是近似，不是真折射**。加载页是 DOM 层、在 WebGL 之上，而球的 shader 只采样
+     它自己那张离屏 buffer（§69「折射场景副本、不折射 DOM」）—— 球的折射根本碰不到 DOM。
+     这里用 backdrop-filter 糊 + 一圈红/青染色来给「边缘在折光」的读感。
+     要真折射，得把加载页内容也放进那个 3D 场景（另一件事，见提交说明）。 */
+  .pl-rim{
+    position:absolute; left:50%; top:50%; z-index:9; pointer-events:none; display:none;
+    width:calc(var(--pl-r,0px) * 2.5); height:calc(var(--pl-r,0px) * 2.5);
+    transform:translate(-50%,-50%); border-radius:50%;
+    backdrop-filter:blur(3px) saturate(1.4);
+    -webkit-backdrop-filter:blur(3px) saturate(1.4);
+    background:radial-gradient(circle at 50% 50%, transparent 0 80%,
+      rgba(255,45,155,.10) 88%, rgba(0,212,255,.10) 96%, transparent 100%);
+    -webkit-mask-image:radial-gradient(circle at 50% 50%,
+      transparent 0 80%, #000 87%, #000 100%, transparent 100%);
+    mask-image:radial-gradient(circle at 50% 50%,
+      transparent 0 80%, #000 87%, #000 100%, transparent 100%);
+  }
+  #pl.pl-open .pl-rim{ display:block; }
+`;
 
 // 注意：下面这段是**拼进 HTML 的 JS 字符串**，内部一律用字符串拼接，
 // 不得出现模板字面量或 `${`（会被这里提前求值）。
@@ -27,30 +178,80 @@ const bootJs = `
     sessionStorage.setItem(KEY, '1');
   } catch (e) { /* 隐私模式：照样播 */ }
 
+  // §102：告诉 FluidGlass island「加载页在场」—— 它据此把球先藏起来（scale 0）。
+  // 本脚本在 body 最前同步执行，一定早于 island 水合。
+  window.__plPending = true;
+
   var URLS = ${urlsJson};      // 预取清单（构建期注入）
-  var MIN_MS = 5000;           // 要让观众看满的时长（像素→清晰整段铺开）
+  var MIN_MS = 5000;           // 要让观众看满的时长（构建动效 + 解析整段铺开）
   var HARD_BAIL_MS = 60000;    // 网络僵死时的唯一逃生口（不想要就设成 Infinity）
   var IDLE_MS = 10000;         // 单个请求「多久没收到字节」算卡死（慢但在动的不会中招）
   var CONC = 5;                // 并发数
+  var BALL_WAIT_MS = 6000;     // 资源到手后最多再等玻璃球就绪这么久（§102）
+  var GROW_MS = 1400;          // 开洞 + 球长大 的时长
+  var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // 玻璃球能否参与过渡。island 会明确表态，避免我们傻等：
+  //   __ballReady = 折射管线已出帧（可用）    __ballNA = 根本没挂载（窄屏/减动效）
+  function ballState() {
+    if (window.__ballReady) return 'ready';
+    if (window.__ballNA) return 'na';
+    return 'wait';
+  }
 
   // —— 建 DOM（首帧即它：脚本在 body 最前面同步执行，解析尚未走到可视内容）——
+  var grid = '';
+  for (var gi = 0; gi < 12; gi++) grid += '<i></i>';
   var el = document.createElement('div');
   el.id = 'pl';
   el.innerHTML =
-    '<canvas id="pl-canvas" aria-hidden="true"></canvas>' +
-    '<i class="pl-scan" aria-hidden="true"></i>' +      // 扫描线（漂移）
-    '<i class="pl-roll" aria-hidden="true"></i>' +      // 回扫亮带
-    '<i class="pl-vig" aria-hidden="true"></i>' +       // 多段渐变暗角 + 玻璃高光
+    '<div class="pl-scene">' +
+      '<div class="pl-grid">' + grid + '</div>' +
+      '<div class="pl-rule pl-rule-t"></div>' +
+      '<div class="pl-rule pl-rule-b"></div>' +
+      '<div class="pl-res">' +
+        '<span class="pl-lbl pl-tl">Penicillinc3</span>' +
+        '<span class="pl-lbl pl-tr"><i class="pl-dot"></i>Syncing</span>' +
+        '<div class="pl-stage">' +
+          '<div class="pl-left">' +
+            '<span class="pl-eyebrow">///Loading</span>' +
+            '<div class="pl-hero"><span class="pl-num">000</span><span class="pl-pct">%</span></div>' +
+          '</div>' +
+          '<div class="pl-data">' +
+            '<span>Routes</span><s data-c="route">00 / 00</s>' +
+            '<span>Assets</span><s data-c="all">00 / 00</s>' +
+            '<span>Bytes</span><s data-c="bytes">0.0 MB</s>' +
+            '<span>Fonts</span><s data-c="font">0 / 0</s>' +
+          '</div>' +
+        '</div>' +
+        '<span class="pl-lbl pl-bl">Site Index</span>' +
+        '<span class="pl-lbl pl-br">Ingest 01</span>' +
+      '</div>' +
+      '<div class="pl-prog"><b></b></div>' +
+    '</div>' +
+    '<i class="pl-rim" aria-hidden="true"></i>' +
+    '<div class="pl-grain" aria-hidden="true"></div>' +
     '<p class="pl-fallback" aria-hidden="true">LOADING</p>';
   document.body.appendChild(el);
   document.body.style.overflow = 'hidden';
   window.__pl = { el: el, urls: URLS }; // 验收探针/调试用（无副作用）
 
-  var canvas = el.querySelector('#pl-canvas');
-  var ctx = canvas.getContext('2d');
-  var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var scene  = el.querySelector('.pl-scene');
+  var grain  = el.querySelector('.pl-grain');
+  var numEl  = el.querySelector('.pl-num');
+  var gcols  = el.querySelectorAll('.pl-grid i');
+  var cells  = {
+    route: el.querySelector('[data-c="route"]'),
+    all:   el.querySelector('[data-c="all"]'),
+    bytes: el.querySelector('[data-c="bytes"]'),
+    font:  el.querySelector('[data-c="font"]')
+  };
+  var lastTxt = {};
   var t0 = Date.now();
   var ended = false;
+
+  // 预加载内联字体（没就绪时前几帧走字链兜底，看不出来）
+  try { document.fonts.load('700 40px HelvSwiss'); } catch (e) { /* 忽略 */ }
 
   function done() {
     if (ended) return;
@@ -59,198 +260,169 @@ const bootJs = `
     setTimeout(function () {
       if (el.isConnected) el.remove();
       document.body.style.overflow = '';
-    }, 360); // 等收尾动画（白闪 + 灰幕内收）播完再摘
+    }, 360);
   }
 
-  // ================= 渲染器：像素阶梯 + CRT 管面 =================
-  var DPR = Math.min(window.devicePixelRatio || 1, 1.5); // §69：DPR 上限 1.5
-  var W = 0, H = 0;
-  function resize() {
-    // 以覆盖层自身为准（其次文档视口），不是画布 —— 画布 display:none 时
-    // clientWidth 会返回 canvas 默认内在宽度 300（§101 实测踩过的坑）
-    var cw = el.clientWidth || document.documentElement.clientWidth || innerWidth;
-    var ch = el.clientHeight || document.documentElement.clientHeight || innerHeight;
-    W = Math.round(cw * DPR);
-    H = Math.round(ch * DPR);
-    canvas.width = W;
-    canvas.height = H;
-  }
-  resize();
-  addEventListener('resize', resize);
+  // ================= §102 玻璃球过渡 =================
+  // 加载页冻结成快照（DOM 停更即冻结；grain/小圆点是 CSS 动画，一并停掉）→ 在其上
+  // 开一个圆洞、洞沿与玻璃球轮廓同步长大 → 洞铺满视口后整层移除（此刻它完全看不见，
+  // 移除无感）→ 球回落成首页平常那颗。
+  //
+  // ★ 洞与球是同一个东西的两个面：洞口半径按「球铺满视口所需的 scale」换算而来，
+  //   所以「球长大」与「洞张开」是同一件事，永远不可能错位。
+  // §102：把加载页版面烘成一张 canvas 交给球 —— 过渡期球折的就是它。
+  // **只在过渡开始时画一次**：那时进度恒为 100%、画面静止，成本可忽略。
+  // ⚠ 下面每一处的百分比都必须与上面的 CSS 对齐，否则过渡期会看到「两份错位的加载页」。
+  function makePlate() {
+    var dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    var CW = innerWidth, CH = innerHeight;
+    var c = document.createElement('canvas');
+    c.width = Math.round(CW * dpr); c.height = Math.round(CH * dpr);
+    var o = c.getContext('2d');
+    o.scale(dpr, dpr);
+    var L = CW * 0.045, R = CW * 0.955, T = CH * 0.10, B = CH * 0.84;
+    var FONT = 'HelvSwiss, "Helvetica Neue", Helvetica, Arial, sans-serif';
+    var vw = function (n) { return CW * n / 100; };
+    var vh = function (n) { return CH * n / 100; };
 
-  var off = document.createElement('canvas');
-  var octx = off.getContext('2d');
-  var K = 0.18;      // 曲率：正 = 枕形（四角内收）/ 负 = 桶形（边缘外凸顶到边框）
-  var INSET = 0.94;  // 画面整体内缩，露出周围机壳（管面嵌在壳里的立体感）
-  var FONT = '"MapleUI Web", "MapleMono Web", ui-monospace, monospace';
-  var BLOCK_BIG = 26; // 起步像素块尺寸（设备像素）：越大越糊
+    o.fillStyle = '#f7f7f6'; o.fillRect(0, 0, CW, CH);
+    o.fillStyle = 'rgba(26,26,26,.09)';
+    for (var i = 0; i < 12; i++) o.fillRect(L + (R - L) * i / 12, T, 1, B - T);
+    o.fillStyle = 'rgba(26,26,26,.3)';
+    o.fillRect(L, T, (R - L) / 2, 1);        // 上横线只跨 6 栏
+    o.fillRect(L, B, R - L, 1);
 
-  // 块尺寸**阶梯**：内部分辨率只在档位之间跳，不在帧间连续变 —— 连续变会让
-  // 字号/字距每帧被 Math.round 重新量化，画面就「抽搐」（§101 用户反馈）。
-  // 吸附到档位后：同一档内完全静止，跳档 = 一次干净的分辨率提升。
-  var BLOCKS = [26, 21, 17, 13.5, 11, 8.5, 6.5, 5, 3.8, 2.9, 2.2, 1.6, 1];
-
-  function resFor(p) {
-    if (reduce) return H;                      // 减动效：直接锐利版
-    var t = Math.min(1, Math.max(0, (p - 0.08) / 0.82));
-    var want = BLOCK_BIG + (1 - BLOCK_BIG) * Math.pow(t, 0.85);   // 连续目标块尺寸
-    var b = 1;
-    for (var i = 0; i < BLOCKS.length; i++) { if (want >= BLOCKS[i]) { b = BLOCKS[i]; break; } }
-    return H / b;
-  }
-
-  // —— 左下角终端文字：先在固定小画布上画，再做 1-bit 阈值化（真像素字），
-  //    最后以最近邻贴到**屏幕空间**（不随主分辨率抽搐），位置对齐管面左下角 ——
-  var termC = document.createElement('canvas');
-  var tctx = termC.getContext('2d');
-  var TERM_W = 158, TERM_H = 38;
-  var termKey = '';
-  function drawTerm() {
-    var key = doneCount + '/' + urls.length + '/' + Math.round(received / 262144) + '/' + ended;
-    if (key === termKey) return;
-    termKey = key;
-    termC.width = TERM_W; termC.height = TERM_H;
-    tctx.clearRect(0, 0, TERM_W, TERM_H);
-    tctx.font = '600 7px ' + FONT;
-    tctx.textBaseline = 'top';
-    var mb = (received / 1048576).toFixed(1);
-    var lines = [
-      'PENICILLINC3 // CRT-9000',
-      'CACHE ' + doneCount + '/' + urls.length + '   ' + mb + 'MB',
-      'SIGNAL ' + (doneCount >= urls.length ? 'READY' : 'SYNCING'),
-      'PHOSPHOR P4 MONOCHROME',
-    ];
-    for (var i = 0; i < lines.length; i++) {
-      tctx.fillStyle = i === 0 ? '#ffffff' : '#d8d8d8';
-      tctx.fillText(lines[i], 1, 1 + i * 9);
+    function txt(s, x, y, size, ls, color, align, baseline) {
+      o.font = '700 ' + size.toFixed(1) + 'px ' + FONT;
+      o.letterSpacing = ls.toFixed(2) + 'px';
+      o.fillStyle = color;
+      o.textAlign = align || 'left';
+      o.textBaseline = baseline || 'top';
+      o.fillText(s, x, y);
     }
-    // 阈值化：抗锯齿的灰边一律削掉 -> 硬边像素字
-    try {
-      var im = tctx.getImageData(0, 0, TERM_W, TERM_H);
-      var d = im.data;
-      for (var k = 0; k < d.length; k += 4) {
-        if (d[k + 3] > 70) { d[k] = 236; d[k + 1] = 236; d[k + 2] = 236; d[k + 3] = 255; }
-        else { d[k + 3] = 0; }
+    var ls1 = vw(1.55) * 0.13;
+    txt('PENICILLINC3', L, vh(5), vw(1.55), ls1, '#1a1a1a');
+    txt('SYNCING', R, vh(5), vw(1.55), ls1, '#1a1a1a', 'right');
+    txt('SITE INDEX', L, CH - vh(5.6), vw(1.55), ls1, '#8a8a88', 'left', 'bottom');
+    txt('INGEST 01', R, CH - vh(5.6), vw(1.55), ls1, '#8a8a88', 'right', 'bottom');
+
+    // 巨数 + %（过渡时进度恒为 100）。基线位置与 DOM 同源推算：
+    // 行框底 = B；内容框顶 = 行框顶 − 0.145em；基线 = 行框顶 + 0.625em。
+    var numSize = vh(22);
+    o.textAlign = 'left';   // ⚠ 必须复位：上面 txt() 最后一次调用把 textAlign 留成了 right，
+                                  //   不复位的话巨数会以 numX 为右边界右对齐 → 整个跑到画布外
+    var boxTop = B - 0.71 * numSize;
+    var baseY = boxTop + 0.625 * numSize;
+    o.textBaseline = 'alphabetic';
+    o.font = '700 ' + numSize.toFixed(1) + 'px ' + FONT;
+    o.letterSpacing = (numSize * -0.042).toFixed(2) + 'px';
+    var numX = L - numSize * 0.035;          // 悬挂左对齐
+    var numW = o.measureText('100').width;
+    o.fillStyle = '#1a1a1a';
+    o.fillText('100', numX, baseY);
+    o.letterSpacing = '0px';
+    o.font = '700 ' + (numSize * 0.3).toFixed(1) + 'px ' + FONT;
+    o.fillStyle = '#8a8a88';
+    o.fillText('%', numX + numW + numSize * 0.07, baseY);
+
+    // 眉标：基线 = 巨数行框顶 − gap − 0.23em
+    var eyeSize = vh(2.6);
+    txt('///LOADING', L, boxTop - (vh(0.55) + 14) - 0.23 * eyeSize,
+        eyeSize, eyeSize * 0.3, '#1a1a1a', 'left', 'alphabetic');
+
+    // 数据表：标签与数值都右对齐、两列贴拢
+    var dSize = vw(1.62), rowH = dSize * 1.42;
+    var rows = [['ROUTES', '13 / 13'], ['ASSETS', '34 / 34'], ['BYTES', '1.9 MB'], ['FONTS', '8 / 8']];
+    for (var r2 = 0; r2 < rows.length; r2++) {
+      var y2 = baseY - (rows.length - 1 - r2) * rowH;
+      o.font = '700 ' + dSize.toFixed(1) + 'px ' + FONT;
+      o.letterSpacing = (dSize * 0.15).toFixed(2) + 'px';
+      o.textBaseline = 'alphabetic';
+      o.fillStyle = '#8a8a88'; o.textAlign = 'right';
+      o.fillText(rows[r2][0], R - o.measureText(rows[r2][1]).width - dSize * 0.7, y2);
+      o.fillStyle = '#1a1a1a';
+      o.fillText(rows[r2][1], R, y2);
+    }
+    o.letterSpacing = '0px';
+
+    // 加载条：满格（过渡时 p=1），渐变铺满整条轨道
+    var g = o.createLinearGradient(L, 0, R, 0);
+    g.addColorStop(0, '#ff2d9b'); g.addColorStop(.22, '#a24bff'); g.addColorStop(.44, '#00d4ff');
+    g.addColorStop(.64, '#7dff3d'); g.addColorStop(.82, '#ffe600'); g.addColorStop(1, '#ff6b1a');
+    o.fillStyle = g; o.fillRect(L, B - 1, R - L, 2);
+    return c;
+  }
+
+  function transition() {
+    ended = true;
+    window.__plPlate = makePlate();         // 烘版面：过渡期球折的就是加载页
+    window.__lensScene = 0;                 // 0 = 球里是加载页，1 = 首页场景
+    el.classList.add('pl-open');            // 施加开洞用的 mask（宽羽化：球心=首页，球外=加载页）
+    el.style.setProperty('--p', '1');
+    window.__lensTransition = true;         // 球锁视口中心、不跟手
+    // 快照：停掉还在跑的 CSS 动画，画面彻底静止
+    scene.style.filter = 'none';
+    grain.style.animation = 'none';
+    // 末态要让**四角也完全透出**：羽化核心 = 0.62r，四角半径 = hypot/2，
+    // 故需 0.62r ≥ hypot/2 → r ≥ hypot/2 / 0.62 ≈ hypot/2 × 1.61，取 1.75 留余量。
+    // （1.15 时四角只透到 66%，屏幕上仍看得见加载页 —— 洞等于白开。）
+    var maxR = Math.hypot(innerWidth, innerHeight) / 2 * 2.2;
+    var cover = window.__lensCoverScale || 2.6;
+
+    // ① 长大 —— 球**不回来**：一路长到罩住整个视口对角线。
+    //    洞口用宽羽化渐变，所以「球心是首页、球外是加载页」，中间平滑过渡；
+    //    球推进 = 这条渐变带推进。此刻球折的是**加载页底板**，所以加载页会被真的折到。
+    var tA = performance.now();
+    function grow(now) {
+      var t = Math.min(1, (now - tA) / GROW_MS);
+      var e = t * t * (3 - 2 * t);          // smoothstep
+      el.style.setProperty('--pl-r', (maxR * e).toFixed(1) + 'px');
+      window.__lensScale = cover * e;
+      if (t < 1) { requestAnimationFrame(grow); return; }
+      resolve(performance.now());
+    }
+    requestAnimationFrame(grow);
+
+    // ② 解析 —— 两件事同时做：
+    //    · 光学衰减到中性（ior→1、thickness→0、色差→0），球越来越不折；
+    //    · 球里内容由「加载页底板」渐变成「首页 3D 场景」（__lensScene 0→1）。
+    //    到终点时球已经是「首页的 3D 场景 + 中性玻璃」，即与首页那颗看到的一致。
+    function resolve(now0) {
+      var DUR = 900;
+      function step(now) {
+        var u = Math.min(1, (now - now0) / DUR);
+        var eu = u * u * (3 - 2 * u);
+        window.__lensOptics = 1 - eu;
+        window.__lensScene = eu;
+        // 中心镂空同步打开：球变大 + 掏空 → 中间的首页完整显出来
+        window.__lensHole = eu * 0.82;
+        if (u < 1) { requestAnimationFrame(step); return; }
+        handoff();
       }
-      tctx.putImageData(im, 0, 0);
-    } catch (e) { /* 取不到像素就算了，字还是有 */ }
-  }
+      requestAnimationFrame(step);
+    }
 
-  function drawTermOnScreen() {
-    drawTerm();
-    var s = Math.max(2, Math.round(H / 300));      // 每个「像素字像素」占几个设备像素
-    var dw = TERM_W * s, dh = TERM_H * s;
-    var ny = ((H - dh * 0.86) / H) * 2 - 1;
-    var sx = reduce ? INSET : (1 - K * ny * ny) * INSET;
-    var tubeLeft = (W - W * sx) / 2;               // 贴合变形后的管面左缘
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(termC, tubeLeft + W * 0.03, H - dh - H * 0.055, dw, dh);
-  }
-
-  // —— 荧光柔光：缩到 1/4 模糊后以 lighter 叠回（显像管的光晕）——
-  var bloom = document.createElement('canvas');
-  var bctx = bloom.getContext('2d');
-  function applyBloom() {
-    var bw = Math.max(8, Math.round(W / 4)), bh = Math.max(8, Math.round(H / 4));
-    if (bloom.width !== bw || bloom.height !== bh) { bloom.width = bw; bloom.height = bh; }
-    bctx.setTransform(1, 0, 0, 1, 0, 0);
-    bctx.clearRect(0, 0, bw, bh);
-    bctx.drawImage(canvas, 0, 0, bw, bh);
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = 0.26;
-    ctx.imageSmoothingEnabled = true;
-    try { ctx.filter = 'blur(4px)'; } catch (e) { /* 不支持就少一点柔光 */ }
-    ctx.drawImage(bloom, 0, 0, W, H);
-    ctx.restore();
-  }
-
-  function drawOff(p) {
-    var h = Math.max(8, Math.round(resFor(p)));
-    var w = Math.max(8, Math.round(h * (W / H)));
-    if (off.width !== w || off.height !== h) { off.width = w; off.height = h; }
-    var o = octx;
-    o.setTransform(1, 0, 0, 1, 0, 0);
-    o.fillStyle = '#8c8c8c';   // 荧光屏底色（比外壳亮，衬出管面）
-    o.fillRect(0, 0, w, h);
-
-    // —— LOADING（逐字手排字距；字号按画幅宽度收敛，让整词占 62%）——
-    var word = 'LOADING';
-    var SP_RATIO = 0.24;
-    o.textAlign = 'center';
-    o.textBaseline = 'middle';
-    o.font = '600 100px ' + FONT;
-    var at100 = 0, i, cw;
-    for (i = 0; i < word.length; i++) at100 += o.measureText(word[i]).width;
-    at100 += SP_RATIO * 100 * (word.length - 1);
-    var fs = Math.max(3, Math.round((w * 0.62) / at100 * 100));
-    o.font = '600 ' + fs + 'px ' + FONT;
-    var sp = fs * SP_RATIO, full = 0;
-    for (i = 0; i < word.length; i++) full += o.measureText(word[i]).width + sp;
-    full -= sp;
-    var y = h * 0.44, x0 = w / 2 - full / 2;
-
-    // 红/青微色差：偏移按内部像素折算 ≈2 设备像素，且随清晰度淡入 ——
-    // 大色块阶段偏移会跨块变成彩色噪点，故按锐度门控（呼应 §31 的边沿色差）
-    var sharp = h / H;
-    var fringeA = Math.max(0, (sharp - 0.15) / 0.85) * 0.55;
-    if (fringeA > 0.03) {
-      var dx = 2 * (h / H) * DPR;
-      var cols = ['rgba(255,70,70,' + fringeA.toFixed(2) + ')', 'rgba(70,150,255,' + fringeA.toFixed(2) + ')'];
-      for (var c = 0; c < 2; c++) {
-        var xc = x0 + (c ? dx : -dx);
-        o.fillStyle = cols[c];
-        for (i = 0; i < word.length; i++) {
-          cw = o.measureText(word[i]).width;
-          o.fillText(word[i], xc + cw / 2, y);
-          xc += cw + sp;
-        }
+    // ③ 呼出首页那颗球 —— 移走加载层（此刻球已中性、洞已罩满，屏幕上本来就是首页），
+    //    然后让它**从零尺寸长到首页平常那颗**：scale 与光学同步从 0 长上去。
+    //    （上一版是在满尺寸上把光学恢复 —— 那才是你看到的「闪现」。）
+    function handoff() {
+      if (el.isConnected) el.remove();
+      document.body.style.overflow = '';
+      window.__lensTransition = false;
+      var HOME = 0.10, DUR = 900, tB = performance.now(); // HOME = LENS_PROPS.scale
+      window.__lensScale = 0;
+      window.__lensOptics = 0;
+      window.__lensHole = 0;              // 首页那颗是实心的
+      function step(now) {
+        var u = Math.min(1, (now - tB) / DUR);
+        var eu = u * u * (3 - 2 * u);
+        window.__lensScale = HOME * eu;     // 中央由零长起
+        window.__lensOptics = eu;
+        if (u < 1) { requestAnimationFrame(step); return; }
+        delete window.__lensOptics;         // 交还给 island 自己管
+        delete window.__lensScale;
       }
-    }
-    o.fillStyle = '#ededed';
-    var xw = x0;
-    for (i = 0; i < word.length; i++) {
-      cw = o.measureText(word[i]).width;
-      o.fillText(word[i], xw + cw / 2, y);
-      xw += cw + sp;
-    }
-
-    // —— 分段格子进度条 ——
-    var bars = 20;
-    var bw = w * 0.62, bx = (w - bw) / 2;
-    var bh = Math.max(2, h * 0.035), by = h * 0.62;
-    var gap = (bw / bars) * 0.22;
-    var cell = (bw - gap * (bars - 1)) / bars;
-    o.fillStyle = 'rgba(255,255,255,0.20)';
-    o.fillRect(bx, by, bw, bh);
-    o.fillStyle = '#f4f4f4';
-    var pc = Math.min(1, Math.max(0, p));
-    var lit = Math.round(pc * bars);
-    for (i = 0; i < lit; i++) o.fillRect(bx + i * (cell + gap), by, cell, bh);
-
-    // —— 百分比读数（内部字号下限 6px：再小就糊成一块看不出数字）——
-    o.font = '600 ' + Math.max(6, Math.round(h * 0.055)) + 'px ' + FONT;
-    o.fillStyle = '#e2e2e2';
-    o.fillText(Math.round(pc * 100) + '%', w / 2, h * 0.73);
-    return h;
-  }
-
-  // 上屏：最近邻放大 + 逐行条带变形（水平收缩 ∝ 距中心距离² → 四角内收）
-  function blit() {
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.imageSmoothingEnabled = false;
-    ctx.fillStyle = '#242424';   // 外壳/边框（深色，管面外圈）
-    ctx.fillRect(0, 0, W, H);
-    var strip = Math.max(1, Math.round(2 * DPR));
-    for (var y = 0; y < H; y += strip) {
-      var ny = ((y + strip / 2) / H) * 2 - 1;
-      var sx = reduce ? INSET : (1 - K * ny * ny) * INSET;
-      var sy0 = (y / H) * off.height;
-      ctx.drawImage(
-        off,
-        0, sy0, off.width, (strip / H) * off.height,
-        (W - W * sx) / 2, y, W * sx, strip
-      );
+      requestAnimationFrame(step);
     }
   }
 
@@ -261,8 +433,18 @@ const bootJs = `
     return !frugal || u.charAt(u.length - 1) === '/';   // 省流量/2G 只取 HTML
   });
 
+  // 分类：路由 / 字体 / 其余算资源。计数与清单同源 —— 显示出来的永远是**真数**，不是演的。
+  function kindOf(u) {
+    if (u.charAt(u.length - 1) === '/') return 'route';
+    return /\\.woff2$/.test(u) ? 'font' : 'img';
+  }
+  var totalN = { route: 0, font: 0, img: 0, all: 0 };
+  var doneN  = { route: 0, font: 0, img: 0, all: 0 };
+  for (var ui = 0; ui < urls.length; ui++) { totalN[kindOf(urls[ui])]++; totalN.all++; }
+
   var state = (window.__plState = {
     done: 0, total: urls.length, bytes: 0, frugal: frugal, finished: false,
+    byKind: totalN,
   });
   var received = 0, seenBytes = 0, seenCount = 0, doneCount = 0;
   var realP = 0, shown = 0;
@@ -313,147 +495,101 @@ const bootJs = `
   function worker() {
     if (idx >= urls.length) return Promise.resolve();
     var u = urls[idx++];
-    return grab(u).then(function () { state.done = ++doneCount; }).then(worker);
+    var k = kindOf(u);
+    return grab(u).then(function () {
+      state.done = ++doneCount;
+      doneN[k]++; doneN.all++;
+    }).then(worker);
   }
   for (var i = 0; i < CONC && i < urls.length; i++) worker();
 
-  // ================= 帧循环：时间轴主导 + 未下完封顶 99% =================
-  // 显示进度 = 时间轴（MIN_MS 内平滑走满），未下完时封顶 99%：
-  //   · 资源快 → 10s 内平顺走完，像素→清晰铺满全程
-  //   · 10s 到点还没下完 → 停在 99%（像素已到原生分辨率），直到全部到手才补满放行
-  // 真实字节进度仍在跑（estimate/done/state 都在用它），只是不再压住显示值 ——
-  // 10s 内那根条是给「效果」定节奏的，10s 之后才代表「还在等」。
+  // ================= 渲染 =================
+  // 计数补零到目标位数 —— 宽度恒定，标签不会在 9→10 那一刻被顶歪；
+  // 也与巨数同一个约定（它是 000→100），整套读数语言一致。
+  function pad(v, w) { var t = String(v); while (t.length < w) t = '0' + t; return t; }
+
+  function paintCounts() {
+    var wR = String(totalN.route).length;
+    var wA = String(totalN.all).length;
+    var wF = String(totalN.font).length;
+    var t = {
+      route: pad(doneN.route, wR) + ' / ' + totalN.route,
+      all:   pad(doneN.all, wA)   + ' / ' + totalN.all,
+      bytes: (received / 1048576).toFixed(1) + ' MB',
+      font:  pad(doneN.font, wF)  + ' / ' + totalN.font
+    };
+    for (var k in t) {
+      if (lastTxt[k] !== t[k] && cells[k]) { cells[k].textContent = t[k]; lastTxt[k] = t[k]; }
+    }
+  }
+
+  // 渲染一帧。p = 0..1（显示进度，时间轴主导、未就绪时封顶 99%）
+  function paint(p) {
+    el.style.setProperty('--p', p.toFixed(4));
+    if (numEl) numEl.textContent = String(Math.round(p * 100)).padStart(3, '0');
+
+    // 构建网格：竖线自上而下逐一落下（每根错开 0.012 进度、0.10 内长满），
+    // 横线自左向右拉开。前 ~16% 进度内建完，之后网格静止。
+    for (var i = 0; i < gcols.length; i++) {
+      var gh = (p - i * 0.012) / 0.10;
+      gcols[i].style.setProperty('--gh', (gh < 0 ? 0 : gh > 1 ? 1 : gh).toFixed(3));
+    }
+    var rw = p / 0.16;
+    el.style.setProperty('--rw', (rw > 1 ? 1 : rw).toFixed(3));
+
+    // 解析：整个场景（网格 / 横线 / 文字 / 加载条）从模糊到清晰。
+    // 模糊单独走一条更快的斜坡（前 55% 内收干）—— 否则 p=0.6 时还剩 ~1px，字一直是毛的。
+    // 归零时直接 filter:none 而不是 blur(0px)：后者依然会强制生成合成层、
+    // 关掉次像素抗锯齿，大字会发毛。
+    var bv = reduce ? 0 : 2.6 * Math.max(0, 1 - p / 0.55);
+    scene.style.filter = bv > 0.06 ? 'blur(' + bv.toFixed(2) + 'px)' : 'none';
+
+    // 颗粒：起点重、终点留一档（不降到 0，留住质感）
+    if (grain) grain.style.opacity = reduce ? 0.08 : (0.07 + 0.25 * (1 - p)).toFixed(3);
+  }
+
+  // ================= 帧循环：时间轴主导 + 未就绪封顶 99% =================
   function drive() {
     if (ended || !el.isConnected) return;
     var el_ms = Date.now() - t0;
     var tt = Math.min(1, el_ms / MIN_MS);
-    var target = tt * tt * (3 - 2 * tt);                   // smoothstep，起步收尾都不突
-    if (doneCount < urls.length) target = Math.min(target, 0.99);
-    if (target > shown) shown += (target - shown) * 0.12;   // 只升不降
+    var target = tt * tt * (3 - 2 * tt);                 // smoothstep，起步收尾都不突
+
+    // §102：资源没下完、或者玻璃球还没就绪，都压在 99%。
+    // 超过 BALL_WAIT_MS 就不再等球（否则窄屏/减动效下会无限停在 99%）。
+    var bs = ballState();
+    var holdingForBall = bs === 'wait' && el_ms < BALL_WAIT_MS;
+    if (doneCount < urls.length || holdingForBall) target = Math.min(target, 0.99);
+
+    if (target > shown) shown += (target - shown) * 0.12; // 只升不降
     else if (target < shown) shown = target;
     window.__plReal = shown;
+    window.__plProgress = shown;
 
-    var p = shown;
-    var res = drawOff(p);
-    blit();
-    drawTermOnScreen();   // 先画一遍：让它参与柔光（有辉光）
-    applyBloom();
-    drawTermOnScreen();   // 再画一遍：压回锐利的 1-bit 像素字
-    window.__plProgress = p;
-    window.__plRes = res;
-    // 画布出第一帧后才撤掉 DOM 兜底文字（脚本半死时屏幕上一直有东西）
+    paint(shown);
+    paintCounts();
     if (!el.classList.contains('pl-drawn')) el.classList.add('pl-drawn');
 
-    if (doneCount >= urls.length && el_ms >= MIN_MS && shown >= 0.995) {
+    if (doneCount >= urls.length && !holdingForBall && el_ms >= MIN_MS && shown >= 0.995) {
       state.finished = true;
       window.__plReal = 1;
-      drawOff(1);
-      blit();
-      drawTermOnScreen();
-      applyBloom();
-      drawTermOnScreen();
-      return done();
+      paint(1);
+      paintCounts();
+      // §102：球就绪 → 走玻璃球过渡；否则（窄屏 / 减动效 / 等超时）退回原来的淡出
+      return bs === 'ready' ? transition() : done();
     }
-    if (el_ms >= HARD_BAIL_MS) {                    // 逃生口：网络僵死
+    if (el_ms >= HARD_BAIL_MS) {                         // 逃生口：网络僵死
       state.finished = true;
       return done();
     }
     requestAnimationFrame(drive);
   }
+  paint(0);
   requestAnimationFrame(drive);
-
-  // 预加载 MapleUI（画布文字用它；没就绪时前几帧走兜底字链，看不出来）
-  try { document.fonts.load('600 40px "MapleUI Web"'); } catch (e) { /* 忽略 */ }
 })();
 `;
 ---
-<style is:inline>
-  /* 兜底：脚本任何异常都不能留下灰屏 —— 14s 后无条件淡出（脚本正常时 5s 内自己收尾） */
-  #pl {
-    position: fixed;
-    inset: 0;
-    z-index: 9999;
-    display: grid;
-    place-items: center;
-    background: #1c1c1c; /* 机壳（画布铺满后基本被盖住，作兜底底色） */
-    animation: pl-failsafe-out 0.5s ease 14s forwards;
-  }
-  @keyframes pl-failsafe-out { to { opacity: 0; visibility: hidden; } }
 
-  #pl-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-
-  /* —— 扫描线：2px 暗 / 2px 亮（比先前粗一倍），整体缓慢上下漂移 —— */
-  .pl-scan {
-    position: absolute;
-    inset: -4px 0; /* 留出一屏扫描线周期，位移时不露边 */
-    pointer-events: none;
-    background: repeating-linear-gradient(
-      to bottom,
-      rgba(0, 0, 0, 0.26) 0 2px,
-      rgba(255, 255, 255, 0.035) 2px 4px
-    );
-    animation: pl-drift 2.6s linear infinite, pl-flicker 0.42s steps(2, end) infinite;
-  }
-  @keyframes pl-drift { from { transform: translateY(0); } to { transform: translateY(4px); } }
-  @keyframes pl-flicker { 0% { opacity: 1; } 50% { opacity: 0.93; } 100% { opacity: 1; } }
-
-  /* —— 回扫亮带：CRT 的 flyback，一条柔亮带缓慢扫过（每轮 7.5s）—— */
-  .pl-roll { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
-  .pl-roll::before {
-    content: '';
-    position: absolute;
-    left: 0; right: 0; height: 26%;
-    background: linear-gradient(
-      to bottom,
-      rgba(255, 255, 255, 0) 0%,
-      rgba(255, 255, 255, 0.05) 45%,
-      rgba(255, 255, 255, 0.075) 50%,
-      rgba(255, 255, 255, 0.05) 55%,
-      rgba(255, 255, 255, 0) 100%
-    );
-    animation: pl-roll 7.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  }
-  @keyframes pl-roll { from { transform: translateY(-30%); } to { transform: translateY(420%); } }
-
-  /* —— 暗角：多段渐变（不是一圈死黑）+ 顶部玻璃高光 + 管面中央微亮 —— */
-  .pl-vig {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background:
-      linear-gradient(to bottom, rgba(255, 255, 255, 0.055) 0%, rgba(255, 255, 255, 0) 16%),
-      radial-gradient(ellipse 62% 48% at 50% 44%, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 62%),
-      radial-gradient(ellipse 118% 104% at 50% 50%,
-        rgba(0, 0, 0, 0) 40%,
-        rgba(0, 0, 0, 0.06) 58%,
-        rgba(0, 0, 0, 0.18) 74%,
-        rgba(0, 0, 0, 0.36) 87%,
-        rgba(0, 0, 0, 0.58) 95%,
-        rgba(0, 0, 0, 0.74) 100%);
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .pl-scan, .pl-roll::before { animation: none; } /* 静态版：不闪、不漂 */
-  }
-
-  /* 收尾：白闪（消磁）→ 灰幕纵向内收（关机塌成一条亮线） */
-  @keyframes pl-out {
-    0% { filter: brightness(1); }
-    14% { filter: brightness(2.8); }
-    100% { filter: brightness(0.15); opacity: 0; transform: scaleY(0.004); }
-  }
-  #pl.pl-out { animation: pl-out 0.34s ease-out forwards; pointer-events: none; }
-
-  #pl.pl-drawn .pl-fallback { display: none; }
-  .pl-fallback {
-    margin: 0;
-    font-family: var(--font-sans);
-    font-size: clamp(1.6rem, 7vw, 3.4rem);
-    font-weight: 500;
-    letter-spacing: 0.22em;
-    color: #e9e9e9;
-    text-shadow: -1px 0 rgba(255, 60, 60, 0.18), 1px 0 rgba(60, 130, 255, 0.18);
-  }
-</style>
+<style is:inline set:html={bootCss}></style>
 
 <script is:inline set:html={bootJs}></script>
