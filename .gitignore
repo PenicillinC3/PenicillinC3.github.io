@@ -17,3 +17,9 @@ Thumbs.db
 
 # 原始照片原件（示例已复制进 src/content/photos）
 /img/
+
+# 酸性图案参考素材（仅本地参考，不入库）
+_Acid/
+
+# macOS 元数据垃圾（AppleDouble，跟 _Acid 一起混进来的）
+._*

@@ -45,7 +45,7 @@ npm run fonts:subset # 新增内容后重建 woff2 子集（song §28 + maple §
 5. **Astro 内容集合完全忽略 `_` 前缀文件**（包括带 `_` 的 .md.example 也不会被收集；模板靠 `.example` 后缀排除，别改）。调试时建临时条目别用 `_` 开头，会静默消失。
 6. **沉浸页舞台必须用 `position: fixed; inset:` 铺满** —— 曾有浏览器对 `100dvh` calc 解析塌陷成 0 导致全黑（见 base.css `body.page-immersive .stage`）。photos 组件内**勿再给 `.stage` 写 height/position**（base 以更高特异性生效；加了 height 会参与定高、把 dock 挤出屏）。⚠ 胶片画廊改用 `page-gallery`（spec §27）：`.main` 身兼 `.wrap`，需显式 `width:100%`（曾测到非 100% 收缩宽度）；html 需 `:has()` 锁高。
 7. **JS 别直写 `style.transform` 覆盖 CSS 组合位移** —— Nav 滑块曾因此把 `translateY(-50%)` 居中挤掉、整体下挂半身。组合位移（含 `-50%`、`--sx` 变量）写在 CSS，JS 只设变量。
-8. 依赖上限纪律：`dependencies` = `astro` + `ogl`（射线着色器 §26）+ **React 栈（spec §69 首页玻璃球特批，仅此 island）**：react/react-dom、@astrojs/react **v4**（须配 Astro5/vite6；@astrojs/react v6 是 Astro6/vite8 用，勿升）、three、@react-three/fiber、@react-three/drei、maath —— 组件在 `src/components/FluidGlass.jsx`、模型在 `public/assets/3d/`。**除该 island 外禁止再加任何 UI 框架/运行时依赖**（§34/§35 旧液态玻璃栈删后勿加回；历史 `--legacy-peer-deps` 注记见 §34.1）。devDependencies = typescript + `subset-font`（字体子集构建 §28/§29）+ @types/react(-dom)。字体：允许嵌入（font/ 原件 + public/fonts 子集；新文案后跑 `npm run fonts:subset`）。
+8. 依赖上限纪律：`dependencies` = `astro` + `ogl`（射线着色器 §26）+ **React 栈（spec §69 首页玻璃球特批，仅此 island）**：react/react-dom、@astrojs/react **v4**（须配 Astro5/vite6；@astrojs/react v6 是 Astro6/vite8 用，勿升）、three、@react-three/fiber、@react-three/drei、maath —— 组件在 `src/components/FluidGlass.jsx`、模型在 `public/assets/3d/`。**除该 island 外禁止再加任何 UI 框架/运行时依赖**（§34/§35 旧液态玻璃栈删后勿加回；历史 `--legacy-peer-deps` 注记见 §34.1）。devDependencies = typescript + `subset-font`（字体子集构建 §28/§29）+ @types/react(-dom)。字体：允许嵌入（_font/ 原件 + public/fonts 子集；新文案后跑 `npm run fonts:subset`）。
 9. 图片管线：真实 JPEG 走构建期 sharp 自动出响应式 webp；SVG 直通不优化。`img/`（根目录原件）已 gitignore。
 10. 已上线：远端 origin = `PenicillinC3/PenicillinC3.github.io`（空仓首推建成，base '/' 主页仓形态）；`astro.config.mjs` 的 `site` 与 `this-blog.md` 的 repo 链接已填真实地址。部署 = 推送 main 触发 `.github/workflows/deploy.yml`（configure-pages 自动启用 Pages，无需手动 Settings）。
 11. **Astro 5 的 `getImage()` 响应式档位在 `srcSet.values`**（`{url, descriptor}[]`），**`attributes.srcset` 不存在** —— 照旧写法取值恒为 `undefined`，`<img>` 静默只剩 `src` + 一个孤零零的 `sizes`：照片全程不响应式（各设备下同一档）、多余档位构建出来没人引用（§101 抓到：13 张 webp 有 10 张是死文件）。渲染 `<img srcset>` 一律走 `src/lib/photo-images.ts` 的 `srcsetOf()`。
@@ -60,7 +60,7 @@ src/layouts/Base.astro  props: {title?, description?, noindex?, dark?, immersive
 src/components/         玻璃组件族（GlassCard/Nav/Footer/Rays 等；FluidGlass.jsx = §69 首页玻璃球 React island）
 src/pages/              路由（photos 为胶片画廊 + 卷备忘）
 src/styles/tokens.css + base.css
-font/ + public/fonts/   华文中宋原件(STZHONGS.TTF) + woff2 子集（scripts/subset-song.mjs）
+_font/ + public/fonts/   华文中宋原件(STZHONGS.TTF) + woff2 子集（scripts/subset-song.mjs）
 docs/superpowers/       spec（设计权威，后节覆盖前节）+ plans（历史实现计划）
 ```
 
