@@ -39,6 +39,30 @@ for (const f of files) {
   }
 }
 
+// —— 摄影页上还有一批字是**代码模板拼出来的**，内容 md 里根本没有：
+//      年 ← src/lib/date.ts       `${y} 年 ${m} 月 ${d} 日`
+//      共 ← src/pages/photos/[slug].astro   「共 {n} 张」
+//      切 ← src/pages/photos/index.astro    「左右胶片切换 …」
+//    漏一个就**静默回退到系统宋体**（实测：这三字在照片备忘页上确实回退了）。
+//    上面那份 UI_TEXT 是手写白名单，已经漂移过一次 —— 里面那句「点击胶片进入备忘录」
+//    早就是旧文案（页面现在写的是「点击居中胶片进入备忘录」）。所以改成顺带扫这几个源文件，
+//    并且**照 Maple 那套剥掉注释**：注释里的中文永远渲染不到，收进来纯属死重。
+//    （正则与 scripts/subset-maple.mjs 的 stripComments 同一套，改一处要同步另一处。）
+const stripComments = (s) =>
+  s
+    .replace(/<!--[\s\S]*?-->/g, '')          // HTML 注释（.astro 模板里的中文多是这种）
+    .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')     // JSX 注释 {/* */}
+    .replace(/^[ \t]*\/\*[\s\S]*?\*\//gm, '') // 顶格块注释
+    .replace(/^[ \t]*\/\/.*$/gm, '');         // 整行行注释
+const SRC_FILES = [
+  'pages/photos/index.astro',
+  'pages/photos/[slug].astro',
+  'lib/date.ts',
+];
+for (const rel of SRC_FILES) {
+  text += '\n' + stripComments(await readFile(join(SRC, rel), 'utf8'));
+}
+
 const font = await readFile(FONT_IN);
 const out = await subsetFont(font, text, { targetFormat: 'woff2' });
 await writeFile(FONT_OUT, out);

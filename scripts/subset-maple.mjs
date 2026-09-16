@@ -25,9 +25,39 @@ async function walk(dir, acc = []) {
   return acc;
 }
 
+// 源码里的**中文注释**字形永远渲染不到，收进子集纯属死重 —— 实测三款正文字体各被
+// 撑大 51~55KB（276→225KB，−18%），而内容页真的在下载它们。
+//
+// ⚠ 剥离必须**保守**，否则会反过来吞掉真代码：
+//   · 块注释只认**顶格**（可有缩进）起头的 `/*`。不能见 `/*` 就删 ——
+//     src/content.config.ts 里有一句 `pattern: '**/*.md'`，字符串里就含 `/*`，
+//     朴素剥离器会从那儿一直吞到下一个 `*/`。实测：朴素做法比谨慎做法多丢
+//     **26 个真代码字形**（不致命但会静默回退到别的字体，属「不看不知道」那类）。
+//   · 行注释只认**整行**（可有缩进）的 `//`，行内的不碰（`https://` 之类全在行内）。
+//   · **.md 一律不剥**：markdown 里 `//` 根本不是注释，代码块里的 `//` 是要渲染的正文。
+function stripComments(src, ext) {
+  if (ext === '.md') return src;
+  return (
+    src
+      // ⚠ .astro 模板里的中文注释大多是 HTML / JSX 形态，上面那两条正则够不着 ——
+      //   实测漏掉它们会白搭 181 个注释字形（「齿孔带」「贯穿视口」那类）。
+      .replace(/<!--[\s\S]*?-->/g, '')          // HTML 注释
+      .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')     // JSX 注释 {/* */}
+      .replace(/^[ \t]*\/\*[\s\S]*?\*\//gm, '') // 顶格块注释
+      .replace(/^[ \t]*\/\/.*$/gm, '')          // 整行行注释
+  );
+}
+
 // 全站正文/UI 用字来源：所有内容 md + 页面与组件脚本（含导航/按钮/页脚文案）
 let text = '';
-for (const f of await walk(SRC)) text += await readFile(f, 'utf8');
+let allRaw = '';
+for (const f of await walk(SRC)) {
+  const raw = await readFile(f, 'utf8');
+  allRaw += raw;
+  text += stripComments(raw, extname(f));
+}
+const dropped = new Set([...allRaw].filter((ch) => !text.includes(ch)));
+console.log(`注释剥离：去掉 ${dropped.size} 个只出现在注释里的字形（全文 ${new Set([...allRaw]).size} → 子集来源 ${new Set([...text]).size}）`);
 
 for (const f of FONTS) {
   const font = await readFile(f.in);
@@ -54,3 +84,17 @@ const uiFont = await subsetFont(await readFile(FONTS[0].in), [...coreChars].join
 const UI_OUT = join(ROOT, 'public/fonts/maple-ui.woff2');
 await writeFile(UI_OUT, uiFont);
 console.log(`MapleUI 子集完成: ${coreChars.size} 字形 -> ${Math.round(uiFont.length / 1024)} KB  maple-ui.woff2`);
+
+// —— §102 加载页子集：加载页是首屏，字体必须 base64 内联进它自己的 <style>，
+//    等不起一次网络往返（否则数字和标签会先以回退字体闪一下）。页面文案全是
+//    ASCII（大写标签 + 数字 + `/ . %`），切全 ASCII 95 个字形就够，且留足余量。
+//    取 **Bold 面**而不是 Medium —— 标签是 font-weight:700，用 Medium 会被合成加粗
+//    （伪粗），与站内 §98 的真粗体不是一回事。
+// 字符集刻意收窄：全 ASCII 要 30KB（base64 后 40KB，首页 HTML 直接翻倍），
+// 而加载页文案只有大写标签 + 数字 + 几个符号。带上小写是防「哪天有人去掉
+// text-transform:uppercase 或加了小写串」——只多 4KB，换掉一整类缺字回退风险。
+const PRE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 /.:%()-+';
+const preFont = await subsetFont(await readFile(FONTS[2].in), PRE_CHARS, { targetFormat: 'woff2' });
+const PRE_OUT = join(ROOT, 'public/fonts/maple-pre.woff2');
+await writeFile(PRE_OUT, preFont);
+console.log(`MaplePre 子集完成: ASCII ${PRE_CHARS.length} 字形 -> ${Math.round(preFont.length / 1024)} KB  maple-pre.woff2`);
