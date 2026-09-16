@@ -39,6 +39,9 @@ const fontCss = `
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- 临时预览页：不收录、不跟随外链。没有链接指向它，但它是站上的公开路由，
+       上线期间不希望被搜索引擎抓到。验收完整个文件会被删掉。 -->
+  <meta name="robots" content="noindex, nofollow" />
   <title>加载页 → 3D 场景 → 球</title>
   <style is:inline set:html={fontCss}></style>
   <style is:inline>
