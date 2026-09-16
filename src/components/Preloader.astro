@@ -26,6 +26,13 @@ const fontB64 =
   'data:font/woff2;base64,' +
   readFileSync(resolve(process.cwd(), 'public/fonts/helv-swiss.woff2')).toString('base64');
 
+// MaplePre：加载页标签/眉标/数据栏改用的 Maple 子集（真粗体面，切法见 scripts/subset-maple.mjs）。
+// 同样必须内联 —— 理由和上面一模一样。12KB → base64 16KB。
+// 百分比（.pl-num / .pl-pct）仍留 Helvetica：它是这一版的视觉主角，字形骨架不能换。
+const mapleB64 =
+  'data:font/woff2;base64,' +
+  readFileSync(resolve(process.cwd(), 'public/fonts/maple-pre.woff2')).toString('base64');
+
 // 噪点：阈值化 alpha 的黑斑点（feColorMatrix 把噪声红通道映射成 alpha，A' = 3R − 2.1）。
 // RGB 全置 0 = 纯黑点 —— 是「撒颗粒」而不是「整体压灰」。color-interpolation-filters
 // 必须显式写 sRGB：SVG 滤镜默认走 linearRGB，会把阈值算歪。
@@ -36,11 +43,23 @@ const GRAIN_URI =
   "%3CfeColorMatrix type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 -2.1'/%3E" +
   "%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E";
 
+// ⚠ 这一整段是**模板字符串**：里面（含注释）不得出现反引号，也不得出现 `${`。
+//   反引号会把模板提前闭合，后面的 CSS 被当成 JS 求值 —— 报错位置与真凶毫无关系
+//   （实测：注释里写 `.pl-stage` 换来一句 ⊂stage is not defined⊃，查了半天）。
+//   bootJs 那边一直写着这条，bootCss 之前漏了。要引类名就直接写，别加反引号。
 const bootCss = `
   @font-face{
     font-family:'HelvSwiss';
     src:url("${fontB64}") format('woff2');
     font-weight:100 900;
+    font-display:block;
+  }
+  /* 标签用的 Maple 子集，同样内联。只声明 700 —— 原件就是 Bold 面，
+     声明宽范围会让浏览器拿它去合成别的字重。 */
+  @font-face{
+    font-family:'MaplePre';
+    src:url("${mapleB64}") format('woff2');
+    font-weight:700;
     font-display:block;
   }
 
@@ -61,6 +80,13 @@ const bootCss = `
 
   .pl-scene{ position:absolute; inset:0; z-index:1; }
 
+  /* 标签 / 眉标 / 数据栏一律 Maple（用户指定）。栈首是内联子集 MaplePre（首屏不等网络），
+     其后是站点标准回退。**百分比不在其中** —— .pl-num / .pl-pct 仍继承 #pl 的 Helvetica，
+     那是这一版的视觉主角，字形骨架不跟着换。（底板 canvas 读的是计算样式的 fontFamily，
+     所以这里怎么改，烘出来的那张就跟到哪。） */
+  .pl-lbl, .pl-eyebrow, .pl-data{
+    font-family:'MaplePre','MapleUI Web','MapleMono Web',ui-monospace,monospace; }
+
   /* 12 栏网格（版心内）。竖线高度由「构建」动效驱动：自上而下逐一落下。 */
   .pl-grid{ position:absolute; left:4.5%; right:4.5%; top:10%; bottom:16%;
     z-index:1; display:flex; pointer-events:none; }
@@ -78,7 +104,7 @@ const bootCss = `
   .pl-res{ position:absolute; inset:0; z-index:4; }
 
   .pl-lbl{ position:absolute; font-weight:700; font-size:clamp(10px,1.55vw,20px);
-    letter-spacing:.13em; text-transform:uppercase; font-variant-numeric:tabular-nums; }
+    letter-spacing:calc(var(--ls,.5) * .13em); text-transform:uppercase; font-variant-numeric:tabular-nums; }
   .pl-tl{ top:5%; left:4.5%; }
   .pl-tr{ top:5%; right:4.5%; display:flex; align-items:center; gap:.62em; }
   .pl-bl{ bottom:5.6%; left:4.5%; color:#8a8a88; }
@@ -89,10 +115,11 @@ const bootCss = `
 
   .pl-stage{ position:absolute; left:4.5%; right:4.5%; top:10%; bottom:16%;
     display:flex; align-items:flex-end; justify-content:space-between; }
-  /* +14px 不是随手写的：巨数的 line-height:.71 < 1，按 hhea 度量字形墨迹会溢出到
-     行框上方 0.092em（22vh 字号下 ≈10.7px）。只给 5px 的话可见空隙只剩 0.4px，等于贴上。 */
-  .pl-left{ display:flex; flex-direction:column; gap:calc(.55vh + 14px); align-items:flex-start; }
-  .pl-eyebrow{ font-weight:700; font-size:clamp(13px,2.6vh,26px); letter-spacing:.3em;
+  /* +24px = 14 + 10。14 不是随手写的：巨数的 line-height:.71 < 1，按 hhea 度量字形墨迹
+     会溢出到行框上方 0.092em（22vh 字号下 ≈10.7px），只给 5px 的话可见空隙只剩 0.4px、
+     等于贴上；另外 10 是用户要求再把眉标往上抬的。 */
+  .pl-left{ display:flex; flex-direction:column; gap:calc(.55vh + 24px); align-items:flex-start; }
+  .pl-eyebrow{ font-weight:700; font-size:clamp(13px,2.6vh,26px); letter-spacing:calc(var(--ls,.5) * .3em);
     text-transform:uppercase; }
   /* 悬挂左对齐：大字号自带左侧边距，不悬挂会看着内缩、与上方小字对不齐 */
   .pl-hero{ display:flex; align-items:baseline; line-height:.71; margin-left:-.035em; }
@@ -101,8 +128,12 @@ const bootCss = `
   .pl-pct{ font-weight:700; font-size:6.6vh; color:#8a8a88; letter-spacing:0; }
 
   /* 数据表：两列贴拢，标签右对齐紧贴数值；整块靠右 */
+  /* margin-bottom 由脚本量的 --data-lift 给：把本栏**最后一行**的基线抬到大数字那条线上。
+     .pl-stage 是 align-items:flex-end，所以本栏底边贴着版心底 —— 抬多少就是差多少。
+     （这里别用反引号包类名：bootCss 本身就是模板字符串，反引号会把它提前闭合。） */
   .pl-data{ display:grid; grid-template-columns:auto auto; gap:.42em .7em; width:auto;
-    font-weight:700; font-size:clamp(11px,1.62vw,21px); letter-spacing:.15em;
+    margin-bottom:var(--data-lift,0px);
+    font-weight:700; font-size:clamp(11px,1.62vw,21px); letter-spacing:calc(var(--ls,.5) * .15em);
     text-transform:uppercase; }
   .pl-data span{ grid-column:1; color:#8a8a88; text-align:right; }
   .pl-data s{ grid-column:2; text-decoration:none; color:#1a1a1a;
@@ -138,36 +169,11 @@ const bootCss = `
     .pl-grain,.pl-dot{ animation:none; }
   }
 
-  /* §102 过渡：在加载层上开一个圆洞，露出下面**已经渲染好的真首页**。
-     --pl-r 由脚本按 smoothstep 推大，洞沿与玻璃球轮廓同步长大（同一个量的两个面）。
-     max(0px, …) 是必需的：--pl-r 为 0 时 calc 会算出负值，负的色标位置会让整条渐变
-     失效 → mask 直接不渲染。留 1.5px 羽化，避免硬边锯齿。 */
-  #pl.pl-open{
-    -webkit-mask-image:radial-gradient(circle at 50% 50%,
-      transparent 0 calc(var(--pl-r,0px) * .72), #000 var(--pl-r,0px));
-    mask-image:radial-gradient(circle at 50% 50%,
-      transparent 0 calc(var(--pl-r,0px) * .72), #000 var(--pl-r,0px));
-  }
-
-  /* 玻璃边缘环：贴着洞口外侧，给一圈「光线被玻璃弯折」的痕迹。
-     ⚠ **这是近似，不是真折射**。加载页是 DOM 层、在 WebGL 之上，而球的 shader 只采样
-     它自己那张离屏 buffer（§69「折射场景副本、不折射 DOM」）—— 球的折射根本碰不到 DOM。
-     这里用 backdrop-filter 糊 + 一圈红/青染色来给「边缘在折光」的读感。
-     要真折射，得把加载页内容也放进那个 3D 场景（另一件事，见提交说明）。 */
-  .pl-rim{
-    position:absolute; left:50%; top:50%; z-index:9; pointer-events:none; display:none;
-    width:calc(var(--pl-r,0px) * 2.5); height:calc(var(--pl-r,0px) * 2.5);
-    transform:translate(-50%,-50%); border-radius:50%;
-    backdrop-filter:blur(3px) saturate(1.4);
-    -webkit-backdrop-filter:blur(3px) saturate(1.4);
-    background:radial-gradient(circle at 50% 50%, transparent 0 80%,
-      rgba(255,45,155,.10) 88%, rgba(0,212,255,.10) 96%, transparent 100%);
-    -webkit-mask-image:radial-gradient(circle at 50% 50%,
-      transparent 0 80%, #000 87%, #000 100%, transparent 100%);
-    mask-image:radial-gradient(circle at 50% 50%,
-      transparent 0 80%, #000 87%, #000 100%, transparent 100%);
-  }
-  #pl.pl-open .pl-rim{ display:block; }
+  /* §102 过渡的目标实现放在 3D 场景那一侧（见本文件 transition()）：
+     加载页版面烘成底板 → 球折射它 → 底板上的 alphaMap 圆洞 → 光学褪到 0 → 撤场。
+     ⚠ 旧的「在 DOM 加载层上开洞 + 一圈假折射边环」方案（pl-open / pl-rim / --pl-r）
+     已整套删除：DOM 在 WebGL 之上，球的 shader 碰不到它，那圈边环只能是近似。
+     现在加载页真的被折到了 —— 因为它已经进了那个 3D 场景。 */
 `;
 
 // 注意：下面这段是**拼进 HTML 的 JS 字符串**，内部一律用字符串拼接，
@@ -193,8 +199,12 @@ const bootJs = `
   var IDLE_MS = 10000;         // 单个请求「多久没收到字节」算卡死（慢但在动的不会中招）
   var CONC = 5;                // 并发数
   var BALL_WAIT_MS = 6000;     // 资源到手后最多再等玻璃球就绪这么久（§102）
-  var GROW_MS = 1400;          // 开洞 + 球长大 的时长
   var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // 开场解析（模糊）的起止。终点**不是 0** —— 100% 与球出来时停在「原来 48% 那一档」
+  // 的柔化上（用户指定）。起点随之抬高，保持同样的衰减区间（原 6.5→0，现 7.33→0.83）。
+  var BLUR_END = 6.5 * (1 - 0.48 / 0.55);   // ≈ 0.83px
+  var BLUR_SPAN = 6.5;                       // 衰减区间
+  var BLUR_POW = 2;                          // 缓入指数（见 paint()：开头慢、末尾快）
 
   // 玻璃球能否参与过渡。island 会明确表态，避免我们傻等：
   //   __ballReady = 折射管线已出帧（可用）    __ballNA = 根本没挂载（窄屏/减动效）
@@ -234,7 +244,6 @@ const bootJs = `
       '</div>' +
       '<div class="pl-prog"><b></b></div>' +
     '</div>' +
-    '<i class="pl-rim" aria-hidden="true"></i>' +
     '<div class="pl-mist" aria-hidden="true"></div>' +
     '<div class="pl-grain" aria-hidden="true"></div>' +
     '<p class="pl-fallback" aria-hidden="true">LOADING</p>';
@@ -279,6 +288,141 @@ const bootJs = `
   // §102：把加载页版面烘成一张 canvas 交给球 —— 过渡期球折的就是它。
   // **只在过渡开始时画一次**：那时进度恒为 100%、画面静止，成本可忽略。
   // ⚠ 下面每一处的百分比都必须与上面的 CSS 对齐，否则过渡期会看到「两份错位的加载页」。
+  // 量某个元素的**文字基线 y**。元素多半被块化了（position:absolute / flex item /
+  // grid item 都会块化），rect.top 是**行盒**顶而不是字形顶
+  // → 基线 = 行盒顶 + 半行距 + 上升部。asc/desc 取 canvas 的字体度量 ——
+  // 浏览器给 DOM 排版用的就是同一套表。
+  // ⚠ makePlate 烘底板时用的是**同一个函数**（baseOf → put），别再复制一份。
+  var _mc = document.createElement('canvas').getContext('2d');
+  function baselineY(e, cs) {
+    var r = e.getBoundingClientRect();
+    cs = cs || getComputedStyle(e);
+    _mc.font = cs.fontStyle + ' ' + cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+    var m = _mc.measureText('M');
+    var a = m.fontBoundingBoxAscent, d = m.fontBoundingBoxDescent, lh = parseFloat(cs.lineHeight);
+    if (!isFinite(lh)) lh = a + d;      // line-height:normal 就是字体度量本身
+    return r.top + (lh - (a + d)) / 2 + a;
+  }
+
+  // 右侧数据栏**最后一行**的基线，拉到与大数字/百分号同一条线上。
+  // 为什么非得量、不能写死：这个差值既不正比于 vh 也不正比于字号 ——
+  //   720 高差 7.22px(/vh 1.00%)、1080 高差 14.34px(/vh 1.33%)。
+  // 因为 .pl-hero 里还叠着一根 16px 的固定结构行，比例关系被它破坏了。
+  // 量一次写进 --data-lift；之后字号/行距怎么改都不会失配（底板读的是 DOM，自动跟上）。
+  function alignData() {
+    var rows = el.querySelectorAll('.pl-data s'), num = el.querySelector('.pl-num');
+    if (!rows.length || !num) return;
+    // ⚠ 先归零再量：本函数会被 resize / fonts.ready 反复调用，而量的时候 --data-lift
+    //   已经生效 —— 不归零的话量到的是「抬过之后的残差」，每调一次就再抬一截，滚雪球。
+    //   （setProperty 后紧跟 getBoundingClientRect，后者强制回流，读到的是新布局。）
+    el.style.setProperty('--data-lift', '0px');
+    var lift = baselineY(rows[rows.length - 1]) - baselineY(num);
+    el.style.setProperty('--data-lift', lift.toFixed(2) + 'px');
+  }
+  alignData();
+  // 视口变了 clamp() 的字号就变，差值跟着变
+  addEventListener('resize', alignData);
+  // 内联字体是异步生效的，首帧量到的可能还是回退字体的度量
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(alignData);
+
+  // ── 开场解密揭示（§102）─────────────────────────────────────────────
+  // 除百分比外的文字，逐字从乱码**锁定**成真字（左→右），元素之间依次起步。单次。
+  // 加载期跑完；transition() 里还会显式收尾一次，保证交班烘进底板的是定格文字。
+  // ⚠ 乱码字符集必须落在 MaplePre 子集内（它只切了 A-Z a-z 0-9 与 / . : % ( ) - +）——
+  //   用了子集外的字，动画途中会**逐字回退到别的字体**，字形当场变样。
+  // ⚠ 这里在 bootJs 模板字符串里：注释中同样不得出现反引号或「美元花括号」。
+  //   （写这行时我自己就违反了一次 —— 把那个符号照原样写进注释，构建直接报
+  //     esbuild 错、位置指向这一行。要说它，就绕着说。）
+  var ORACLE = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/.:%()-+';
+  // ↓ 用户在预览页定的：基础 2000/160 的 2.8 倍，闪动 100ms。
+  // ⚠ 整段揭示 = 12×448 + 5600 ≈ 11s，**远超 MIN_MS(5s) 最短加载** ——
+  //   所以揭示走的是「虚拟时钟」（见 tickDecrypt）：加载够久就按这个时长原样跑，
+  //   不够久则自动跟上进度，保证**永远在交班前定格**，不会被切在半途。
+  var DECRYPT_MS = 5600;     // 单个元素内：首字到末字的揭示跨度
+  var DECRYPT_STAGGER = 448; // 元素之间依次起步的间隔
+  var FLICKER_MS = 100;      // 单个乱码字多久翻一次（小了糊成噪点，大了像卡住）
+  var dec = [], decOn = false;
+  // 虚拟时钟 v 的起点与总量（v 怎么取见 tickDecrypt）
+  var decStart = 0, decTotal = 0;
+
+  // 只动**第一个非空文本节点** —— 不能整块 textContent 赋值：
+  // .pl-tr 里还挂着闪动小圆点 <i>，整体覆写会把圆点抹掉。
+  function firstTextNode(e) {
+    for (var i = 0; i < e.childNodes.length; i++) {
+      var n = e.childNodes[i];
+      if (n.nodeType === 3 && n.nodeValue.trim()) return n;
+    }
+    return null;
+  }
+  // 乱码字**每 FLICKER_MS 才换一次**，不是每帧换。逐帧换等于 60 次/秒，
+  // 糊成一片噪点，根本看不出「字在跳」；拉开到 ~80ms 才有逐格翻滚的读感。
+  // 用「位置 + 时间刻度」的哈希代替 Math.random：同一刻度内稳定（同一帧内重画不变），
+  // 跨刻度才翻新 —— 也就不必给每个字符存 nextAt 之类的状态。
+  function flickChar(i, tick) {
+    var h = ((i + 1) * 2654435761) ^ ((tick + 1) * 40503);
+    h = (h ^ (h >>> 13)) >>> 0;
+    h = (h * 1274126177) >>> 0;
+    return ORACLE.charAt(h % ORACLE.length);
+  }
+  // u = 该元素自身的揭示进度（0..1）。第 i 个字在 u >= (i+1)/n 时定形；空格不动。
+  // now 传的是**虚拟时间** v —— 闪动也跟着一起压缩，否则揭示加速后字还没跳够就定形了。
+  function scramble(s, u, v) {
+    var out = '', n = s.length, tick = Math.floor(v / FLICKER_MS);
+    for (var i = 0; i < n; i++) {
+      var c = s.charAt(i);
+      out += (c === ' ' || u >= (i + 1) / n) ? c : flickChar(i, tick);
+    }
+    return out;
+  }
+  function startDecrypt() {
+    // ⚠ 先把上一轮收尾，再重新抓终值。终值取自**节点当前值**，本函数若在上一轮
+    //   中途被再次调用（预览页的滑块、重播都会），抓到的就是乱码 —— 那个乱码
+    //   会被当成终值，文字再也回不到真值。真组件只调一次，但这条防线要留住。
+    finishDecrypt();
+    dec = [];
+    var k = 0, t = performance.now();
+    var items = el.querySelectorAll('.pl-lbl, .pl-eyebrow, .pl-data span, .pl-data s');
+    for (var i = 0; i < items.length; i++) {
+      var n = firstTextNode(items[i]);
+      if (!n) continue;
+      dec.push({ n: n, final: n.nodeValue, off: k * DECRYPT_STAGGER, ms: DECRYPT_MS });
+      k++;
+    }
+    decStart = t;
+    decTotal = (k > 0 ? (k - 1) * DECRYPT_STAGGER : 0) + DECRYPT_MS;
+    decOn = dec.length > 0;
+  }
+
+  // 虚拟时钟：v = max(真实耗时, 进度 × 总时长)。
+  //   前半项 = 用户定的时长 —— 加载够久就按它跑完，手感原样保留；
+  //   后半项 = 硬保证 —— 进度到 1 时 v 必到 decTotal，揭示**一定在交班前定格**
+  //            （交班条件本身就要求 shown >= 0.995，所以「进度满」与「交班」天然同步）。
+  // ⚠ 别改回「预估加载时长、按需加速」那版：真正的瓶颈是等玻璃球就绪（BALL_WAIT_MS
+  //   最多 6s），从资源完成度上根本看不出来；估出的期限一收紧就是猛跳，
+  //   实测照样有 5 个元素被切。这里不预测任何东西。
+  function tickDecrypt(now) {
+    if (!decOn) return;
+    // 进度项留一成余量（到 90% 就收干）：shown 到 1 的那一刻就是交班，
+    // 踩着点定格等于把最后一个元素压在交班那一刻，探针和眼睛都判它「被切」。
+    var byProg = Math.min(1, (shown || 0) / 0.9) * decTotal;
+    var v = Math.max(now - decStart, byProg);
+    var left = 0;
+    for (var i = 0; i < dec.length; i++) {
+      var d = dec[i], u = (v - d.off) / d.ms;
+      if (u < 1) { left++; d.n.nodeValue = scramble(d.final, u, v); }
+      else if (d.n.nodeValue !== d.final) d.n.nodeValue = d.final;
+    }
+    decOn = left > 0;
+  }
+  // 收尾：把每个节点还原成真字，并清掉 paintCounts 的「上次写过什么」记忆 ——
+  // 否则计数列若恰好与记忆值相同就不再重写，屏幕上会留着解密期的乱码。
+  function finishDecrypt() {
+    for (var i = 0; i < dec.length; i++) dec[i].n.nodeValue = dec[i].final;
+    decOn = false;
+    lastTxt = {};
+  }
+  startDecrypt();
+
   function makePlate() {
     var dpr = Math.min(window.devicePixelRatio || 1, 1.5);
     var CW = innerWidth, CH = innerHeight;
@@ -286,154 +430,228 @@ const bootJs = `
     c.width = Math.round(CW * dpr); c.height = Math.round(CH * dpr);
     var o = c.getContext('2d');
     o.scale(dpr, dpr);
-    var L = CW * 0.045, R = CW * 0.955, T = CH * 0.10, B = CH * 0.84;
-    var FONT = 'HelvSwiss, "Helvetica Neue", Helvetica, Arial, sans-serif';
-    var vw = function (n) { return CW * n / 100; };
-    var vh = function (n) { return CH * n / 100; };
+    // ── 几何与文字一律**从活着的 DOM 上量**，不再手写百分比和魔法系数 ──────────
+    // 教训：以前按 CSS 的百分比在 canvas 里重算一遍（baseY = boxTop + 0.625*numSize
+    // 之类），结果三块文字各错各的 —— 顶部标签高 3px、///LOADING 低 1px、大数字高 11px
+    // （探针实测，见 .superpowers/brainstorm/852-.../bisect.mjs）。根因是 canvas 与 CSS
+    // 本是三套独立度量（行高 .71 / flex 基线对齐 / textBaseline 'top'），手算的值只要
+    // CSS 动一下就重新失配 —— clamp 那次也是同一个病。改成量 DOM 之后 CSS 随便改都不会错。
+    // 时机是白拿的：makePlate 只在 transition() 里跑一次，此刻 el 还好端端在屏幕上。
+    var q = function (s) { return document.querySelector(s); };
+    var qa = function (s) { return document.querySelectorAll(s); };
+    var Rc = function (e) { return e ? e.getBoundingClientRect() : null; };
+
+    // 被块化的元素（position:absolute / flex item / grid item 都会块化）rect.top 是
+    // **行盒**顶、不是字形顶 → 基线 = 行盒顶 + 半行距 + 上升部。asc/desc 取 canvas 的
+    // 字体度量 —— 浏览器给 DOM 排版用的就是同一套表。
+    function font(e) {
+      var cs = getComputedStyle(e);
+      o.font = cs.fontStyle + ' ' + cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+      o.letterSpacing = (parseFloat(cs.letterSpacing) || 0).toFixed(2) + 'px';
+      return cs;
+    }
+    function baseOf(e) {
+      var r = e.getBoundingClientRect(), cs = font(e);   // font() 设 o.font/字距，put() 要用
+      return { l: r.left, r: r.right, y: baselineY(e, cs), cs: cs };
+    }
+    // 文字内容、大小写、字距、颜色也全取自 DOM 计算值 —— canvas 只负责画。
+    // 「100」不再是写死的：停 99% 时画的就是 99。
+    function put(e, align) {
+      if (!e) return;
+      var g = baseOf(e), s = e.textContent.trim(), tt = g.cs.textTransform;
+      if (tt === 'uppercase') s = s.toUpperCase(); else if (tt === 'lowercase') s = s.toLowerCase();
+      o.fillStyle = g.cs.color; o.textAlign = align; o.textBaseline = 'alphabetic';
+      o.fillText(s, align === 'right' ? g.r : g.l, g.y);
+    }
 
     o.fillStyle = '#f7f7f6'; o.fillRect(0, 0, CW, CH);
-    o.fillStyle = 'rgba(26,26,26,.09)';
-    // 线距 = 版心/11：DOM 网格是 12 个子元素、最后一个 flex:0，前 11 个平分版心，
-    // 最右那条正好压版心右缘。用 /12 会与 DOM 错位（交班瞬间网格跳一下）。
-    for (var i = 0; i < 12; i++) o.fillRect(L + (R - L) * i / 11, T, 1, B - T);
+
+    // 交班那层柔化也得烘进底板。DOM 的模糊是 CSS filter 打在 .pl-scene 上的，
+    // canvas 不带它的话，撤下 DOM 那一刻整页会「咔」地变清晰 —— 又一处交班跳变
+    // （终点改成 BLUR_END≈0.83px 之后才成为问题，以前终点是 0 就无所谓）。
+    // 从计算样式直接读，CSS 改多少这里跟多少（reduced-motion 下是 none → 不设）。
+    // 只罩场景内容：底板背景和后面的噪点纹都在 .pl-scene 之外，本来就不吃这层模糊。
+    var mBlur = /blur\(([\d.]+)px\)/.exec(getComputedStyle(q('.pl-scene')).filter);
+    if (mBlur && parseFloat(mBlur[1]) > 0.01) o.filter = 'blur(' + mBlur[1] + 'px)';
+
+    // 竖线：量每一列的左缘，含最后那根 flex:0 的零宽列（它正好压在版心右缘）。
+    // 旧代码靠「除以 11 而不是 12」硬凑 —— CSS 一改就废。
+    var gbox = Rc(q('.pl-grid')), gis = qa('.pl-grid i');
+    if (gbox) {
+      o.fillStyle = 'rgba(26,26,26,.09)';
+      for (var i = 0; i < gis.length; i++) o.fillRect(Rc(gis[i]).left, gbox.top, 1, gbox.height);
+    }
     o.fillStyle = 'rgba(26,26,26,.3)';
-    o.fillRect(L, T, (R - L) / 2, 1);        // 上横线只跨 6 栏
-    o.fillRect(L, B, R - L, 1);
+    var rt = Rc(q('.pl-rule-t')), rb = Rc(q('.pl-rule-b'));
+    if (rt) o.fillRect(rt.left, rt.top, rt.width, 1);     // 上横线只跨 6 栏
+    if (rb) o.fillRect(rb.left, rb.top, rb.width, 1);
 
-    function txt(s, x, y, size, ls, color, align, baseline) {
-      o.font = '700 ' + size.toFixed(1) + 'px ' + FONT;
-      o.letterSpacing = ls.toFixed(2) + 'px';
-      o.fillStyle = color;
-      o.textAlign = align || 'left';
-      o.textBaseline = baseline || 'top';
-      o.fillText(s, x, y);
+    put(q('.pl-tl'), 'left'); put(q('.pl-tr'), 'right');
+    put(q('.pl-bl'), 'left'); put(q('.pl-br'), 'right');
+    var dotEl = q('.pl-dot'), dr = Rc(dotEl);   // 闪动小圆点：以前漏画，交班瞬间会消失
+    if (dr) {
+      o.fillStyle = getComputedStyle(dotEl).backgroundColor;
+      o.beginPath(); o.arc(dr.left + dr.width / 2, dr.top + dr.height / 2, dr.width / 2, 0, Math.PI * 2); o.fill();
     }
-    // ⚠ 画布字号必须与 CSS 的 clamp() 一致，否则宽屏下交班时文字会「变大」
-    var clamp = function (lo, v, hi) { return Math.min(hi, Math.max(lo, v)); };
-    var fsLbl = clamp(10, vw(1.55), 20);
-    var fsData = clamp(11, vw(1.62), 21);
-    var fsEye = clamp(13, vh(2.6), 26);
-    var ls1 = fsLbl * 0.13;
-    txt('PENICILLINC3', L, vh(5), fsLbl, ls1, '#1a1a1a');
-    txt('SYNCING', R, vh(5), fsLbl, ls1, '#1a1a1a', 'right');
-    txt('SITE INDEX', L, CH - vh(5.6), fsLbl, ls1, '#8a8a88', 'left', 'bottom');
-    txt('INGEST 01', R, CH - vh(5.6), fsLbl, ls1, '#8a8a88', 'right', 'bottom');
+    put(q('.pl-eyebrow'), 'left');
+    put(q('.pl-num'), 'left'); put(q('.pl-pct'), 'left');
+    var dl = qa('.pl-data span'), dv = qa('.pl-data s');
+    for (var r2 = 0; r2 < dl.length; r2++) put(dl[r2], 'right');   // 标签列右对齐
+    for (var r3 = 0; r3 < dv.length; r3++) put(dv[r3], 'right');   // 数值贴右缘
 
-    // 巨数 + %（过渡时进度恒为 100）。基线位置与 DOM 同源推算：
-    // 行框底 = B；内容框顶 = 行框顶 − 0.145em；基线 = 行框顶 + 0.625em。
-    var numSize = vh(22);
-    o.textAlign = 'left';   // ⚠ 必须复位：上面 txt() 最后一次调用把 textAlign 留成了 right，
-                                  //   不复位的话巨数会以 numX 为右边界右对齐 → 整个跑到画布外
-    var boxTop = B - 0.71 * numSize;
-    var baseY = boxTop + 0.625 * numSize;
-    o.textBaseline = 'alphabetic';
-    o.font = '700 ' + numSize.toFixed(1) + 'px ' + FONT;
-    o.letterSpacing = (numSize * -0.042).toFixed(2) + 'px';
-    var numX = L - numSize * 0.035;          // 悬挂左对齐
-    var numW = o.measureText('100').width;
-    o.fillStyle = '#1a1a1a';
-    o.fillText('100', numX, baseY);
-    o.letterSpacing = '0px';
-    o.font = '700 ' + (numSize * 0.3).toFixed(1) + 'px ' + FONT;
-    o.fillStyle = '#8a8a88';
-    o.fillText('%', numX + numW + numSize * 0.07, baseY);
+    // 加载条：量轨道本身，渐变照旧（这段本就是满格）
+    var pg = Rc(q('.pl-prog b')) || Rc(q('.pl-prog'));
+    if (pg) {
+      var g = o.createLinearGradient(pg.left, 0, pg.right, 0);
+      g.addColorStop(0, '#ff2d9b'); g.addColorStop(.22, '#a24bff'); g.addColorStop(.44, '#00d4ff');
+      g.addColorStop(.64, '#7dff3d'); g.addColorStop(.82, '#ffe600'); g.addColorStop(1, '#ff6b1a');
+      o.fillStyle = g; o.fillRect(pg.left, pg.top, pg.width, pg.height);
+    }
 
-    // 眉标：基线 = 巨数行框顶 − gap − 0.23em
-    var eyeSize = fsEye;
-    txt('///LOADING', L, boxTop - (vh(0.55) + 14) - 0.23 * eyeSize,
-        eyeSize, eyeSize * 0.3, '#1a1a1a', 'left', 'alphabetic');
-
-    // 数据表：标签与数值都右对齐、两列贴拢
-    var dSize = fsData, rowH = dSize * 1.42;
-    var rows = [['ROUTES', '13 / 13'], ['ASSETS', '34 / 34'], ['BYTES', '1.9 MB'], ['FONTS', '8 / 8']];
-    for (var r2 = 0; r2 < rows.length; r2++) {
-      var y2 = baseY - (rows.length - 1 - r2) * rowH;
-      o.font = '700 ' + dSize.toFixed(1) + 'px ' + FONT;
-      o.letterSpacing = (dSize * 0.15).toFixed(2) + 'px';
-      o.textBaseline = 'alphabetic';
-      o.fillStyle = '#8a8a88'; o.textAlign = 'right';
-      o.fillText(rows[r2][0], R - o.measureText(rows[r2][1]).width - dSize * 0.7, y2);
-      o.fillStyle = '#1a1a1a';
-      o.fillText(rows[r2][1], R, y2);
+    // 噪点纹（.pl-grain，z-index 8 压在最上层）。少了它，交班瞬间整屏的颗粒感会消失，
+    // 是同一类「交班不能有跳」的漏网之鱼 —— 实测这层在空白区把亮度压掉 17.1/247，不是可忽略的。
+    //
+    // ⚠ **别改成把那张 SVG 用 drawImage 光栅化**：同一个 SVG，drawImage 路径解出来的
+    //   alpha 只有 CSS 背景渲染的 1/13（实测 meanAlpha 1.4/255，铺上去底板空白带仍是
+    //   246.6，等于没铺）。两条路径的栅格化就是不一样，跟参数无关。
+    //   所以这里照**屏幕上量到的强度**自己合成：黑像素、逐像素 alpha 在 [0, 0.432) 上均匀
+    //   （均值 0.216），再乘元素自身的 opacity → 有效均值 0.069，即暗 0.069×247 ≈ 17 ✓。
+    // 花纹与相位不必与 DOM 一致：本来就是随机噪点，而且它每 0.55s 抖一次，接缝看不出来。
+    o.filter = 'none';   // 噪点纹在 .pl-scene 之外，不受场景那层模糊影响
+    if (grain) {
+      var gcs = getComputedStyle(grain);
+      var ts = Math.round(parseFloat(gcs.backgroundSize) || 140);
+      var ga = parseFloat(gcs.opacity); if (!isFinite(ga)) ga = 0.32;
+      var tile = document.createElement('canvas');
+      tile.width = tile.height = ts;
+      var tc = tile.getContext('2d');
+      var id = tc.createImageData(ts, ts), pd = id.data;
+      var seed = 0x2f6e2b1;                       // 定值种子：每次交班花纹一致，便于复现
+      for (var pk = 0; pk < pd.length; pk += 4) { // RGB 默认 0 = 黑，只写 alpha
+        seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+        pd[pk + 3] = 255 * 0.432 * ((seed >>> 8) / 8388608);
+      }
+      tc.putImageData(id, 0, 0);
+      o.save();
+      o.globalAlpha = ga;
+      o.fillStyle = o.createPattern(tile, 'repeat');
+      o.fillRect(0, 0, CW, CH);
+      o.restore();
     }
     o.letterSpacing = '0px';
-
-    // 加载条：满格（过渡时 p=1），渐变铺满整条轨道
-    var g = o.createLinearGradient(L, 0, R, 0);
-    g.addColorStop(0, '#ff2d9b'); g.addColorStop(.22, '#a24bff'); g.addColorStop(.44, '#00d4ff');
-    g.addColorStop(.64, '#7dff3d'); g.addColorStop(.82, '#ffe600'); g.addColorStop(1, '#ff6b1a');
-    o.fillStyle = g; o.fillRect(L, B - 1, R - L, 2);
     return c;
   }
 
+  /* ══ 进场过渡（§102，与预览页 dev-ball 同一套编排）══════════════════════
+     编排：呼出球 → 光学褪到 0 → 撤场（底板淡出 + 球缩没）→ 进入首页。
+
+     与旧版的区别（用户定的新方案）：
+       · 球长到**固定的 663px 半径**，不再「长到铺满视口对角线」；
+       · 洞开在**底板**上（alphaMap），不是开在 DOM 加载层上 —— 所以旧的那套
+         pl-open / --pl-r / maxR 全部不再需要；
+       · 光学褪完之后不再「缩回首页那颗小球」再由它接管，而是直接把球撤掉。
+
+     ⚠⚠ **出球的前提是加载真的完成**。本函数只由 drive() 在
+       doneCount >= urls.length && !holdingForBall && el_ms >= MIN_MS && shown >= 0.995
+       时调用 —— 也就是说资源一个不剩、进度真的到 100% 才可能走到这里。
+       别把它挪到别处调用，也别放宽那个条件：那会让球在还没下完时就冒出来。
+     ═══════════════════════════════════════════════════════════════════════ */
+  var BALL_RADIUS_PX = 663;   // 呼出的球半径（屏幕像素）
+  var BALL_GAP_W = 0.2;       // 球面停在相机前方的世界距离（球心随尺寸后推，别把相机吞进去）
+  var MODEL_R_W = 1.009;      // 模型半径（scale=1 时的世界单位）
+  var HOLE_RATIO = 14;        // 底板上的洞 = 球半径 × 此系数
+  var CAM_Z = 20, FOV = 15, LENS_Z = 15;      // 与 FluidGlass 一致
+  var T_CALL = 1700, T_FADE = 300, T_OUT = 700;   // 呼出 / 褪光学 / 撤场 的时长（ms）
+  // 撤场结束后，首页那颗常态小球要不要长回来。
+  // ⚠ 加载页的球与首页的球是**两个独立的 mesh**（见 FluidGlass 的 LoadingBall）：
+  //   这颗撤走时不会带走首页那颗的任何状态，首页那颗也不读 __lens*。
+  //   首页设计里球是主角（§69），所以线上留 true；预览页 dev-ball 是 false。
+  var HOME_BALL = true;
+
+  function worldPerPx() {
+    return (2 * Math.tan((FOV * Math.PI) / 360) * (CAM_Z - LENS_Z)) / innerHeight;
+  }
+  function smooth(t) { return t * t * (3 - 2 * t); }
+
   function transition() {
     ended = true;
+    // 交班前先把解密收干净：drive() 在 ended 置位后就不再跑，若此刻还在揭示中途，
+    // 烘出来的底板会**定格在乱码上**（用户要求：最后的 3D 场景里动画停掉）。
+    finishDecrypt();
+    // ⚠ 紧接着必须补一次计数：解密期间 paintCounts() 是被让出去的（decOn 早退），
+    //   而它平时只在 drive() 里跑 —— 本函数把 ended 一置位 drive() 就 return 了，
+    //   不在这里补，数值列会永远停在标记里的初始值 00 / 00，并被烘进底板。
+    paintCounts();
     window.__plPlate = makePlate();         // 烘版面：过渡期球折的就是加载页
     window.__lensScene = 0;                 // 0 = 球里是加载页，1 = 首页场景
-    el.classList.add('pl-open');            // 施加开洞用的 mask（宽羽化：球心=首页，球外=加载页）
-    el.style.setProperty('--p', '1');
-    window.__lensTransition = true;         // 球锁视口中心、不跟手
-    // 快照：停掉还在跑的 CSS 动画，画面彻底静止
-    scene.style.filter = 'none';
+    window.__lensBall = true;               // 加载页那颗球上场（首页那颗整体让位）
+    window.__lensTransition = true;         // 首页那颗锁视口中心、不跟手（它此刻不可见）
+    // 快照：停掉还在跑的 CSS 动画，画面彻底静止。
+    // ⚠ 只停 grain 的动画 —— **别再把 scene.style.filter 清成 'none'**：
+    //   模糊终点是 BLUR_END(≈0.83px) 而不是 0，清掉等于交班瞬间整页「咔」地变清晰。
+    //   主循环在 ended 置位后就不再调 paint()，滤镜本来就停在末值上，不需要额外干预。
     grain.style.animation = 'none';
-    // 末态要让**四角也完全透出**：羽化核心 = 0.62r，四角半径 = hypot/2，
-    // 故需 0.62r ≥ hypot/2 → r ≥ hypot/2 / 0.62 ≈ hypot/2 × 1.61，取 1.75 留余量。
-    // （1.15 时四角只透到 66%，屏幕上仍看得见加载页 —— 洞等于白开。）
-    var maxR = Math.hypot(innerWidth, innerHeight) / 2 * 2.2;
-    var cover = window.__lensCoverScale || 2.6;
+    // 撤下 DOM 层：屏幕交给 WebGL（底板与刚烘的版面逐像素一致），球的折射才够得着它。
+    if (el.isConnected) el.remove();
+    document.body.style.overflow = '';
 
-    // ① 长大 —— 球**不回来**：一路长到罩住整个视口对角线。
-    //    洞口用宽羽化渐变，所以「球心是首页、球外是加载页」，中间平滑过渡；
-    //    球推进 = 这条渐变带推进。此刻球折的是**加载页底板**，所以加载页会被真的折到。
+    var scaleFull = BALL_RADIUS_PX * worldPerPx();
     var tA = performance.now();
-    function grow(now) {
-      var t = Math.min(1, (now - tA) / GROW_MS);
-      var e = t * t * (3 - 2 * t);          // smoothstep
-      el.style.setProperty('--pl-r', (maxR * e).toFixed(1) + 'px');
-      window.__lensScale = cover * e;
-      if (t < 1) { requestAnimationFrame(grow); return; }
-      resolve(performance.now());
-    }
-    requestAnimationFrame(grow);
 
-    // ② 解析 —— 两件事同时做：
-    //    · 光学衰减到中性（ior→1、thickness→0、色差→0），球越来越不折；
-    //    · 球里内容由「加载页底板」渐变成「首页 3D 场景」（__lensScene 0→1）。
-    //    到终点时球已经是「首页的 3D 场景 + 中性玻璃」，即与首页那颗看到的一致。
-    function resolve(now0) {
-      var DUR = 900;
-      function step(now) {
-        var u = Math.min(1, (now - now0) / DUR);
-        var eu = u * u * (3 - 2 * u);
-        window.__lensOptics = 1 - eu;
-        window.__lensScene = eu;
-        if (u < 1) { requestAnimationFrame(step); return; }
-        handoff();
+    (function frame(now) {
+      var ms = now - tA;
+      // ① 呼出球：由零长到 scaleFull，球心同步后推，底板上的洞按比例跟着长
+      var u = smooth(Math.min(1, ms / T_CALL));
+      window.__lensScale = scaleFull * u;
+      window.__lensZ = CAM_Z - BALL_GAP_W - scaleFull * u * MODEL_R_W;
+      window.__lensHolePx = BALL_RADIUS_PX * u * HOLE_RATIO;
+      // ② 褪光学：从满强度衰减到中性（ior→1、thickness→0、色差→0）
+      var opt = 1;
+      if (ms > T_CALL) opt = 1 - smooth(Math.min(1, (ms - T_CALL) / T_FADE));
+      window.__lensOptics = opt;
+      // ③ 撤场：**球一褪完光学就整颗删掉，没有收回动画**（用户明确要求）。
+      //    早先这里还跟着一句 __lensScale = scaleFull * (1 - oo) —— 那是「把球收回去」，
+      //    和「加载页的球到点消失、首页的球另外长出来」是两回事，已删。
+      //    底板仍旧淡出（__lensScene 驱动它的 opacity）：它不能硬删，
+      //    否则会「啪」地跳一下；球本来就已中性、删不删看不出，底板才需要过渡。
+      var oo = 0;
+      if (ms > T_CALL + T_FADE) {
+        window.__lensBall = false;                 // 球：立即退场
+        // ⚠ __homeGrow 必须与上一行**同时**置零。首页那颗的可见性只看 __lensBall，
+        //   置零晚一步（比如放到 settle 里）中间那 700ms 它就已经可见、而 __homeGrow
+        //   还是 undefined（= 满尺寸）—— 屏幕上就是「删完之后首页玻璃球闪一下」。
+        window.__homeGrow = 0;
+        oo = smooth(Math.min(1, (ms - T_CALL - T_FADE) / T_OUT));
+        window.__lensScene = oo;
+        // ⚠ 洞**不跟着收**，保持满洞。收了的话底板上「没被挖掉」的面积会重新长回来 ——
+        //   等于加载页（左下那个 100）在淡出过程中又冒回来一下（用户实测：百分比闪一下）。
+        //   保持满洞 → 底板始终被整块挖空、它的淡出全程无感。
+        window.__lensHolePx = BALL_RADIUS_PX * HOLE_RATIO;
       }
-      requestAnimationFrame(step);
-    }
+      if (ms < T_CALL + T_FADE + T_OUT) { requestAnimationFrame(frame); return; }
+      window.__lensHolePx = 0;              // 洞交还（底板此后全透明，有没有洞都一样）
+      // 加载页那几个量到此已无人读（首页那颗一个都不读），清掉免得留成陈旧状态
+      delete window.__lensScale;
+      delete window.__lensOptics;
+      delete window.__lensZ;
+      settle();
+    })(performance.now());
 
-    // ③ 呼出首页那颗球 —— 移走加载层（此刻球已中性、洞已罩满，屏幕上本来就是首页），
-    //    然后让它**从零尺寸长到首页平常那颗**：scale 与光学同步从 0 长上去。
-    //    （上一版是在满尺寸上把光学恢复 —— 那才是你看到的「闪现」。）
-    function handoff() {
-      if (el.isConnected) el.remove();
-      document.body.style.overflow = '';
-      window.__lensTransition = false;
-      var HOME = 0.10, DUR = 900, tB = performance.now(); // HOME = LENS_PROPS.scale
-      window.__lensScale = 0;
-      window.__lensOptics = 0;
-      window.__lensHole = 0;              // 首页那颗是实心的
-      function step(now) {
-        var u = Math.min(1, (now - tB) / DUR);
-        var eu = u * u * (3 - 2 * u);
-        window.__lensScale = HOME * eu;     // 中央由零长起
-        window.__lensOptics = eu;
-        if (u < 1) { requestAnimationFrame(step); return; }
-        delete window.__lensOptics;         // 交还给 island 自己管
-        delete window.__lensScale;
-      }
-      requestAnimationFrame(step);
+    // ④ 收尾：把球交还给 island 自己管。
+    //    HOME_BALL=true → 由零长回首页那颗常态小球（scale 0.10），光学同步恢复；
+    //    =false → 直接把球撤掉，首页不留球。
+    function settle() {
+      // 首页那颗**从首页自己长出来**（不是加载页那颗缩回去）：只推 __homeGrow 0→1，
+      // 尺寸由 FluidGlass 用它乘 LENS_PROPS.scale 得到。加载页那几个量一概不碰。
+      if (!HOME_BALL) { window.__lensTransition = false; return; }
+      window.__lensTransition = false;      // 它就是首页那颗了：正常跟手
+      var DUR = 800, tB = performance.now();   // __homeGrow 已在撤场开始时置零
+      (function step(now) {
+        var k = smooth(Math.min(1, (now - tB) / DUR));
+        window.__homeGrow = k;
+        if (k < 1) { requestAnimationFrame(step); return; }
+        delete window.__homeGrow;           // 交还给 island：此后就是常态那颗球
+      })(performance.now());
     }
   }
 
@@ -520,6 +738,9 @@ const bootJs = `
   function pad(v, w) { var t = String(v); while (t.length < w) t = '0' + t; return t; }
 
   function paintCounts() {
+    // 解密期间把这一列让给揭示动画 —— 否则还没定形的乱码会被计数立刻盖掉，
+    // 那几格就完全不参与了。（解密一结束本轮全量重写，见 finishDecrypt 清 lastTxt）
+    if (decOn) return;
     var wR = String(totalN.route).length;
     var wA = String(totalN.all).length;
     var wF = String(totalN.font).length;
@@ -549,11 +770,15 @@ const bootJs = `
     el.style.setProperty('--rw', (rw > 1 ? 1 : rw).toFixed(3));
 
     // 解析：整个场景（网格 / 横线 / 文字 / 加载条）从模糊到清晰。
-    // 模糊单独走一条更快的斜坡（前 55% 内收干）—— 否则 p=0.6 时还剩 ~1px，字一直是毛的。
-    // 归零时直接 filter:none 而不是 blur(0px)：后者依然会强制生成合成层、
-    // 关掉次像素抗锯齿，大字会发毛。
-    var bv = reduce ? 0 : 6.5 * Math.max(0, 1 - p / 0.55);
-    scene.style.filter = bv > 0.06 ? 'blur(' + bv.toFixed(2) + 'px)' : 'none';
+    // 前 55% 内收干到 BLUR_END，**且是缓入的**（1 − u^POW）：开头几乎不动、末尾猛收，
+    // 即「先糊着，快加载完才啪地对上焦」（用户指定）。u² 之下 p=0.3 还剩 5.4px，
+    // 到 p=0.5 才跌到 2.2px；线性的话 p=0.3 就只剩 3.0px 了，糊不住。
+    // ⚠ 终点是 BLUR_END(≈0.83px) 而不是 0 —— 用户要求 100% 和球出来时保留那一档柔化，
+    //   所以永远走 blur()，不再有 filter:none 那一档（代价：末段文字会关掉次像素抗锯齿、
+    //   比纯 filter:none 略软 —— 这正是要的效果，别顺手「优化」回去）。
+    var u = Math.min(1, p / 0.55);
+    var bv = reduce ? 0 : BLUR_END + BLUR_SPAN * (1 - Math.pow(u, BLUR_POW));
+    scene.style.filter = bv > 0.02 ? 'blur(' + bv.toFixed(2) + 'px)' : 'none';
     // 灰雾：开场最浓，前 70% 内散尽
     el.style.setProperty('--mist', (reduce ? 0 : Math.max(0, 1 - p / 0.70)).toFixed(3));
 
@@ -579,6 +804,7 @@ const bootJs = `
     window.__plReal = shown;
     window.__plProgress = shown;
 
+    tickDecrypt(performance.now());
     paint(shown);
     paintCounts();
     if (!el.classList.contains('pl-drawn')) el.classList.add('pl-drawn');

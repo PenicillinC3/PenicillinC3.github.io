@@ -143,6 +143,58 @@ function SceneTexts() {
 /* 玻璃球本体 + 离屏管线（官方 ModeWrapper，机制原样；Lens 专用）。
    follow = { current: {x,y} } 归一化指针（§69.8：window 级 pointermove 写入，
    不再依赖 canvas 自身事件 —— 悬停按钮等 DOM 上层元素时球仍全域跟手） */
+/* §102 加载页那颗球 —— 与首页那颗是**两个独立的 mesh**（用户明确要求）。
+   整段生命周期由加载页写的全局量驱动，本组件不做任何自己的决策：
+     window.__lensBall    true = 这颗在场（首页那颗整体让位）
+     window.__lensScale   尺寸（scale，由半径像素换算）
+     window.__lensZ       球心 z（球大时后推，别把相机吞进去）
+     window.__lensOptics  光学强度（褪光学那段 1 → 0）
+   只在 __lensBall 为 true 时可见；关掉即整体消失，不留任何状态给首页那颗。 */
+const LoadingBall = memo(function LoadingBall({ buffer, geo }) {
+  const mesh = useRef();
+  const mat = useRef();
+  useFrame(() => {
+    const on = window.__lensBall === true;
+    const sc = typeof window.__lensScale === 'number' ? window.__lensScale : 0;
+    if (mesh.current) {
+      mesh.current.visible = on && sc > 0.0005;
+      if (on) {
+        mesh.current.position.set(0, 0, typeof window.__lensZ === 'number' ? window.__lensZ : 15);
+        mesh.current.scale.setScalar(sc);
+      }
+    }
+    const m = mat.current;
+    if (!m) return;
+    const opt = typeof window.__lensOptics === 'number' ? window.__lensOptics : 1;
+    const tgt = {
+      ior: 1 + (LENS_PROPS.ior - 1) * opt,
+      thickness: LENS_PROPS.thickness * opt,
+      chromaticAberration: LENS_PROPS.chromaticAberration * opt,
+      anisotropy: LENS_PROPS.anisotropy * opt,
+    };
+    for (const k in tgt) if (k in m) m[k] = tgt[k];
+    const u = m.uniforms;
+    if (u) {
+      if (u.ior) u.ior.value = tgt.ior;
+      if (u.thickness) u.thickness.value = tgt.thickness;
+      if (u.chromaticAberration) u.chromaticAberration.value = tgt.chromaticAberration;
+      if (u.anisotropy) u.anisotropy.value = tgt.anisotropy;
+    }
+  });
+  return (
+    <mesh ref={mesh} rotation-x={Math.PI / 2} geometry={geo} visible={false}>
+      <MeshTransmissionMaterial
+        ref={mat}
+        buffer={buffer.texture}
+        ior={LENS_PROPS.ior}
+        thickness={LENS_PROPS.thickness}
+        anisotropy={LENS_PROPS.anisotropy}
+        chromaticAberration={LENS_PROPS.chromaticAberration}
+      />
+    </mesh>
+  );
+});
+
 const Lens = memo(function Lens({ follow }) {
   const ref = useRef();
   const { nodes } = useGLTF('/assets/3d/lens.glb');
@@ -185,11 +237,26 @@ const Lens = memo(function Lens({ follow }) {
     const { gl, viewport, camera } = state;
     const v = viewport.getCurrentViewport(camera, [0, 0, 15]);
 
-    const inTransit = window.__lensTransition === true;
-    const destX = inTransit ? 0 : (follow.current.x * v.width) / 2;
-    const destY = inTransit ? 0 : (follow.current.y * v.height) / 2;
-    // 跟手阻尼（官方阻尼系数 0.15）；过渡期锁视口中心，阻尼略快一点
-    easing.damp3(ref.current.position, [destX, destY, 15], inTransit ? 0.3 : 0.15, delta);
+
+    // 归加载页管的时候球**直接钉死在视口中心**，不走阻尼。
+    // ⚠ 别改回「阻尼趋近中心」（试过）：球正是这段时间从零长起来的，阻尼会让它从
+    //   指针最后停留的角落「边飘边涨」—— 看上去像在角落里冒出来再溜到中间。
+    //   钉死没有这个问题。
+    // §102 球心 z 可被外部覆盖：球巨大时（半径远超相机到球心的距离）必须把球心往相机
+    // 后方推，否则相机会陷在球**内部** —— 材质默认 FrontSide，从内部看全是背面、
+    // 被整体剔除，球直接消失（实测半径 >2045px 就看不见了，见 dev-ball 的球半径滑块）。
+    const bz = typeof window.__lensZ === 'number' ? window.__lensZ : 15;
+    if (window.__lensTransition === true) {
+      ref.current.position.set(0, 0, bz);
+    } else {
+      // 跟手阻尼（官方阻尼系数 0.15）
+      easing.damp3(
+        ref.current.position,
+        [(follow.current.x * v.width) / 2, (follow.current.y * v.height) / 2, bz],
+        0.15,
+        delta
+      );
+    }
 
     // 球在 z=15 处的投影要盖住视口对角线 —— 加载页把这值与洞口半径同步，
     // 球轮廓才会和洞沿重合（差一点就会看到「洞比球大」的白圈）。
@@ -199,20 +266,30 @@ const Lens = memo(function Lens({ follow }) {
     const dia = Math.hypot(v.width, v.height);
     window.__lensCoverScale = (dia * 2.6) / (geoWidthRef.current || 2);
 
-    if (scale == null) {
+    // ── 首页这颗球（§102 起与加载页那颗**分成两个独立 mesh**）──────────────
+    // 加载页的球在场时，这颗整体让位。两组状态互不干扰：
+    //   · 加载页那颗读 __lensScale / __lensZ / __lensOptics（由加载页写）
+    //   · 这颗一个都不读，只认 LENS_PROPS.scale 与自己的入场量 __homeGrow
+    // 分开之前是一个 mesh 从大球缩成小球再长回来 —— 加载页那边的状态会漏到首页这颗上。
+    const loadingBallOn = window.__lensBall === true;
+    ref.current.visible = !loadingBallOn;
+    const homeGrow = typeof window.__homeGrow === 'number' ? window.__homeGrow : 1;
+    if (loadingBallOn) {
+      // 让位期间不更新尺寸，交班时从零长起（见 __homeGrow）
+    } else if (scale == null) {
       const maxWorld = viewport.width * 0.9;
       const desired = maxWorld / geoWidthRef.current;
-      ref.current.scale.setScalar(Math.min(0.15, desired));
-    } else if (typeof window.__lensScale === 'number') {
-      ref.current.scale.setScalar(window.__lensScale); // 加载页在驱动
-    } else if (ref.current.scale.x !== scale) {
-      ref.current.scale.setScalar(scale); // 过渡交还后回到常态
+      ref.current.scale.setScalar(Math.min(0.15, desired) * homeGrow);
+    } else {
+      ref.current.scale.setScalar(scale * homeGrow);
     }
 
     // §102：过渡收尾时把光学性能「减弱」到中性 —— 球铺满视口后逐渐变成一块
     // 无色、无畸变的玻璃，视觉上等同消失；此时换回首页那颗球的光学是无感的。
     // __lensOptics 1 = 原样，0 = 中性。没有加载页时该全局量不存在 → 恒为 1。
-    const opt = typeof window.__lensOptics === 'number' ? window.__lensOptics : 1;
+    // ⚠ 读 __lensOptics 的**只有加载页那颗**。这颗固定用 LENS_PROPS 原值 ——
+    //   否则加载页褪光学撤走后留下的 0 会跟着漏过来，首页的球变成一块平板玻璃。
+    const opt = 1;
     const m = matRef.current;
     if (m) {
       const tgt = {
@@ -267,7 +344,9 @@ const Lens = memo(function Lens({ follow }) {
         <planeGeometry />
         <meshBasicMaterial map={buffer.texture} transparent />
       </mesh>
-      {/* 玻璃球本体：几何来自 lens.glb，材质吃同一张 buffer */}
+      {/* §102 加载页那颗球（独立 mesh，只在过渡期可见） */}
+      <LoadingBall buffer={buffer} geo={nodes.Cylinder?.geometry} />
+      {/* 首页那颗球：几何来自 lens.glb，材质吃同一张 buffer */}
       <mesh
         ref={ref}
         scale={scale ?? 0.15}
@@ -296,10 +375,36 @@ const Lens = memo(function Lens({ follow }) {
    这张 canvas 只在过渡开始时画一次：那时进度恒为 100%，画面是静止的。 */
 const PLATE_Z = 5;   // 底板平面所在深度（网格 z0 与 3D 文字 z3 之前、球 z15 之后）
 
+/* §102 背景挖洞：底板中央开一个圆洞，洞里透出底板**后面的场景**（Backdrop 网格）。
+   走 alphaMap —— meshBasicMaterial 原生支持，不动 shader、不动球的几何。
+   ⚠ 圆必须把宽高比烘进图里：alphaMap 的 UV 铺满整块底板，而底板是按视口宽高铺的，
+   所以屏幕上的正圆在 UV 空间是椭圆 —— 直接画圆会得到一圈随窗口比例拉伸的洞。 */
+const HOLE_TEX_W = 512;
+function makeHoleAlpha(holePx) {
+  const w = HOLE_TEX_W;
+  const h = Math.max(2, Math.round((HOLE_TEX_W * window.innerHeight) / window.innerWidth));
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#fff';                     // 白 = 不透明（alphaMap 取绿通道）
+  ctx.fillRect(0, 0, w, h);
+  const r = (holePx * w) / window.innerWidth; // 屏幕像素 → texel
+  const g = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, r);
+  g.addColorStop(0, '#000');
+  g.addColorStop(0.88, '#000');
+  g.addColorStop(1, '#fff');                  // 留一点羽化，硬边会看到台阶
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(w / 2, h / 2, r, 0, Math.PI * 2);
+  ctx.fill();
+  return c;
+}
+
 function LoadingPlate() {
   const mesh = useRef();
   const mat = useRef();
   const texRef = useRef(null);
+  const holeRef = useRef({ px: -1, tex: null });   // { 上次的洞径屏幕像素, alpha 纹理 }
 
   useFrame((state) => {
     const { viewport, camera } = state;
@@ -308,13 +413,34 @@ function LoadingPlate() {
     // 拿 z=0 的尺寸去铺 z=5 的平面 → 大 1.333 倍，交班瞬间整页「莫名放大」。
     const vp = viewport.getCurrentViewport(camera, [0, 0, PLATE_Z]);
     const src = window.__plPlate;
-    if (src && !texRef.current) {
+    // ⚠ 判据必须是「**还是不是同一张 canvas**」，不能是「有没有纹理」。
+    //   旧写法 `if (src && !texRef.current)` 只在第一次建纹理：dev-ball 的动画是循环
+    //   重播的，reset() 会把 __plPlate 换成新烘的一张，纹理却仍指着第一张 ——
+    //   改了字距/模糊再重播，屏幕纹丝不动（实测差异 0 像素，而 __plPlate 已确实换了）。
+    if (src && (!texRef.current || texRef.current.image !== src)) {
       const t = new THREE.CanvasTexture(src);
       t.colorSpace = THREE.SRGBColorSpace;
       t.minFilter = THREE.LinearFilter;   // 非 2 次幂尺寸 → 不能上 mipmap
       t.generateMipmaps = false;
+      if (texRef.current) texRef.current.dispose();   // 换新前释放旧的，别漏显存
       texRef.current = t;
       if (mat.current) { mat.current.map = t; mat.current.needsUpdate = true; }
+    }
+    // 圆洞：洞径由外部给（window.__lensHolePx，屏幕像素），随玻璃球半径变化。
+    // 只在变化超过 1px 时重建纹理 —— 拖滑块时每帧重建会一直分配显存。
+    const holePx = typeof window.__lensHolePx === 'number' ? window.__lensHolePx : 0;
+    if (mat.current) {
+      if (holePx > 1) {
+        if (!holeRef.current.tex || Math.abs(holeRef.current.px - holePx) > 1) {
+          if (holeRef.current.tex) holeRef.current.tex.dispose();
+          holeRef.current = { px: holePx, tex: new THREE.CanvasTexture(makeHoleAlpha(holePx)) };
+          mat.current.alphaMap = holeRef.current.tex;
+          mat.current.needsUpdate = true;
+        }
+      } else if (mat.current.alphaMap) {
+        mat.current.alphaMap = null;            // 归零即回到实心底板
+        mat.current.needsUpdate = true;
+      }
     }
     if (mesh.current) mesh.current.scale.set(vp.width, vp.height, 1);
     if (mat.current && mesh.current) {
