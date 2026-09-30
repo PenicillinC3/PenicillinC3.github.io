@@ -1,6 +1,16 @@
 // MapleMono-NF-CN 子集化（spec §29/§32）：全站（除摄影页，正文用字）TTF
 // → public/fonts/maple-mono.woff2（常规）与 maple-mono-italic.woff2（中文注释用斜体）。
-// 字形取自全部内容 md + 页面/组件文案。新增内容后执行：npm run fonts:subset
+// 字形取自全部内容 md + 页面/组件文案。
+//
+// ⚠ 字形集随内容走 —— 这个脚本**必须**在内容变化后重跑，而漏跑是静默的：
+//   子集里没有的字形会逐字回退到系统字体，页面不会报错，只是新旧字体混排。
+//   2026-10-01 实测栽过：字体停在 09-16，之后 09-23/09-24 两次内容提交没重跑，
+//   线上缺 140 个汉字（「专 业 严 义 乐 乱 产…」），两个月没人发现。
+//   → 现由 package.json 的 prebuild / predev 钩子自动跑（5.4s，输出确定性），
+//     别再退回「记得手动执行」。
+//
+// 顺带：MapleMono 是编程字体，**没有 emoji 字形**（🎉✨🐛📚🛠⚡ 等永远缺席，
+//   落回系统 emoji 字体 —— 这是正确行为，不是缺字）。
 import { readFile, readdir, writeFile, stat } from 'node:fs/promises';
 import { join, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
