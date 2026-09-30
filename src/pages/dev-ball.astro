@@ -375,7 +375,14 @@ const fontCss = `
       clock = target;
     });
 
-    function ease(t) { return t * t * (3 - 2 * t); }
+    function ease(t) { return t * t * (3 - 2 * t); }        // ease-in-out（球长大 / 撤场用）
+    // 光学衰减专用：先快后慢（ease-out），对应 cubic-bezier(0.22, 1, 0.36, 1)。
+    function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
+    // 光学曲线与「降到一半」的时刻（按曲线解，不写死 0.5 —— ease-out 下 opt 到 0.5
+    // 时 t≈0.21，跟时间中点差一倍多）。与 Preloader.astro 同一套。
+    function optAt(t) { return 1 - easeOut(Math.min(1, Math.max(0, t))); }
+    var HALF_AT = (function () { for (var i = 0; i <= 100; i++) if (optAt(i / 100) <= 0.5) return i / 100; return 0.5; })();
+    var T_HALF = HALF_AT * T_FADE;
     function pad(v, w) { var s = String(v); while (s.length < w) s = '0' + s; return s; }
 
     // 把加载页版面烘成 canvas 交给球 —— 只在交班那一刻画一次（进度恒 100%、画面静止）。
@@ -663,21 +670,18 @@ const fontCss = `
         // 用户要求：加载完成后**不呼出球** —— 只把底板挖洞，洞后露出首页。
         // 要恢复呼出：把 SUMMON_BALL 改回 true（球半径 / 贴脸距 / 光学三个滑块都还在）。
         var t2 = t - T_LOAD - T_HOLD;            // 交班之后的相对时间
-        var u = ease(Math.min(1, t2 / T_CALL));
-        window.__lensScale = SUMMON_BALL ? summonScale() * u : 0;
-        // 球心随尺寸同步后退，球面始终停在相机前固定距离 —— 否则球一大就把相机吞进去
-        window.__lensZ = CAM_Z - BALL_GAP_W - summonScale() * (SUMMON_BALL ? u : 0) * MODEL_R_W;
         // 本页是**加载页的预览**：上场的自始至终是**加载页那颗球**（独立 mesh）。
         window.__lensBall = true;
         window.__lensTransition = true;
 
-        // ② 褪光学：从滑块那个强度衰减到 0（中性玻璃 = ior 1 / 厚度 0 / 无色差）
-        var opt = 1;
-        if (t2 > T_CALL) {
-          var of = Math.min(1, (t2 - T_CALL) / T_FADE);
-          opt = 1 - ease(of);
-        }
-        window.__lensOptics = opticsBase * opt;
+        // ① 褪光学：**先跑**（从交班那一刻开始），先快后慢（ease-out）
+        window.__lensOptics = opticsBase * optAt(t2 / T_FADE);
+        // ② 呼出球：光学降到 50% 的瞬间才触发，之后与光学衰减**并行**。
+        //    球自身的时长 / 曲线 / 视觉都没变，只是起点从 0 挪到了 T_HALF。
+        var u = ease(Math.min(1, Math.max(0, (t2 - T_HALF)) / T_CALL));
+        window.__lensScale = SUMMON_BALL ? summonScale() * u : 0;
+        // 球心随尺寸同步后退，球面始终停在相机前固定距离 —— 否则球一大就把相机吞进去
+        window.__lensZ = CAM_Z - BALL_GAP_W - summonScale() * (SUMMON_BALL ? u : 0) * MODEL_R_W;
 
         // ③ 撤场：底板淡出（__lensScene 0→1 驱动它的 opacity）、球同步缩没
         if (t2 > T_CALL + T_FADE) {
@@ -695,8 +699,8 @@ const fontCss = `
         }
 
         stgEl.textContent = !SUMMON_BALL ? '挖洞'
-          : t2 < T_CALL ? '呼出球'
-          : t2 < T_CALL + T_FADE ? '褪光学'
+          : t2 < T_HALF ? '褪光学'
+          : t2 < T_CALL + T_FADE ? '呼出球'
           : t2 < T_CALL + T_FADE + T_OUT ? '撤场' : '落定';
       }
       // 球半径（像素）：呼出球时按实时 scale 算，不呼出时用滑块那个**标称值** ——

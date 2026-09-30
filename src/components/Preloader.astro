@@ -14,10 +14,14 @@
 // 旧的 Canvas 渲染器（BLOCKS / blit / drawTerm / applyBloom / 枕形条带）已全部移除。
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { prefetchUrls } from '../lib/prefetch-manifest';
+import { prefetchPlan } from '../lib/prefetch-manifest';
 
-// 清单在构建期算好注入脚本；`<` 转义防 `</script>` 逃逸（CLAUDE.md 坑 2）
-const urlsJson = JSON.stringify(await prefetchUrls()).replace(/</g, '\\u003c');
+// §103 清单分两批：critical = 加载页期间必须拉完的（首页首屏 + 五个栏目首页 + 球的模型与字体）；
+// deferred = 首页渲染完、主线程空闲后才在后台拉的子页与正文大图。
+// `<` 转义防 `</script>` 逃逸（CLAUDE.md 坑 2）
+const plan = await prefetchPlan();
+const urlsJson = JSON.stringify(plan.critical).replace(/</g, '\\u003c');
+const lazyJson = JSON.stringify(plan.deferred).replace(/</g, '\\u003c');
 
 // 构建期内联 Helvetica 子集（7020 B → base64 9360 B）。
 // **加载页首帧就要有字**，不能等一次网络往返 —— 否则数字和 LOADING 会先以回退字体
@@ -193,7 +197,8 @@ const bootJs = `
   // 本脚本在 body 最前同步执行，一定早于 island 水合。
   window.__plPending = true;
 
-  var URLS = ${urlsJson};      // 预取清单（构建期注入）
+  var URLS = ${urlsJson};     // §103 critical：加载页期间拉完这批就退场
+  var LAZY = ${lazyJson};     // §103 deferred：首页渲染完后空闲时再拉
   var MIN_MS = 5000;           // 要让观众看满的时长（构建动效 + 解析整段铺开）
   var HARD_BAIL_MS = 60000;    // 网络僵死时的唯一逃生口（不想要就设成 Infinity）
   var IDLE_MS = 10000;         // 单个请求「多久没收到字节」算卡死（慢但在动的不会中招）
@@ -571,7 +576,11 @@ const bootJs = `
   function worldPerPx() {
     return (2 * Math.tan((FOV * Math.PI) / 360) * (CAM_Z - LENS_Z)) / innerHeight;
   }
-  function smooth(t) { return t * t * (3 - 2 * t); }
+  function smooth(t) { return t * t * (3 - 2 * t); }        // ease-in-out（球长大 / 撤场用）
+  // 光学衰减专用：**先快后慢**（ease-out）。玻璃质感一上来就掉得最快、后面越来越慢地
+  // 收尾 —— 对应 CSS 那条 cubic-bezier(0.22, 1, 0.36, 1)。
+  // ⚠ 别拿它去替 smooth：球长大 / 撤场要的是 ease-in-out，不是这条。
+  function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
 
   function transition() {
     ended = true;
@@ -598,17 +607,27 @@ const bootJs = `
     var scaleFull = BALL_RADIUS_PX * worldPerPx();
     var tA = performance.now();
 
+    // 光学曲线：opt(t) = 1 - easeOut(t)，先快后慢
+    function optAt(t) { return 1 - easeOut(Math.min(1, Math.max(0, t))); }
+    // 「光学降到一半」那一刻在曲线上的位置。⚠ **按曲线解，不写死 0.5** ——
+    // ease-out 下 opt 降到 0.5 时 t≈0.21，跟时间中点差了一倍多。
+    // 数值解（100 步扫描）而不是解析：曲线以后换了这里自动跟上。
+    var HALF_AT = (function () {
+      for (var i = 0; i <= 100; i++) if (optAt(i / 100) <= 0.5) return i / 100;
+      return 0.5;
+    })();
+    var T_HALF = HALF_AT * T_FADE;          // 光学降到 50% 的时刻
+
     (function frame(now) {
       var ms = now - tA;
-      // ① 呼出球：由零长到 scaleFull，球心同步后推，底板上的洞按比例跟着长
-      var u = smooth(Math.min(1, ms / T_CALL));
+      // ① 褪光学：**先跑**（从交班那一刻开始），先快后慢
+      window.__lensOptics = optAt(ms / T_FADE);
+      // ② 呼出球：光学降到 50% 的瞬间才触发，之后与光学衰减**并行**（互不阻塞）。
+      //    球自身的时长 / 曲线 / 视觉完全没变，只是起点挪了。
+      var u = smooth(Math.min(1, Math.max(0, (ms - T_HALF)) / T_CALL));
       window.__lensScale = scaleFull * u;
       window.__lensZ = CAM_Z - BALL_GAP_W - scaleFull * u * MODEL_R_W;
       window.__lensHolePx = BALL_RADIUS_PX * u * HOLE_RATIO;
-      // ② 褪光学：从满强度衰减到中性（ior→1、thickness→0、色差→0）
-      var opt = 1;
-      if (ms > T_CALL) opt = 1 - smooth(Math.min(1, (ms - T_CALL) / T_FADE));
-      window.__lensOptics = opt;
       // ③ 撤场：**球一褪完光学就整颗删掉，没有收回动画**（用户明确要求）。
       //    早先这里还跟着一句 __lensScale = scaleFull * (1 - oo) —— 那是「把球收回去」，
       //    和「加载页的球到点消失、首页的球另外长出来」是两回事，已删。
@@ -637,13 +656,36 @@ const bootJs = `
       settle();
     })(performance.now());
 
+    // ⑤ §103 子页后台预加载 —— 首页首屏渲染完 + 主线程空闲时才启动。
+    //    用 requestIdleCallback（Safari 不支持 → setTimeout 兜底），并发 2、priority:'low'，
+    //    全程不阻塞交互。用户点进子页时：拉到就直接渲染，没拉完就走 Astro 自己的
+    //    viewport 预取（§100）—— 不会因为这里而变慢。
+    function idlePrefetch() {
+      if (!LAZY.length) return;
+      var i = 0, running = 0, MAX = 2;
+      function schedule() {
+        if (i >= LAZY.length) return;
+        if (window.requestIdleCallback) requestIdleCallback(step, { timeout: 3000 });
+        else setTimeout(step, 200);          // Safari：退化成低优先级定时器
+      }
+      function step() {
+        while (running < MAX && i < LAZY.length) {
+          running++;
+          fetch(LAZY[i++], { priority: 'low', cache: 'force-cache' })
+            .catch(function () {})           // 单个失败不影响其余，也不上报
+            .then(function () { running--; schedule(); });
+        }
+      }
+      schedule();
+    }
+
     // ④ 收尾：把球交还给 island 自己管。
     //    HOME_BALL=true → 由零长回首页那颗常态小球（scale 0.10），光学同步恢复；
     //    =false → 直接把球撤掉，首页不留球。
     function settle() {
       // 首页那颗**从首页自己长出来**（不是加载页那颗缩回去）：只推 __homeGrow 0→1，
       // 尺寸由 FluidGlass 用它乘 LENS_PROPS.scale 得到。加载页那几个量一概不碰。
-      if (!HOME_BALL) { window.__lensTransition = false; return; }
+      if (!HOME_BALL) { window.__lensTransition = false; idlePrefetch(); return; }
       window.__lensTransition = false;      // 它就是首页那颗了：正常跟手
       var DUR = 800, tB = performance.now();   // __homeGrow 已在撤场开始时置零
       (function step(now) {
@@ -651,6 +693,7 @@ const bootJs = `
         window.__homeGrow = k;
         if (k < 1) { requestAnimationFrame(step); return; }
         delete window.__homeGrow;           // 交还给 island：此后就是常态那颗球
+        idlePrefetch();                     // 首页已渲染完 → 此刻才开始后台拉子页
       })(performance.now());
     }
   }
