@@ -2,9 +2,10 @@ import { readdir } from 'node:fs/promises';
 import { listSorted, photoEntries, seriesRolls } from './collections';
 import { coverImage, memoImage } from './photo-images';
 
-// §101：首页加载页要预取的清单 —— 构建期算好，注入加载页的内联脚本。
-// 覆盖：全部路由 HTML + 全部照片展示图（与页面同一套 getImage 参数，见
-// photo-images.ts）+ 全部字体子集。清单只在首页构建时生成一次。
+// 首页加载页要预取的清单 —— 构建期算好，注入加载页的内联脚本。
+// §101 起：覆盖全站路由 HTML + 照片展示图（与页面同一套 getImage 参数，见
+// photo-images.ts）+ 字体子集。**§103 起分两批**（critical / deferred，见
+// prefetchPlan）—— 加载页只等 critical。清单只在首页构建时生成一次。
 
 /** 没有动态段的路由（栏目首页 + 首页 + 404 不进清单） */
 const STATIC_ROUTES = ['/', '/notes/', '/musings/', '/links/', '/projects/', '/photos/'];
