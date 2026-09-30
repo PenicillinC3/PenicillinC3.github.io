@@ -386,6 +386,33 @@ body.page-dark {
     inset 3px 3px 7px -2px rgba(0, 0, 0, 0.5),
     inset -3px -3px 7px -2px rgba(255, 255, 255, 0.1);
 }
+/* §104 日光版（用户指定）：**只作用于摄影栏目的子页（卷备忘页）**，
+   画廊首页保持原暗房。用 :has(.memohead) 圈定 —— 备忘页头部带 .memohead，
+   画廊首页没有；不新加 class、不动任何布局与组件。
+   ⚠ 必须整组一起翻：白底 + 原来的亮色正文 = 字直接看不见。
+   胶片画面 / 玻璃卡等**内容**的深色不受影响，翻的只是底与字。 */
+body.page-dark:has(.memohead) {
+  --canvas: #ffffff;
+  --grid-line: transparent;            /* 子页不要装饰网格（用户要求）*/
+  --text-1: #17191f;
+  --text-2: #565d6e;
+  --text-3: #7e8598;
+  --glass-bg: rgba(255, 255, 255, 0.62);
+  --glass-border: rgba(15, 23, 42, 0.1);
+  --glass-inset:
+    inset 3px 3px 7px -2px rgba(15, 23, 42, 0.06),
+    inset -3px -3px 7px -2px rgba(255, 255, 255, 0.9);
+}
+body.page-dark:has(.memohead) .topbar {
+  background: rgba(255, 255, 255, 0.72);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.1);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 rgba(15, 23, 42, 0.06),
+    0 14px 32px -22px rgba(15, 23, 42, 0.25);
+}
+body.page-dark:has(.memohead) .drawer { background: #ffffff; }
+
 /* §71：摄影作品集页及其子页（= 全部 page-dark）顶栏材质 = 玻璃面板（用户选定，
    与站点 .glass/.btn 同语言）：半透明深底自带明度层次（0–56px 上带背后无内容，
    纯黑近黑玻璃会隐形 —— §70 系列教训）+ 上缘内高光/下缘内影对仗 + 发丝描边 +
