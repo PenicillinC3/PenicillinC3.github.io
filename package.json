@@ -4,7 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "predev": "npm run fonts:subset",
     "dev": "astro dev",
+    "prebuild": "npm run fonts:subset",
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",

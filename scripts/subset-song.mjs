@@ -1,6 +1,9 @@
 // 华文中宋子集化（spec §28）：把 _font/STZHONGS.TTF（~12MB）按「摄影作品集
 // 首页及其分页实际用到的字形」子集 → public/fonts/stzhongsong.woff2。
-// 新增照片/卷文案后重新执行：npm run fonts:subset
+//
+// ⚠ 同 subset-maple.mjs：漏跑是**静默**的（缺形逐字回退系统宋体）。现由
+//   package.json 的 prebuild / predev 钩子自动执行，勿退回手动。2026-10-01 实测
+//   这份子集也停在 09-16，落后了两轮内容。
 import { readFile, readdir, writeFile, stat } from 'node:fs/promises';
 import { join, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
