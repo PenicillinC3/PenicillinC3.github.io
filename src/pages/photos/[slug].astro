@@ -71,7 +71,12 @@ const imgBySlug = new Map(imgs.map((it) => [it.p.id, it]));
 ---
 <Base title={s.data.title} description={s.data.summary ?? `摄影备忘录：${s.data.title}`} dark>
   {/* 红色射线氛围（spec §26）：backdrop 沉于玻璃卡后方，随正文滚动 */}
-  <Rays variant="backdrop" />
+  <Rays variant="backdrop" config={{
+    rayColor1: '#FFF176',   // §104 日光版：黄绿相间（用户指定）
+    rayColor2: '#81C784',
+    intensity: 1.3,
+    opacity: 0.45,           // 白底上要调淡，否则字幕底下被压成深色
+  }} />
   <article class="memo">
     <p class="crumb"><a href="/photos/">← 摄影作品集</a></p>
     <header class="glass memohead">
@@ -139,6 +144,6 @@ const imgBySlug = new Map(imgs.map((it) => [it.p.id, it]));
 
   /* 暗房点缀（spec §21.3）：页头红光发丝线 */
   .memohead { border-bottom: 1px solid rgba(255, 107, 107, 0.45); box-shadow: var(--glass-inset), var(--glass-shadow), 0 10px 40px -18px rgba(255, 77, 77, 0.5); }
-  .memohead .page-title { color: #fff; text-shadow: 0 0 24px rgba(255, 77, 77, 0.35); }
+  .memohead .page-title { color: #17191f; text-shadow: 0 0 24px rgba(255, 77, 77, 0.18); } /* §104 日光版：白底上白字看不见 */
   .meta { color: var(--text-3); }
 </style>

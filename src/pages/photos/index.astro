@@ -299,7 +299,9 @@ const n = covers.length;
     object-fit: cover; /* 3:2 源填满 3:2 片窗 */
     transition: filter 0.25s ease-out;
   }
-  .bg--wide { object-fit: contain; }
+  /* 用户要求：一律放大填满胶片框、不留黑边 —— 宽图也从 contain 改 cover
+     （代价：比 3:2 更宽的图会裁掉左右两侧，换来的是没有上下黑边）。 */
+  .bg--wide { object-fit: cover; }
   .frame:hover .bg { filter: brightness(1.06); }
   /* 通透玻璃占位（无作品的一侧，spec §50/§51）：无模糊、高透 —— 极淡白渐变
      勾勒面板，黑底/红光直接透出；描边降淡（§51），不响应点击 */
