@@ -22,6 +22,13 @@ npm run fonts:subset # 重建 woff2 子集（song §28 + maple §29 + maple-pre 
 
 **无单元测试**。验收 = `npm run build` 零警告 + `npm run preview` 后对路由 curl 状态码（全 200、`/nope-xyz` 404）+ 浏览器人工走查（视觉项）。每次改动后必须 build 通过再提交；git 提交身份已配置（PenicillinC3），逐任务小步提交。
 
+## 更新日志（每次改动必做）
+
+根目录 `CHANGELOG.md` 记着站点自 2026-09-06 创立至今的全部改动。**每次改动后都要在最上方追加一条**（倒序，最新在最前；同一天并入已有小节）。格式与维护约定见该文件末尾。
+
+- **该文件已 gitignore，不入库、不上传** —— 它是作者自己的开发史，不是站点的一部分。**别 `git add -f` 把它带上去。**
+- 条目要写**关键决策、踩到的坑、实测数字**，尤其是「**为什么这么做**」和「**试过什么不行**」—— spec 之外只有这里会记。涉设计规范变动的对齐 spec 编号（`docs/superpowers/specs/`）。
+
 ## 架构要点
 
 - **内容层**：`src/content.config.ts` 用 zod 定义 6 个集合 —— `notes`/`musings`/`links`/`projects`/`photos`/`series`。共享字段 `title/date(YYYY-MM-DD)/summary?/draft?`；`photos` 经 `image()` 引用**同目录同名文件**（md 与其图按卷分文件夹存放：`src/content/photos/<卷名>/`，§96；集合 glob loader，slug = **文件夹名/文件名**（如 `nikon-roll/dsc0007`）—— 引用带卷前缀，同名照片跨卷互不冲突，仅需卷内不重名）；**glob loader 集合条目主键是 `id` 不是 `slug`**（§99 抓到：切 loader 后沿读 .slug 全为 undefined → 封面匹配失效、映射撞键，照片张冠李戴——凡照片条目一律用 `entry.id`），并带可选 `series` slug 挂靠；`series`（摄影卷）有 `cover`（卷内照片 slug，必填）。frontmatter 错误在构建期报错拦截，这是特性。

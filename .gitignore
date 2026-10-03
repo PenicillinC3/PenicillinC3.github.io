@@ -21,5 +21,8 @@ Thumbs.db
 # 酸性图案参考素材（仅本地参考，不入库）
 _Acid/
 
+# 开发更新日志（作者自己的开发史，不是站点的一部分；每次改动都要更新）
+CHANGELOG.md
+
 # macOS 元数据垃圾（AppleDouble，跟 _Acid 一起混进来的）
 ._*
