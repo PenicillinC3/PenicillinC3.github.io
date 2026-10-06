@@ -68,7 +68,7 @@ const bootCss = `
   }
 
   /* 兜底：脚本任何异常都不能留下白屏 —— 无条件淡出。
-     最坏路径 = MIN_MS 5s + BALL_WAIT_MS 6s + GROW 1.4s + SETTLE 1s ≈ 13.4s，取 18s。 */
+     §105 起最坏路径 = MIN_MS 2.5s + BALL_WAIT_MS 6s + 过渡 1.6s + 交班 0.8s ≈ 10.9s，取 18s。 */
   #pl{
     position:fixed; inset:0; z-index:9999; overflow:hidden;
     background:#f7f7f6; color:#1a1a1a;
@@ -197,9 +197,12 @@ const bootJs = `
   // 本脚本在 body 最前同步执行，一定早于 island 水合。
   window.__plPending = true;
 
-  var URLS = ${urlsJson};     // §103 critical：加载页期间拉完这批就退场
-  var LAZY = ${lazyJson};     // §103 deferred：首页渲染完后空闲时再拉
-  var MIN_MS = 5000;           // 要让观众看满的时长（构建动效 + 解析整段铺开）
+  var URLS = ${urlsJson};     // §105 critical：**只有首页自己**要的 4 项，下完就退场
+  var LAZY = ${lazyJson};     // §105 deferred：首页渲染完后空闲时按序再拉（顺序即优先级）
+  // ⚠ 这个值同时是**解密揭示的速度**：shown 到 0.9 时进度项就把揭示收干
+  //   （见 tickDecrypt 的 byProg），所以实际揭示时长 ≈ 0.9 × MIN_MS。
+  //   改它会同时改「看满多久」和「字锁定得多快」，别只按其中一个调。
+  var MIN_MS = 2500;
   var HARD_BAIL_MS = 60000;    // 网络僵死时的唯一逃生口（不想要就设成 Infinity）
   var IDLE_MS = 10000;         // 单个请求「多久没收到字节」算卡死（慢但在动的不会中招）
   var CONC = 5;                // 并发数
@@ -566,7 +569,9 @@ const bootJs = `
   var MODEL_R_W = 1.009;      // 模型半径（scale=1 时的世界单位）
   var HOLE_RATIO = 14;        // 底板上的洞 = 球半径 × 此系数
   var CAM_Z = 20, FOV = 15, LENS_Z = 15;      // 与 FluidGlass 一致
-  var T_CALL = 1700, T_FADE = 300, T_OUT = 700;   // 呼出 / 褪光学 / 撤场 的时长（ms）
+  // 呼出 / 褪光学 / 撤场 的时长（ms）。§105：合计 2.7s → 1.6s（用户反馈加载页等太久）。
+  // ⚠ 三者是**串行**的（球在光学降到 50% 时触发，见 T_HALF），改一个要连着看总时长。
+  var T_CALL = 1000, T_FADE = 200, T_OUT = 400;
   // 撤场结束后，首页那颗常态小球要不要长回来。
   // ⚠ 加载页的球与首页的球是**两个独立的 mesh**（见 FluidGlass 的 LoadingBall）：
   //   这颗撤走时不会带走首页那颗的任何状态，首页那颗也不读 __lens*。
@@ -656,8 +661,10 @@ const bootJs = `
       settle();
     })(performance.now());
 
-    // ⑤ §103 子页后台预加载 —— 首页首屏渲染完 + 主线程空闲时才启动。
-    //    用 requestIdleCallback（Safari 不支持 → setTimeout 兜底），并发 2、priority:'low'，
+    // ⑤ §103/§105 后台预加载 —— 首页首屏渲染完 + 主线程空闲时才启动。
+    //    LAZY **本身已按优先级排好序**（构建期定序：正文字体 → 栏目首页 → 封面 →
+    //    其余），这里是 FIFO + 并发 2，所以顺序就是优先级，不必再排序。
+    //    用 requestIdleCallback（Safari 不支持 → setTimeout 兜底）、priority:'low'，
     //    全程不阻塞交互。用户点进子页时：拉到就直接渲染，没拉完就走 Astro 自己的
     //    viewport 预取（§100）—— 不会因为这里而变慢。
     function idlePrefetch() {
@@ -830,8 +837,15 @@ const bootJs = `
   }
 
   // ================= 帧循环：时间轴主导 + 未就绪封顶 99% =================
-  function drive() {
+  // §105：进度推进**必须帧率无关**。原来是 shown += (target-shown)*0.12 每帧一次 ——
+  //   系数是按 60fps 调的，帧率一掉，收敛就等比变慢：实测 5.3fps 下从 0.43 爬到 0.99
+  //   要 7 秒（31 帧），整个加载页被拖到 10s+，而资源其实 1.9s 就下完了。
+  //   玻璃球初始化那一下能卡掉一整帧（实测最长 2145ms），所以低配机/手机会实打实中招。
+  //   换算成「每 16.67ms 推进 0.12」后，60fps 下手感与原来完全一致，低帧率下不再变慢。
+  var lastFrameT = 0;
+  function drive(now) {
     if (ended || !el.isConnected) return;
+    now = now || performance.now();                      // rAF 会给时间戳；直调时兜底
     var el_ms = Date.now() - t0;
     var tt = Math.min(1, el_ms / MIN_MS);
     var target = tt * tt * (3 - 2 * tt);                 // smoothstep，起步收尾都不突
@@ -842,7 +856,11 @@ const bootJs = `
     var holdingForBall = bs === 'wait' && el_ms < BALL_WAIT_MS;
     if (doneCount < urls.length || holdingForBall) target = Math.min(target, 0.99);
 
-    if (target > shown) shown += (target - shown) * 0.12; // 只升不降
+    // dt 封顶 250ms：切标签页回来时 rAF 会一次跳好几秒，不封顶会让进度瞬间冲到顶
+    var dt = lastFrameT ? Math.min(now - lastFrameT, 250) : 16.67;
+    lastFrameT = now;
+    var k = 1 - Math.pow(1 - 0.12, dt / 16.67);          // 60fps 下 k === 0.12
+    if (target > shown) shown += (target - shown) * k;   // 只升不降
     else if (target < shown) shown = target;
     window.__plReal = shown;
     window.__plProgress = shown;
