@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PenicillinC3 博客 · 项目结构</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      /* 项目自有皮肤：取自 src/styles/tokens.css（paper 禁纯白，校暖一档） */
+      --color-paper:   #fafafa;
+      --color-paper-2: #f1f2f4;
+      --color-ink:     #17191f;
+      --color-muted:   #4f5568;
+      --color-soft:   #5a6580;
+      --color-accent:  #2f62e6;
+      --color-link:    #2e5aa8;
+      --font-sans:     'Geist', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      --font-serif:    'Instrument Serif', 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 2rem;
+    }
+
+    .frame { max-width: 1360px; width: 100%; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: var(--color-ink);
+      margin-bottom: 1.5rem;
+    }
+
+    svg { width: 100%; min-width: 1280px; display: block; }
+    @media print {
+      .diagram-container { overflow-x: visible; }
+      svg { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Architecture · Astro 5 · GitHub Pages</p>
+    <h1>PenicillinC3 博客 · 项目结构</h1>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="vibe-structure-title vibe-structure-desc">
+        <title id="vibe-structure-title">PenicillinC3 博客项目结构</title>
+        <desc id="vibe-structure-desc">Astro 5 静态博客的架构：六个内容集合经查询层进入十条路由的页面层，页面调用静态组件族与三个特殊运行时；字体子集管线在构建期产出静态资产，推送 main 后由 GitHub Actions 构建并发布到 GitHub Pages。</desc>
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5568"/></marker>
+          <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2f62e6"/></marker>
+          <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2e5aa8"/></marker>
+        </defs>
+
+        <rect width="100%" height="100%" fill="#fafafa"/>
+
+        <!-- ══ 分区（先画：底 → 分区 → 箭头 → 节点）══ -->
+        <rect x="40" y="56" width="744" height="440" rx="8" fill="rgba(23,25,31,0.02)" stroke="rgba(23,25,31,0.10)" stroke-width="0.8"/>
+        <rect x="56" y="60" width="96" height="16" rx="2" fill="#fafafa"/>
+        <text x="104" y="72" fill="#5a6580" font-size="12" font-weight="500" font-family="'Geist','Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif" text-anchor="middle">源码层 · src/</text>
+
+        <rect x="816" y="56" width="424" height="440" rx="8" fill="rgba(23,25,31,0.02)" stroke="rgba(23,25,31,0.10)" stroke-width="0.8"/>
+        <rect x="832" y="60" width="132" height="16" rx="2" fill="#fafafa"/>
+        <text x="898" y="72" fill="#5a6580" font-size="12" font-weight="500" font-family="'Geist','Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif" text-anchor="middle">构建与资产 · BUILD</text>
+
+        <rect x="40" y="524" width="1200" height="100" rx="8" fill="rgba(23,25,31,0.02)" stroke="rgba(23,25,31,0.10)" stroke-width="0.8"/>
+        <rect x="56" y="528" width="96" height="16" rx="2" fill="#fafafa"/>
+        <text x="104" y="540" fill="#5a6580" font-size="12" font-weight="500" font-family="'Geist','Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif" text-anchor="middle">部署 · DEPLOY</text>
+
+        <!-- ══ 箭头（节点之前绘制）══ -->
+        <!-- A 内容集合 → B 查询层 -->
+        <line x1="412" y1="196" x2="412" y2="236" stroke="#4f5568" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <rect x="420" y="204" width="40" height="16" rx="2" fill="#fafafa"/>
+        <text x="440" y="216" fill="#5a6580" font-size="12" font-weight="500" font-family="'Geist','Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif" text-anchor="middle">取数</text>
+
+        <!-- B 查询层 → C 页面层 -->
+        <line x1="412" y1="308" x2="412" y2="360" stroke="#4f5568" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <rect x="420" y="322" width="40" height="16" rx="2" fill="#fafafa"/>
+        <text x="440" y="334" fill="#5a6580" font-size="12" font-weight="500" font-family="'Geist','Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif" text-anchor="middle">供数</text>
+
+        <!-- C 页面层 → E 静态组件族 -->
+        <line x1="280" y1="408" x2="240" y2="408" stroke="#4f5568" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <rect x="240" y="384" width="40" height="16" rx="2" fill="#fafafa"/>
+        <text x="260" y="396" fill="#5a6580" font-size="12" font-weight="500" font-family="'Geist','Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif" text-anchor="middle">渲染</text>
+
+        <!-- C 页面层 → F 交互运行时（焦点路径）-->
+        <line x1="544" y1="408" x2="584" y2="408" stroke="#2f62e6" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
+        <rect x="544" y="384" width="40" height="16" rx="2" fill="#fafafa"/>
+        <text x="564" y="396" fill="#5a6580" font-size="12" font-weight="500" font-family="'Geist','Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif" text-anchor="middle">挂载</text>
+
+        <!-- G 字体管线 → H 静态资产 -->
+        <line x1="1028" y1="216" x2="1028" y2="284" stroke="#4f5568" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <rect x="1036" y="236" width="44" height="14" rx="2" fill="#fafafa"/>
+        <text x="1058" y="246" fill="#5a6580" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">SUBSET</text>
+
+        <!-- H 静态资产 → F 交互运行时（hydrate 时按需取）-->
+        <line x1="848" y1="376" x2="768" y2="376" stroke="#4f5568" stroke-width="1" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+        <rect x="776" y="356" width="40" height="14" rx="2" fill="#fafafa"/>
+        <text x="796" y="366" fill="#5a6580" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">FETCH</text>
+
+        <!-- 源码层 → GitHub Actions（推送触发）-->
+        <line x1="412" y1="496" x2="412" y2="556" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+        <rect x="420" y="516" width="56" height="14" rx="2" fill="#fafafa"/>
+        <text x="448" y="526" fill="#5a6580" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">PUSH MAIN</text>
+
+        <!-- H 静态资产 → GitHub Pages（原样复制）-->
+        <line x1="1028" y1="396" x2="1028" y2="556" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+        <rect x="1036" y="466" width="36" height="14" rx="2" fill="#fafafa"/>
+        <text x="1054" y="476" fill="#5a6580" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">COPY</text>
+
+        <!-- GitHub Actions → GitHub Pages -->
+        <line x1="592" y1="584" x2="652" y2="584" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+        <rect x="596" y="564" width="48" height="14" rx="2" fill="#fafafa"/>
+        <text x="620" y="574" fill="#5a6580" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">DEPLOY</text>
+
+        <!-- ══ 节点 ══ -->
+
+        <!-- A 内容集合（store）-->
+        <rect x="280" y="100" width="264" height="96" rx="6" fill="#fafafa"/>
+        <rect x="280" y="100" width="264" height="96" rx="6" fill="rgba(23,25,31,0.05)" stroke="#4f5568" stroke-width="1"/>
+        <rect x="288" y="106" width="48" height="12" rx="2" fill="transparent" stroke="rgba(79,85,104,0.40)" stroke-width="0.8"/>
+        <text x="312" y="115" fill="rgba(79,85,104,0.80)" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.08em">CONTENT</text>
+        <text x="412" y="144" fill="#17191f" font-size="12" font-weight="600" font-family="'Geist','Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif" text-anchor="middle">内容集合</text>
+        <text x="412" y="160" fill="#4f5568" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">src/content/ · 6 collections</text>
+        <text x="412" y="174" fill="#4f5568" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">notes·musings·links·projects·photos·series</text>
+
+        <!-- B 查询层（backend）-->
+        <rect x="280" y="236" width="264" height="72" rx="6" fill="#fafafa"/>
+        <rect x="280" y="236" width="264" height="72" rx="6" fill="#ffffff" stroke="#17191f" stroke-width="1"/>
+        <rect x="288" y="242" width="28" height="12" rx="2" fill="transparent" stroke="rgba(23,25,31,0.40)" stroke-width="0.8"/>
+        <text x="302" y="251" fill="rgba(23,25,31,0.80)" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.08em">LIB</text>
+        <text x="412" y="274" fill="#17191f" font-size="12" font-weight="600" font-family="'Geist','Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif" text-anchor="middle">查询层</text>
+        <text x="412" y="290" fill="#4f5568" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">src/lib/collections.ts</text>
+
+        <!-- C 页面与布局（backend）-->
+        <rect x="280" y="360" width="264" height="96" rx="6" fill="#fafafa"/>
+        <rect x="280" y="360" width="264" height="96" rx="6" fill="#ffffff" stroke="#17191f" stroke-width="1"/>
+        <rect x="288" y="366" width="40" height="12" rx="2" fill="transparent" stroke="rgba(23,25,31,0.40)" stroke-width="0.8"/>
+        <text x="308" y="375" fill="rgba(23,25,31,0.80)" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.08em">PAGES</text>
+        <text x="412" y="410" fill="#17191f" font-size="12" font-weight="600" font-family="'Geist','Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif" text-anchor="middle">页面与布局</text>
+        <text x="412" y="426" fill="#4f5568" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">10 routes · Base.astro · tokens.css</text>
+
+        <!-- E 静态组件族（backend）-->
+        <rect x="72" y="360" width="168" height="96" rx="6" fill="#fafafa"/>
+        <rect x="72" y="360" width="168" height="96" rx="6" fill="#ffffff" stroke="#17191f" stroke-width="1"/>
+        <rect x="80" y="366" width="28" height="12" rx="2" fill="transparent" stroke="rgba(23,25,31,0.40)" stroke-width="0.8"/>
+        <text x="94" y="375" fill="rgba(23,25,31,0.80)" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.08em">UI</text>
+        <text x="156" y="410" fill="#17191f" font-size="12" font-weight="600" font-family="'Geist','Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif" text-anchor="middle">静态组件族</text>
+        <text x="156" y="426" fill="#4f5568" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">src/components/ ×10</text>
+
+        <!-- F 交互运行时（焦点）-->
+        <rect x="584" y="360" width="184" height="96" rx="6" fill="#fafafa"/>
+        <rect x="584" y="360" width="184" height="96" rx="6" fill="rgba(47,98,230,0.08)" stroke="#2f62e6" stroke-width="1"/>
+        <rect x="592" y="366" width="48" height="12" rx="2" fill="transparent" stroke="rgba(47,98,230,0.40)" stroke-width="0.8"/>
+        <text x="616" y="375" fill="#2f62e6" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.08em">RUNTIME</text>
+        <text x="676" y="410" fill="#17191f" font-size="12" font-weight="600" font-family="'Geist','Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif" text-anchor="middle">交互运行时</text>
+        <text x="676" y="426" fill="#4f5568" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">FluidGlass · Preloader · Rays</text>
+
+        <!-- G 字体子集管线（backend）-->
+        <rect x="848" y="112" width="360" height="104" rx="6" fill="#fafafa"/>
+        <rect x="848" y="112" width="360" height="104" rx="6" fill="#ffffff" stroke="#17191f" stroke-width="1"/>
+        <rect x="856" y="118" width="48" height="12" rx="2" fill="transparent" stroke="rgba(23,25,31,0.40)" stroke-width="0.8"/>
+        <text x="880" y="127" fill="rgba(23,25,31,0.80)" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.08em">SCRIPTS</text>
+        <text x="1028" y="160" fill="#17191f" font-size="12" font-weight="600" font-family="'Geist','Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif" text-anchor="middle">字体子集管线</text>
+        <text x="1028" y="176" fill="#4f5568" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">scripts/subset-*.mjs · prebuild hook</text>
+        <text x="1028" y="190" fill="#4f5568" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">_font/ originals → public/fonts/ subsets</text>
+
+        <!-- H 静态资产（store）-->
+        <rect x="848" y="284" width="360" height="112" rx="6" fill="#fafafa"/>
+        <rect x="848" y="284" width="360" height="112" rx="6" fill="rgba(23,25,31,0.05)" stroke="#4f5568" stroke-width="1"/>
+        <rect x="856" y="290" width="44" height="12" rx="2" fill="transparent" stroke="rgba(79,85,104,0.40)" stroke-width="0.8"/>
+        <text x="878" y="299" fill="rgba(79,85,104,0.80)" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.08em">PUBLIC</text>
+        <text x="1028" y="342" fill="#17191f" font-size="12" font-weight="600" font-family="'Geist','Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif" text-anchor="middle">静态资产</text>
+        <text x="1028" y="358" fill="#4f5568" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">public/fonts/ ×10 · public/assets/3d/lens.glb</text>
+
+        <!-- I GitHub Actions（external）-->
+        <rect x="72" y="556" width="520" height="60" rx="6" fill="#fafafa"/>
+        <rect x="72" y="556" width="520" height="60" rx="6" fill="rgba(23,25,31,0.03)" stroke="rgba(23,25,31,0.30)" stroke-width="1"/>
+        <rect x="80" y="562" width="28" height="12" rx="2" fill="transparent" stroke="rgba(23,25,31,0.30)" stroke-width="0.8"/>
+        <text x="94" y="571" fill="rgba(23,25,31,0.80)" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.08em">CI</text>
+        <text x="332" y="588" fill="#17191f" font-size="12" font-weight="600" font-family="'Geist','Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif" text-anchor="middle">GitHub Actions</text>
+        <text x="332" y="604" fill="#4f5568" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">npm ci → prebuild (fonts) → astro build → dist/</text>
+
+        <!-- J GitHub Pages（external）-->
+        <rect x="652" y="556" width="556" height="60" rx="6" fill="#fafafa"/>
+        <rect x="652" y="556" width="556" height="60" rx="6" fill="rgba(23,25,31,0.03)" stroke="rgba(23,25,31,0.30)" stroke-width="1"/>
+        <rect x="660" y="562" width="32" height="12" rx="2" fill="transparent" stroke="rgba(23,25,31,0.30)" stroke-width="0.8"/>
+        <text x="676" y="571" fill="rgba(23,25,31,0.80)" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.08em">HOST</text>
+        <text x="930" y="588" fill="#17191f" font-size="12" font-weight="600" font-family="'Geist','Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif" text-anchor="middle">GitHub Pages</text>
+        <text x="930" y="604" fill="#4f5568" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">penicillinc3.github.io · 15 static pages</text>
+
+        <!-- ══ 图例（底部横条）══ -->
+        <line x1="40" y1="648" x2="1240" y2="648" stroke="rgba(23,25,31,0.10)" stroke-width="0.8"/>
+        <text x="40" y="671" fill="#4f5568" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" letter-spacing="0.14em">LEGEND</text>
+
+        <rect x="110" y="660" width="14" height="14" rx="2" fill="rgba(47,98,230,0.08)" stroke="#2f62e6" stroke-width="1"/>
+        <text x="132" y="671" fill="#4f5568" font-size="12" font-weight="500" font-family="'Geist','Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif">焦点 · React island</text>
+
+        <rect x="330" y="660" width="14" height="14" rx="2" fill="rgba(23,25,31,0.05)" stroke="#4f5568" stroke-width="1"/>
+        <text x="352" y="671" fill="#4f5568" font-size="12" font-weight="500" font-family="'Geist','Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif">内容 / 资产存储</text>
+
+        <rect x="520" y="660" width="14" height="14" rx="2" fill="#ffffff" stroke="#17191f" stroke-width="1"/>
+        <text x="542" y="671" fill="#4f5568" font-size="12" font-weight="500" font-family="'Geist','Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif">源码模块</text>
+
+        <rect x="650" y="660" width="14" height="14" rx="2" fill="rgba(23,25,31,0.03)" stroke="rgba(23,25,31,0.30)" stroke-width="1"/>
+        <text x="672" y="671" fill="#4f5568" font-size="12" font-weight="500" font-family="'Geist','Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif">外部服务</text>
+
+        <line x1="770" y1="667" x2="798" y2="667" stroke="#4f5568" stroke-width="1" stroke-dasharray="5,4"/>
+        <text x="806" y="671" fill="#4f5568" font-size="12" font-weight="500" font-family="'Geist','Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif">按需加载</text>
+
+        <line x1="930" y1="667" x2="958" y2="667" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+        <text x="966" y="671" fill="#4f5568" font-size="12" font-weight="500" font-family="'Geist','Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif">部署链路</text>
+      </svg>
+    </div>
+  </div>
+</body>
+</html>
