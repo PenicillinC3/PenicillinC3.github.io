@@ -3,6 +3,9 @@ title: 项目名
 date: 2026-09-06
 url: https://demo.example.com
 repo: https://github.com/you/repo
+# 按钮文案可选，不写就是「在线演示」/「源代码」
+# urlLabel: GitHub 仓库
+# repoLabel: 查看源码
 tech: [Astro, CSS]
 draft: true
 ---

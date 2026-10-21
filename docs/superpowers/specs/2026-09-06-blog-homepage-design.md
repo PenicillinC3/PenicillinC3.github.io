@@ -1056,3 +1056,21 @@ setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160）
 
 **验收**：`npm run build` 15 页 0 警告；路由全 200、`/nope-xyz` 404；
 探针零页面错误、`__lensTransition` 正常交还。
+
+## §106（2026-10-21）项目卡按钮文案可配 —— `urlLabel` / `repoLabel`
+
+用户发现「DeepSeek 余额助手」卡的按钮写着「在线演示」，但 `url` 指向的是 GitHub 仓库，问能不能改。
+
+**原因**：这两个文案从来不是数据，是 `ProjectCard.astro` 里写死的字面量 —— `url` 恒为「在线演示」、`repo` 恒为「源代码」。所以「在线演示」既不是默认值也不能在 frontmatter 里改。
+
+**改动**：`projects` 集合新增两个可选字段 `urlLabel` / `repoLabel`（`.trim().min(1)`，防止渲染成空白按钮），
+`ProjectCard` 用 `project.urlLabel ?? '在线演示'` / `project.repoLabel ?? '源代码'` 回落。
+**不写就与旧行为完全一致**，已有条目不迁移。模板 `_projects-template.md.example` 里补了两行注释示例。
+
+**为什么用「两个独立字段」而不是一个 `links: [{url,label}]`**：`url` 与 `repo` 在语义上仍是两类东西
+（演示站 vs 源码仓），标题链接的回落顺序、schema 的「至少提供一个」校验都依赖这个区分；
+改成数组要把这些全重做，收益只是少一行 frontmatter。
+
+**内容侧**：`ds-balance-helper-extension` 的 `url` 本就是仓库，加 `urlLabel: GitHub 仓库`。
+
+**验收**：build 15 页 0 警告；`dist/projects/index.html` 里「GitHub 仓库」×1、「源代码」×1、「在线演示」×0。

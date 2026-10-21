@@ -33,7 +33,9 @@ export interface ProjectItem {
   title: string;
   date: string;
   url?: string;
+  urlLabel?: string;
   repo?: string;
+  repoLabel?: string;
   tech: string[];
   summary: string;
 }
@@ -81,7 +83,9 @@ export async function projectItems(): Promise<ProjectItem[]> {
     title: e.data.title,
     date: e.data.date,
     url: e.data.url,
+    urlLabel: e.data.urlLabel,
     repo: e.data.repo,
+    repoLabel: e.data.repoLabel,
     tech: e.data.tech,
     summary: excerpt(e.body ?? '', 180),
   }));

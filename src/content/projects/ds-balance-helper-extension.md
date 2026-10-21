@@ -3,6 +3,7 @@
 title: DeepSeek 余额助手（Chrome / Edge 扩展）
 date: 2026-09-22
 url: https://github.com/PenicillinC3/ds-balance-helper-extension
+urlLabel: GitHub 仓库
 tech: [Deepseek, 前端, 便利]
 ---
 

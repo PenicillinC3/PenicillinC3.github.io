@@ -18,12 +18,12 @@ const { project } = Astro.props;
     <div class="acts">
       {project.url && (
         <a class="act" href={project.url} target="_blank" rel="noopener noreferrer">
-          在线演示 <span aria-hidden="true">↗</span>
+          {project.urlLabel ?? '在线演示'} <span aria-hidden="true">↗</span>
         </a>
       )}
       {project.repo && (
         <a class="act" href={project.repo} target="_blank" rel="noopener noreferrer">
-          源代码 <span aria-hidden="true">↗</span>
+          {project.repoLabel ?? '源代码'} <span aria-hidden="true">↗</span>
         </a>
       )}
     </div>

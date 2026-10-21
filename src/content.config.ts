@@ -35,12 +35,16 @@ export const collections = {
       ...base,
       tech: z.array(z.string()),
       url: z.string().url().optional(),
+      // 按钮文案（可选）：url 默认「在线演示」、repo 默认「源代码」。
+      // 例：url 指向仓库而非演示站时写 urlLabel: GitHub 仓库。
+      urlLabel: z.string().trim().min(1, 'urlLabel 不能为空').optional(),
       // 允许 https(s):// 或 git@host:path 形式的仓库引用（防 javascript: 等进 href）
       repo: z
         .string()
         .refine((v) => /^https?:\/\//i.test(v) || /^git@[^:]+:.+/.test(v) || /^ssh:\/\//.test(v),
           'repo 需为 http(s)://、ssh:// 或 git@host:path 形式')
         .optional(),
+      repoLabel: z.string().trim().min(1, 'repoLabel 不能为空').optional(),
     }).superRefine((p, ctx) => {
       if (!p.url && !p.repo) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'projects 的 url 与 repo 至少提供一个' });
