@@ -1,24 +1,25 @@
 ---
 import Base from '../layouts/Base.astro';
 import FluidGlass from '../components/FluidGlass.jsx';
+import HomeTitle from '../components/HomeTitle.jsx';
 import { site } from '../site.config';
 ---
-<!-- 欢迎页。站名 = 静态大标题（spec §69.4：打字机动效 §39/§40 按用户要求删除，
-     直接展示全文）。§69：全屏垫底 react-bits FluidGlass 玻璃球 island（方案 B，
-     背景观感与 notes 页一致：白底 0.05 发丝方格矢量线）；其余页面仍零框架 -->
+<!-- 欢迎页（spec §107）：站名主视觉 = TechText（Canvas 2D 技术图风格）。
+     FluidGlass 已改成「加载页专用舞台」：首页不再显示玻璃球，它只负责首访
+     加载页退场时那颗球与底板；仍挂 client:idle 让它在过渡前就绪。
+     其余页面仍零框架。 -->
 <Base>
   <div class="glass-scene" aria-hidden="true">
-    <!-- §78：client:load → idle —— 玻璃球 chunk ~1.1MB(gzip 315KB) 与首屏抢主线程；
-         空闲时再拉取+水合，首屏文字/按钮/背景先出，球随后无缝补上（背景观感一致） -->
+    <!-- §78：idle 水合 —— chunk 与首屏抢主线程；空闲时再拉取。加载页会等
+         `__ballReady`（最多 BALL_WAIT_MS），等不到就走无球兜底。 -->
     <FluidGlass client:idle />
   </div>
   <section class="welcome">
     <div class="stack">
-      <!-- §69.5/§69.6：标题与 tagline 已做进 FluidGlass 场景（球折射它们）；
-           此处同名元素 opacity:0 仅作语义/占位 —— 盒子保留（布局与场景文字
-           测量都靠它们），屏幕阅读器与 SEO 不丢 -->
-      <h1 class="name" data-scene-title={site.title} aria-label={site.title}>{site.title}</h1>
-      <p class="tagline" data-scene-tagline={site.tagline}>{site.tagline}</p>
+      <!-- §107：DOM h1 保语义/无 JS 回退；TechText 首帧画完后 html.tt-on
+           让 h1 淡出、画布淡入（见 HomeTitle.jsx） -->
+      <HomeTitle client:load />
+      <p class="tagline">{site.tagline}</p>
       <div class="acts">
         <!-- §100：两枚主入口在加载时即预取目标页，点击后立刻换页（不再有等待） -->
         <a class="btn prism" href="/notes/" data-astro-prefetch="load">个人笔记</a>
@@ -28,72 +29,84 @@ import { site } from '../site.config';
   </section>
 </Base>
 
-<!-- §87：玻璃球 island 加载兜底 —— chunk 拉取失败（网络抖动/缓存过期）时球会
-     静默消失（页面其余正常，不易察觉）；此处监听动态导入/脚本加载失败，静默整页
-     重载一次（sessionStorage 去抖，成功出现 canvas 后清标，杜绝死循环） -->
-<script is:inline>
-  (function () {
-    var KEY = '__fgIslandRetry';
-    var fail = function (msg) {
-      if (!/FluidGlass|dynamically imported module/i.test(String(msg))) return;
-      if (sessionStorage.getItem(KEY)) return; // 重试过仍失败：停，避免循环
-      sessionStorage.setItem(KEY, '1');
-      location.reload();
-    };
-    addEventListener('unhandledrejection', function (e) {
-      var r = e.reason;
-      fail((r && (r.message || r)) || '');
-    });
-    addEventListener(
-      'error',
-      function (e) {
-        var t = e.target;
-        if (t && t.tagName === 'SCRIPT') fail(t.src || '');
-        else if (e.message) fail(e.message);
-      },
-      true,
-    );
-    // 水合成功（canvas 出现）→ 清标记，下次故障仍可再试
-    var n = 0;
-    var iv = setInterval(function () {
-      if (document.querySelector('.glass-scene canvas')) {
-        sessionStorage.removeItem(KEY);
-        clearInterval(iv);
-      } else if (++n > 30) clearInterval(iv); // 30s 后停止观察
-    }, 1000);
-  })();
-</script>
-
 <style>
-  /* —— §69 玻璃球层叠：canvas fixed 全屏垫底(z0)，顶栏(z60)/欢迎内容(z1)/页脚(z1)
-       提层盖其上；顶栏、欢迎文字都允许事件穿透到 canvas（球全域跟手），
-       唯按钮区保留交互（pointer-events auto） —— */
-  /* 层叠策略：canvas(fixed z0) 与 .welcome(z1) 须同处**根级**堆叠上下文。
-     关键坑（§69.1）：勿给 .main 加 z-index/transform —— 那会把 fixed canvas
-     收进 main 自身堆叠上下文，文字反而压在 canvas 之下（首页字消失 bug）。
-     正解：.main 不设 z-index，由 .welcome 自身提层盖过 canvas。 */
+  /* —— 层叠（§69.1 教训保留）：canvas(fixed z0) 与 .welcome(z1) 须同处根级
+       堆叠上下文。勿给 .main 加 z-index/transform —— 那会把 fixed canvas 收进
+       main 自身堆叠上下文，内容反而压在 canvas 之下。
+       §107 起 canvas 只服务加载过渡，首页没有可交互的球 → 整层 pointer-events:none。 —— */
   .glass-scene {
     position: fixed;
     inset: 0;
     z-index: 0;
-    pointer-events: none; /* 包装层穿透；canvas 子元素自身重新接收事件 */
+    pointer-events: none;
   }
   .glass-scene canvas,
-  .glass-scene > div {
-    pointer-events: auto; /* R3F 事件绑在 canvas 或其容器 div 上，两者都放行 */
-    display: block;
-  }
+  .glass-scene > div { display: block; }
   .welcome {
     position: relative;
-    z-index: 1; /* 盖过垫底 canvas（与 .glass-scene 同处根上下文） */
-    pointer-events: none; /* 文字区不拦 pointer → canvas 收到事件、球全域跟手 */
+    z-index: 1; /* 盖过垫底 canvas */
+    pointer-events: none; /* 空白区穿透；标题层与按钮各自重开 */
+    transition: opacity 0.25s ease-out; /* pl-live 交班隐藏 */
   }
   .acts {
-    pointer-events: auto; /* 两枚入口按钮保留点击/悬停（在 pointer-events:none 下重开） */
+    pointer-events: auto;
   }
   :global(body:has(.welcome) > footer) {
     position: relative;
     z-index: 1; /* 首页版权行：垫底 canvas 之上可见 */
+  }
+
+  /* —— 站名舞台（React island 渲染，需全局选择器）——
+     高度 = 原 h1 行盒（clamp × 1.15）；TechText 按 0.66×容器高自适应，
+     落点与旧视觉字号基本一致。宽度给足，窄屏由 92vw 收缩。 —— */
+  :global(.title-stage) {
+    position: relative;
+    width: min(92vw, 1120px);
+    height: calc(clamp(1.9rem, 11vw, 6.6rem) * 1.15);
+    pointer-events: auto; /* 悬停揭示 / 拖拽字母 */
+  }
+  :global(.title-stage .name) {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    display: grid;
+    place-items: center;
+    font-family: var(--font-song);
+    /* §91：窄屏由 11vw 主导，避免 clamp 下限把长站名撑出视口 */
+    font-size: clamp(1.9rem, 11vw, 6.6rem);
+    font-weight: 500;
+    line-height: 1.15;
+    letter-spacing: 0.04em;
+    color: var(--text-1);
+    transition: opacity 0.25s ease-out;
+  }
+  :global(.tech-layer) {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 0.3s ease-out;
+  }
+  /* TechText 首帧画完后才加 tt-on（无 JS / island 失败 → h1 保持可见） */
+  :global(html.tt-on .name) {
+    opacity: 0;
+    user-select: none;
+  }
+  :global(html.tt-on .tech-layer) {
+    opacity: 1;
+  }
+
+  /* —— 加载页交班（§107）——
+     transition() 删掉 DOM 加载层、由 WebGL 底板接管的那 1.6s 里，首页 DOM
+     （标题 / tagline / 按钮 / 顶栏 / 页脚）必须让位，否则会浮在底板之上。
+     settle() 摘掉 pl-live 后淡入；另有 10s 安全计时器兜底。 —— */
+  :global(html.pl-live .welcome),
+  :global(html.pl-live .topbar),
+  :global(html.pl-live body > footer) {
+    opacity: 0;
+  }
+  :global(.topbar),
+  :global(body > footer) {
+    transition: opacity 0.25s ease-out;
   }
 
   .welcome {
@@ -107,29 +120,6 @@ import { site } from '../site.config';
   .stack {
     display: grid;
     justify-items: center;
-  }
-  .name {
-    margin: 0;
-    font-family: var(--font-song);
-    /* §91：下限由 3.2rem 放宽到 1.9rem —— 窄屏（320px）时 clamp 下限把
-       「PenicillinC3」撑到 ~324px 溢出视口、连带整页横向可滚（页脚等内容
-       被推挤错位）。11vw 主导后文字随屏宽收缩、系统大字缩放也不受影响 */
-    font-size: clamp(1.9rem, 11vw, 6.6rem);
-    font-weight: 500;
-    line-height: 1.15;
-    letter-spacing: 0.04em; /* 拉丁长站名，收紧字距比华文中宋习惯值更稳 */
-    color: var(--text-1);
-  }
-  /* §69.9：html.fg-on 由 FluidGlass island 挂载时挂（条件 = JS + ≥900px +
-     非减动效，即场景文字确实在场时）才隐藏 DOM 标题/tagline；其余情况
-     （<900px/reduced-motion/无 JS/切页返回尚未挂载）回退 DOM 可见 ——
-     盒子始终保留，布局与场景测量不变。
-     勿改回首屏 inline script 挂 html.js 的方案：ViewTransitions 历史返回会
-     抹掉该 class（双层标题 bug，spec §69.9） */
-  html.fg-on .name,
-  html.fg-on .tagline {
-    opacity: 0;
-    user-select: none;
   }
   .tagline {
     margin: clamp(14px, 3vh, 26px) 0 0;
@@ -145,5 +135,4 @@ import { site } from '../site.config';
     justify-content: center;
     gap: 12px;
   }
-
 </style>

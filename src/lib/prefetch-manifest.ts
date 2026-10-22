@@ -30,11 +30,11 @@ const FONT_TIER: Record<string, 0 | 1 | 4 | 'skip'> = {
 /**
  * 分两批返回（§103 / §105）：
  *
- *   critical —— **首页自己**要用的，加载页严格以此为退场条件：
- *               `/`（HTML）+ maple-ui（DOM 文案）+ song-3d.ttf（3D 场景站名/tagline）
- *               + lens.glb（玻璃球模型）。
- *               ⚠ 实测（CDP 记录首页全部请求 + 查实际渲染字体）：**首页只用这 4 个，
- *                 合计约 76KB，且一张图都不请求**。
+ *   critical —— **首页自己 + 首访加载页的球**要用的，加载页严格以此为退场条件：
+ *               `/`（HTML）+ maple-ui（DOM 文案）+ lens.glb（加载页玻璃球模型）。
+ *               ⚠ §107 起站名由 Canvas TechText 画（系统/嵌入式字体，无额外文件），
+ *                 `song-3d.ttf` 不再产出、不再预取。实测 critical ≈ 57KB，
+ *                 且首页一张图都不请求。
  *
  *   deferred —— 首页渲染完、主线程空闲后才在后台拉的，**数组顺序即优先级**。
  *               分四档：① 正文字体 → ② 栏目首页 HTML → ③ 卷封面 + 粗体
@@ -72,9 +72,7 @@ export async function prefetchPlan(): Promise<{ critical: string[]; deferred: st
   const t3: string[] = [];   // 卷封面 + 粗体
   const t4: string[] = [];   // 其余字体 + 子页 + 备忘页大图
 
-  // ① 字体分档。song-3d 是 .ttf，glob 收不到 → 单独指定（首页 3D 文字要用）
-  critical.add('/fonts/song-3d.ttf');
-  seen.add('/fonts/song-3d.ttf');
+  // ① 字体分档（§107：song-3d.ttf 已随场景文字删除）
   const fontsDir = new URL('../../public/fonts', import.meta.url);
   for (const f of await readdir(fontsDir)) {
     if (!f.endsWith('.woff2')) continue;

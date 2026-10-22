@@ -6,9 +6,9 @@ import react from '@astrojs/react';
 export default defineConfig({
   site: 'https://penicillinc3.github.io',
   base: '/',
-  // React 栈：spec §69 首页玻璃球特批（react-bits FluidGlass 官方移植，仅首页一个
-  // island）。§34 液态玻璃镜头 §35 已删、§68 全撤 —— §69 与历史不同：官方组件
-  // 机制、不折射 DOM。其余页面仍零框架（ogl 供 Rays）。
+  // React 栈（spec §69 / §107）：首页两个 island —— HomeTitle（TechText 站名画布）
+  // 与 FluidGlass（首访加载页的玻璃球舞台，首页不再显示球）。其余页面零框架
+  // （ogl 供 Rays）。
   integrations: [react()],
   // §100：链接点击「像没反应」的根治 —— 客户端路由点击后要先取回目标页 HTML
   // 才换页，这段等待期 URL 不变、页面不动。Astro 预取默认只在 hover（悬停 80ms）

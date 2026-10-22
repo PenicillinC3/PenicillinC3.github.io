@@ -73,16 +73,3 @@ const inKb = Math.round((await stat(FONT_IN)).size / 1024);
 const outKb = Math.round(out.length / 1024);
 console.log(`华文中宋子集完成: ${inKb} KB -> ${outKb} KB (${Math.round((out.length / (await stat(FONT_IN)).size) * 1000) / 10}%)`);
 console.log(`输出: ${FONT_OUT}`);
-
-// —— 首页场景文字子集（spec §69.5/§69.6）：标题与 tagline 已做进 FluidGlass
-//     场景（troika Text 不吃 woff2，只吃 ttf/otf/woff）→ 从 site.config.ts
-//     提取 title/tagline 字符 + ASCII 32–126，出 truetype 子集 song-3d.ttf ——
-const SITE_CFG = await readFile(join(SRC, 'site.config.ts'), 'utf8');
-const quoted = (key) => (SITE_CFG.match(new RegExp(key + "\\s*:\\s*'([^']+)'")) || [])[1] || '';
-const TEXT_OUT = join(ROOT, 'public/fonts/song-3d.ttf');
-const textChars = new Set(String.fromCharCode(...Array.from({ length: 95 }, (_, i) => i + 32)));
-for (const ch of quoted('title') + quoted('tagline')) textChars.add(ch);
-const textFont = await subsetFont(font, [...textChars].join(''), { targetFormat: 'truetype' });
-await writeFile(TEXT_OUT, textFont);
-console.log(`场景文字子集完成: ${inKb} KB -> ${Math.round(textFont.length / 1024)} KB`);
-console.log(`输出: ${TEXT_OUT}`);

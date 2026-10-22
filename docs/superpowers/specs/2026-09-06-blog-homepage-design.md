@@ -1074,3 +1074,57 @@ setGeom 弃用旧 peek 步进公式（gap = W/2−fw/2−peek，peek 80–160）
 **内容侧**：`ds-balance-helper-extension` 的 `url` 本就是仓库，加 `urlLabel: GitHub 仓库`。
 
 **验收**：build 15 页 0 警告；`dist/projects/index.html` 里「GitHub 仓库」×1、「源代码」×1、「在线演示」×0。
+
+## §107（2026-10-22）首页玻璃球 → TechText 站名（球只留给加载页）
+
+用户提供 react-bits `TechText` 组件（Canvas 2D 技术图风格：虚线轮廓、透镜揭示、角标 specks、
+可拖拽字母），要求替换首页的液态玻璃球装饰。确认后的边界：**TechText 画站名做主视觉；
+玻璃球只保留加载页退场那一颗；站名仍用华文中宋；组件动效参数用默认值。**
+
+### 为什么不是「直接换组件」
+
+首页的球不只是装饰，它是三件事的载体：DOM 标题的视觉替身（`html.fg-on`）、
+加载页交班的 WebGL 舞台（`__lensBall/__lensScale/__lensOptics`）、以及 306KB gzip 的
+three 栈入口。所以本次 = 拆掉「首页球 + 场景文字」，保留「加载球 + 底板 + 网格 FBO」，
+再把站名交给 TechText。
+
+### 首页结构
+
+- `FluidGlass.jsx` **原地改造成加载专用舞台**：保留 `LoadingBall` / `LoadingPlate` /
+  `Backdrop` / FBO 渲染与 `__ballReady` 信号；删除首页那颗 mesh、`SceneTexts`、
+  `TEXT_META/TEXT_Z`、指针跟随与 `maath` 阻尼、`__homeGrow/__lensTransition/__lensCoverScale`。
+  文件仍挂载在 `index.astro`（`client:idle`），因为预加载页需要它提前就绪。
+- 新增 `src/components/TechText.jsx` + `TechText.css`（用户提供的源码原样迁入）。
+- 新增 `src/components/HomeTitle.jsx`：`h1`（语义 + 无 JS 回退）与绝对定位的 TechText 层；
+  TechText 首帧画出后才给 `<html>` 挂 `tt-on`，CSS 据此让 `h1` 淡出、画布淡入 ——
+  无双层标题，island 加载失败时回退 DOM 标题。
+- `.title-stage` 尺寸 = 原 `h1` 行盒：高 `calc(clamp(1.9rem, 11vw, 6.6rem) * 1.15)`，
+  宽 `min(92vw, 1120px)`。TechText 的 `0.66 × 容器高` 自适应落点约等于原视觉字号。
+- **字体**：`fontFamily` 传 `"Song Web", "华文中宋", "STZhongsong", "Songti SC", "SimSun", serif`
+  （与 `--font-song` 同栈），`fontWeight 500`、`letterSpacing 0.03`、`accentColor #2f62e6`。
+  其余参数用组件默认：`sweep` / `reveal:'letter'` / `specks 15` / `labels` / `draggable` /
+  `clickKick`。
+- 层级：标题层在 `.welcome` 内（`z1`），`pointer-events:auto` 供拖拽与悬停；按钮区独立可点。
+  画布垫底（`.glass-scene` z0）不变。
+
+### 加载页交班
+
+- `HOME_BALL = false`：加载球褪完光学后整颗删除，不再长回首页小球。
+- 交班那 1.6s 屏幕由 WebGL 底板接管，而 TechText 是 DOM（z1）会浮在底板之上 ——
+  因此 `transition()` 删 DOM 层时给 `<html>` 加 `pl-live`，CSS 隐藏 `.welcome`；
+  `settle()` 移除并 0.25s 淡入。另设 10s 安全计时器，交班异常时强制移除，
+  避免首页永久不可见。
+- 加载球挂载失败时保持原兜底：`BALL_WAIT_MS` 到点放行，首页正常出现。
+
+### 顺带清理
+
+- `song-3d.ttf` 只服务 troika 场景文字 → `subset-song.mjs` 停止生成、删除产物、
+  从 §105 的 critical 清单移除（−19KB）；`lens.glb` 仍被加载球使用，保留。
+- `maath` 依赖删除（只被首页球阻尼用过）。three / fiber / drei 保留。
+- 更新 `FluidGlass.jsx` 头部、`index.astro` 注释、README 结构段文字；本文件即 §107。
+
+### 验收
+
+`npm run build` 15 页 0 error / 0 warning；全路由 200、`/nope-xyz` 404；
+人工检查首访交班无闪烁、桌面/窄屏标题正确、拖拽与按钮不冲突、reduced-motion 不自动扫掠、
+禁用 JS 时 `h1` 可见；确认 `dist` 不再产出 `song-3d.ttf`、预取清单无该项。

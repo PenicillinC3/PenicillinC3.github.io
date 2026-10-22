@@ -1,39 +1,29 @@
 /* eslint-disable react/no-unknown-property */
 /**
- * 首页玻璃球 —— react-bits FluidGlass.jsx 官方移植（D-Mbithi/react-bits
- * commit 86dfdfc 的 Lens 模式，方案 B，spec §69）。
+ * 加载页玻璃球舞台（spec §102 / §107）—— react-bits FluidGlass 官方 Lens 的移植，
+ * 2026-10-22 起**只服务进站加载页的退场**：首页的球与场景文字已删除，
+ * 站名改由 TechText（Canvas 2D）承担（§107）。
  *
- * 机制逐行保留官方原版（这是「一比一」的承诺部分）：
- *   ① 折射内容先进 FBO：portal 场景（本站网格底）每帧离屏渲染；
+ * 机制逐行保留官方原版：
+ *   ① 折射内容先进 FBO：portal 场景（网格底 + 加载页底板）每帧离屏渲染；
  *   ② 同一张 buffer 纹理同时给「全屏 quad 铺底」与球的
- *      MeshTransmissionMaterial 采样 —— 球折射的 = 它背后屏幕正在显示的，
- *      所见即所折射（自洽，无镜像偏移）；
- *   ③ 球跟手：maath easing.damp3 阻尼吸附 pointer，z=15 贴相机近处。
+ *      MeshTransmissionMaterial 采样 —— 球折射的 = 它背后屏幕正在显示的；
+ *   ③ 球的位置 / 尺寸 / 光学全部由加载页写全局量驱动（见 LoadingBall）。
  *
- * 定制点（仅「内容」层，不改机制）：
- *   - 官方紫底 #5227ff / 白字 "React Bits" / 5 张 Unsplash 照片 —— 全删；
- *     清屏改白 0xffffff。
- *   - 折射内容 = 与普通页一致的矢量发丝方格（§69.4：22px/0.05 细条几何，
- *     非 CanvasTexture —— 纹理重采样浓度失真已证 §69.2）+ **场景大标题
- *     SceneTitle**（§69.5：标题做进折射场景本体、球掠过即折射字迹，官方 demo
- *     同构；DOM h1 仅 opacity:0 占位）。
- *   - bar/cube 模式、ScrollControls、NavItems、Typography、Images 均未移植。
- *   - <900px 或 prefers-reduced-motion：不挂载（页面回退纯 DOM 欢迎页）。
+ * 现在这个 island 只在首页挂载（`client:idle`），等待加载页的 `__lensBall`
+ * 信号；没有加载页（同会话二次进入 / 历史返回 / 内页直达）时它整场静默，
+ * 不画球、不跟手、不留任何 DOM 副作用。
  *
  * 模型：public/assets/3d/lens.glb（"Cylinder"，直径 2.0 世界单位）。
- * 玻璃参数：官方 docs 面板默认 scale .25 / ior 1.15 / thickness 2 /
- * chromaticAberration .05 / anisotropy .01（调这里即可微调观感）。
+ * 玻璃参数：ior 1.15 / thickness 2 / chromaticAberration .05 / anisotropy .01。
  */
 import * as THREE from 'three';
 import { memo, useEffect, useRef, useState } from 'react';
 import { Canvas, createPortal, useFrame, useThree } from '@react-three/fiber';
-import { MeshTransmissionMaterial, Text, useFBO, useGLTF } from '@react-three/drei';
-import { easing } from 'maath';
+import { MeshTransmissionMaterial, useFBO, useGLTF } from '@react-three/drei';
 
-/* 玻璃球材质参数（官方 docs 面板默认 scale .25；§69.3→.18、§69.4→.12、
-   §69.6→.10 —— 直径 0.5→0.36→0.24→0.20 世界单位，约屏高 18%→15%） */
+/* 玻璃球材质参数（§107 起只有加载页那颗球用） */
 const LENS_PROPS = {
-  scale: 0.10,
   ior: 1.15,
   thickness: 2,
   chromaticAberration: 0.05,
@@ -49,9 +39,6 @@ const LENS_PROPS = {
 const GRID_RGBA = 'rgba(15, 23, 42, 0.08)'; // §69.10：用户调深（原 0.05 与 body 一致）
 const GRID_CSS_PX = 22;
 const MAX_DPR = 1.5; // 与 Canvas dpr 上限一致（§78 降至 1.5）
-const CAM_Z = 20;
-const FOV = 15;
-const worldHeightAt = (z) => 2 * Math.tan((FOV * Math.PI) / 360) * (CAM_Z - z);
 
 function makeGridTexture() {
   const rdpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
@@ -82,67 +69,10 @@ function makeGridTexture() {
   return tex;
 }
 
-/* —— 场景文字（标题 + tagline，spec §69.5/§69.6）—— 首页标题与「记录 · 拍摄 ·
-   思考」tagline 都做进折射场景本体：球掠过即折射字迹（官方 demo 同构）；
-   DOM 侧同名元素以 opacity:0 保留盒子与语义（布局/居中测量不破坏，屏幕
-   阅读器可读）。位置/字号按各 DOM 元素 rect 实测换算到 TEXT_Z 平面（与网格
-   同缓冲、球 z15 在字前）；字号 = DOM 计算值 × 各自 SCALE（微调钮）；
-   字色对应 --text-1/--text-2；troika 吃 ttf → song-3d.ttf（ASCII + tagline
-   中文字形子集）。 */
-const TEXT_Z = 3; // 网格(z0)前、球(z15)后
-const TEXT_META = [
-  { sel: '[data-scene-title]', color: '#17191f', ls: 0.04, scale: 1 }, // --text-1
-  { sel: '[data-scene-tagline]', color: '#565d6e', ls: 0.02, scale: 1 }, // --text-2
-];
+/* §107：场景文字（标题 / tagline）已删除 —— 站名改由 TechText 在 DOM 层画，
+   球只折射网格与加载页底板。song-3d.ttf 因此不再需要。 */
 
-function SceneTexts() {
-  const [items, setItems] = useState([]);
-  useEffect(() => {
-    const measure = () => {
-      const cssH = window.innerHeight;
-      const perPx = worldHeightAt(TEXT_Z) / cssH; // 每 css px 的世界单位
-      const out = [];
-      for (const m of TEXT_META) {
-        const el = document.querySelector(m.sel);
-        if (!el) continue;
-        const r = el.getBoundingClientRect();
-        const cssFS = parseFloat(getComputedStyle(el).fontSize);
-        if (!cssFS || !r.height) continue;
-        out.push({
-          ...m,
-          text: el.textContent ?? '',
-          y: (cssH / 2 - (r.top + r.height / 2)) * perPx, // 屏幕 y↓ → 世界 y↑
-          fs: cssFS * m.scale * perPx,
-        });
-      }
-      setItems(out);
-    };
-    measure();
-    document.fonts?.ready.then(measure).catch(() => {});
-    window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
-  }, []);
-  return items.map((it) =>
-    it.text ? (
-      <Text
-        key={it.sel}
-        position={[0, it.y, TEXT_Z]}
-        fontSize={it.fs}
-        color={it.color}
-        font="/fonts/song-3d.ttf"
-        letterSpacing={it.ls}
-        anchorX="center"
-        anchorY="middle"
-      >
-        {it.text}
-      </Text>
-    ) : null,
-  );
-}
-
-/* 玻璃球本体 + 离屏管线（官方 ModeWrapper，机制原样；Lens 专用）。
-   follow = { current: {x,y} } 归一化指针（§69.8：window 级 pointermove 写入，
-   不再依赖 canvas 自身事件 —— 悬停按钮等 DOM 上层元素时球仍全域跟手） */
+/* 玻璃球本体 + 离屏管线（官方 ModeWrapper，机制原样；Lens 专用） */
 /* §102 加载页那颗球 —— 与首页那颗是**两个独立的 mesh**（用户明确要求）。
    整段生命周期由加载页写的全局量驱动，本组件不做任何自己的决策：
      window.__lensBall    true = 这颗在场（首页那颗整体让位）
@@ -195,129 +125,37 @@ const LoadingBall = memo(function LoadingBall({ buffer, geo }) {
   );
 });
 
-const Lens = memo(function Lens({ follow }) {
-  const ref = useRef();
+const Lens = memo(function Lens() {
   const { nodes } = useGLTF('/assets/3d/lens.glb');
   const buffer = useFBO();
   const { viewport: vp } = useThree();
   const [scene] = useState(() => new THREE.Scene());
-  const geoWidthRef = useRef(1);
   const framesRef = useRef(0);
-  const matRef = useRef();
   /* §102 中心镂空 —— ⚠ **不要用 onBeforeCompile 往 MeshTransmissionMaterial 里注入 discard**。
      试过并已回退：球会发黑 / 炸开。原因是那个材质由 drei 深度定制（多趟渲染 +
-     屏幕空间折射），注入片元丢弃会破坏它的渲染管线；更糟的是补丁**是永久的**，
-     过渡结束后仍留在材质上，于是首页那颗球跟着一起坏（用户实测：「首页玻璃球炸了，
-     跟加载页那颗一样」）。
-     「中间露出完整首页」现在由两条**不改 shader** 的途径达成：
-       ① 光学衰减到中性（ior→1、thickness→0、色差→0）→ 球在视觉上变清，透出背后的首页；
+     屏幕空间折射），注入片元丢弃会破坏它的渲染管线；更糟的是补丁**是永久的**。
+     「中间露出完整首页」由两条不改 shader 的途径达成：
+       ① 光学衰减到中性（ior→1、thickness→0、色差→0）→ 球在视觉上变清；
        ② 加载层的 mask 中心本就是透明核心（宽羽化）→ 镂空由 DOM 侧负责。
      若将来确实需要几何镂空：换一个车削好的**环形几何**，而不是改 shader。 */
-  const { scale, ior, thickness, anisotropy, chromaticAberration, ...extraMat } = LENS_PROPS;
 
-  useEffect(() => {
-    // 官方同款：量模型宽度（scale 为 null 时按视口宽自适应，此处固定 .25 不走该分支）
-    const geo = nodes.Cylinder?.geometry;
-    geo?.computeBoundingBox();
-    geoWidthRef.current = geo ? geo.boundingBox.max.x - geo.boundingBox.min.x || 1 : 1;
-  }, [nodes]);
-
-  /* ── 进站过渡接口（spec §102）────────────────────────────────────────
+  /* ── 进站过渡接口（spec §102 / §107）─────────────────────────────────
      加载页是普通内联脚本，这里是 React island，两者没有现成通道。用**只读全局量**
-     通信：useFrame 本来就按帧跑，读全局天然同步、不会错过事件。没有加载页时
-     这些量都不存在，整段逻辑退化成原样（球照常用 LENS_PROPS.scale）。
+     通信：useFrame 本来就按帧跑，读全局天然同步、不会错过事件。
+     首页没有加载页时这些量都不存在 → LoadingBall 整颗不可见，本组件静默。
 
-       window.__plPending      加载页在场（球先藏起来，scale = 0）
-       window.__lensScale      加载页在驱动球的大小时写这里（数值）
-       window.__lensTransition true = 过渡中：球锁在视口中心、不跟手
-       window.__lensCoverScale 本帧写入：球「铺满视口」所需的 scale（加载页读它对齐洞口）
-       window.__ballReady      本组件写：折射管线已出帧，球可用
+       window.__plPending   加载页在场（LoadingBall 先藏起来，scale = 0）
+       window.__lensScale   加载页在驱动球的大小时写这里（数值）
+       window.__lensZ       球心 z（球大时后推，别把相机吞进去）
+       window.__lensOptics  光学强度（褪光学那段 1 → 0）
+       window.__lensBall    true = 加载球在场
+       window.__ballReady   本组件写：折射管线已出帧，球可用
      ─────────────────────────────────────────────────────────────────── */
-  useFrame((state, delta) => {
-    const { gl, viewport, camera } = state;
-    const v = viewport.getCurrentViewport(camera, [0, 0, 15]);
+  useFrame((state) => {
+    const { gl, camera } = state;
 
-
-    // 归加载页管的时候球**直接钉死在视口中心**，不走阻尼。
-    // ⚠ 别改回「阻尼趋近中心」（试过）：球正是这段时间从零长起来的，阻尼会让它从
-    //   指针最后停留的角落「边飘边涨」—— 看上去像在角落里冒出来再溜到中间。
-    //   钉死没有这个问题。
-    // §102 球心 z 可被外部覆盖：球巨大时（半径远超相机到球心的距离）必须把球心往相机
-    // 后方推，否则相机会陷在球**内部** —— 材质默认 FrontSide，从内部看全是背面、
-    // 被整体剔除，球直接消失（实测半径 >2045px 就看不见了，见 dev-ball 的球半径滑块）。
-    const bz = typeof window.__lensZ === 'number' ? window.__lensZ : 15;
-    if (window.__lensTransition === true) {
-      ref.current.position.set(0, 0, bz);
-    } else {
-      // 跟手阻尼（官方阻尼系数 0.15）
-      easing.damp3(
-        ref.current.position,
-        [(follow.current.x * v.width) / 2, (follow.current.y * v.height) / 2, bz],
-        0.15,
-        delta
-      );
-    }
-
-    // 球在 z=15 处的投影要盖住视口对角线 —— 加载页把这值与洞口半径同步，
-    // 球轮廓才会和洞沿重合（差一点就会看到「洞比球大」的白圈）。
-    // 系数 1.5 而不是 1.06：模型是**圆柱透镜**（不是正球），且包围盒宽度包含了
-    // 非光学部分，1.06 的余量实测盖不住四角。宁可多盖 —— 多盖只是留白多一点，
-    // 盖不住则会露出接缝。
-    const dia = Math.hypot(v.width, v.height);
-    window.__lensCoverScale = (dia * 2.6) / (geoWidthRef.current || 2);
-
-    // ── 首页这颗球（§102 起与加载页那颗**分成两个独立 mesh**）──────────────
-    // 加载页的球在场时，这颗整体让位。两组状态互不干扰：
-    //   · 加载页那颗读 __lensScale / __lensZ / __lensOptics（由加载页写）
-    //   · 这颗一个都不读，只认 LENS_PROPS.scale 与自己的入场量 __homeGrow
-    // 分开之前是一个 mesh 从大球缩成小球再长回来 —— 加载页那边的状态会漏到首页这颗上。
-    const loadingBallOn = window.__lensBall === true;
-    ref.current.visible = !loadingBallOn;
-    const homeGrow = typeof window.__homeGrow === 'number' ? window.__homeGrow : 1;
-    if (loadingBallOn) {
-      // 让位期间不更新尺寸，交班时从零长起（见 __homeGrow）
-    } else if (scale == null) {
-      const maxWorld = viewport.width * 0.9;
-      const desired = maxWorld / geoWidthRef.current;
-      ref.current.scale.setScalar(Math.min(0.15, desired) * homeGrow);
-    } else {
-      ref.current.scale.setScalar(scale * homeGrow);
-    }
-
-    // §102：过渡收尾时把光学性能「减弱」到中性 —— 球铺满视口后逐渐变成一块
-    // 无色、无畸变的玻璃，视觉上等同消失；此时换回首页那颗球的光学是无感的。
-    // __lensOptics 1 = 原样，0 = 中性。没有加载页时该全局量不存在 → 恒为 1。
-    // ⚠ 读 __lensOptics 的**只有加载页那颗**。这颗固定用 LENS_PROPS 原值 ——
-    //   否则加载页褪光学撤走后留下的 0 会跟着漏过来，首页的球变成一块平板玻璃。
-    const opt = 1;
-    const m = matRef.current;
-    if (m) {
-      const tgt = {
-        ior: 1 + (ior - 1) * opt,                 // 1.15 → 1.0（不折）
-        thickness: thickness * opt,               // 2 → 0（无厚度 = 无畸变）
-        chromaticAberration: chromaticAberration * opt,
-        anisotropy: anisotropy * opt,
-      };
-      // 逐项「存在才写」：drei 不同版本可能把它挂成实例属性、也可能只挂 uniform，
-      // 两条路都试，缺哪条都不至于抛错。
-      for (const k in tgt) {
-        if (k in m) m[k] = tgt[k];
-      }
-      const u = m.uniforms;
-      if (u) {
-        if (u.uIor) u.uIor.value = tgt.ior;
-        if (u.uThickness) u.uThickness.value = tgt.thickness;
-        if (u.uChromaticAberration) u.uChromaticAberration.value = tgt.chromaticAberration;
-        if (u.uAnisotropy) u.uAnisotropy.value = tgt.anisotropy;
-      }
-      // 验收探针用：把材质当前实际值摊出来（无副作用）
-      window.__lensMat = {
-        opt, ior: m.ior, thickness: m.thickness, ca: m.chromaticAberration,
-        hasUni: !!u,
-      };
-    }
-
-    // 后台渲染折射场景 → buffer
+    // 后台渲染折射场景 → buffer（LoadingBall 采样它）。
+    // 加载页把 __lensScene 从 0 推到 1：底板淡出 → 球里由加载页换成网格。
     gl.setRenderTarget(buffer);
     gl.render(scene, camera);
     gl.setRenderTarget(null);
@@ -333,8 +171,7 @@ const Lens = memo(function Lens({ follow }) {
       {createPortal(
         <>
           <Backdrop />
-          <SceneTexts />
-          {/* §102：加载页底板，盖在最前；过渡时淡出，球里就由加载页换成首页场景 */}
+          {/* §102：加载页底板，盖在最前；过渡时淡出，球里就由加载页换成网格 */}
           <LoadingPlate />
         </>,
         scene,
@@ -344,25 +181,8 @@ const Lens = memo(function Lens({ follow }) {
         <planeGeometry />
         <meshBasicMaterial map={buffer.texture} transparent />
       </mesh>
-      {/* §102 加载页那颗球（独立 mesh，只在过渡期可见） */}
+      {/* §107：只剩加载页那颗球（首页那颗已删除） */}
       <LoadingBall buffer={buffer} geo={nodes.Cylinder?.geometry} />
-      {/* 首页那颗球：几何来自 lens.glb，材质吃同一张 buffer */}
-      <mesh
-        ref={ref}
-        scale={scale ?? 0.15}
-        rotation-x={Math.PI / 2}
-        geometry={nodes.Cylinder?.geometry}
-      >
-        <MeshTransmissionMaterial
-          ref={matRef}
-          buffer={buffer.texture}
-          ior={ior ?? 1.15}
-          thickness={thickness ?? 5}
-          anisotropy={anisotropy ?? 0.01}
-          chromaticAberration={chromaticAberration ?? 0.1}
-          {...extraMat}
-        />
-      </mesh>
     </>
   );
 });
@@ -370,8 +190,8 @@ const Lens = memo(function Lens({ follow }) {
 /* §102 加载页「底板」—— 过渡期球要折的是**加载页**，不是首页场景。
    加载页是 DOM，而球的 shader 只采样自己的离屏 buffer（§69：折射场景副本、不折射 DOM），
    所以由加载页那一侧把自身版面画成一张 canvas 交过来（window.__plPlate），这里当一张
-   平面放进场景、盖在首页场景前面（z=5，位于网格 z=0 与 3D 文字 z=3 之前）。
-   过渡时按 window.__lensScene 0→1 淡出 → 球里的内容就由「加载页」变成「首页场景」。
+   平面放进场景、盖在网格前面（z=5，网格 z=0 之前）。
+   过渡时按 window.__lensScene 0→1 淡出 → 球里的内容就由「加载页」变成网格。
    这张 canvas 只在过渡开始时画一次：那时进度恒为 100%，画面是静止的。 */
 const PLATE_Z = 5;   // 底板平面所在深度（网格 z0 与 3D 文字 z3 之前、球 z15 之后）
 
@@ -499,101 +319,17 @@ function Backdrop() {
 
 export default function FluidGlass() {
   const [ok, setOk] = useState(false);
-  // §69.8：全页指针（window 级）→ 归一化 [-1,1]（y↑），与 canvas 事件解耦；
-  //   悬停按钮/导航等 DOM 上层元素时球仍跟手
-  const pt = useRef({ x: 0, y: 0 });
-  const moved = useRef(false);
-  useEffect(() => {
-    const onMove = (e) => {
-      // §74-2：悬停导航栏 = 视为移出（球回静置点）；下方内容区才跟手
-      const nav = document.querySelector('.topbar');
-      if (nav) {
-        const r = nav.getBoundingClientRect();
-        if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
-          setIdle();
-          return;
-        }
-      }
-      moved.current = true;
-      pt.current.x = (e.clientX / window.innerWidth) * 2 - 1;
-      pt.current.y = -(e.clientY / window.innerHeight) * 2 + 1;
-    };
-    window.addEventListener('pointermove', onMove);
-    return () => window.removeEventListener('pointermove', onMove);
-  }, []);
-
-  // §73/§74：静置点 = 大标题中心（DOM h1 实测，上抬 IDLE_LIFT_PX=2px）。
-  //   应用于：初始（§73）、resize 未动过时、指针离开页面回位（§74）
-  const IDLE_LIFT_PX = 2;
-  const setIdle = () => {
-    const el = document.querySelector('[data-scene-title]');
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    const cy = r.top + r.height / 2 - IDLE_LIFT_PX; // css px 上抬
-    pt.current.x = 0;
-    pt.current.y = -(cy / window.innerHeight) * 2 + 1; // 屏幕 y↓ → 归一化 y↑
-  };
-  useEffect(() => {
-    setIdle();
-    const onResize = () => {
-      if (!moved.current) setIdle();
-    };
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-
-  // §74：指针离开页面（移出视口/失焦）→ 球自动阻尼回初始静置点
-  // §74-1：离开判定加坐标兜底 —— 事件里 clientX/Y 仍落在页面元素上
-  //   （如悬停顶栏）则忽略，避免「移到导航栏也回位」的误触发
-  useEffect(() => {
-    const reset = () => {
-      moved.current = false;
-      setIdle();
-    };
-    const onLeave = (e) => {
-      if (document.hidden) {
-        reset(); // 真失焦（Alt-Tab/切窗口）
-        return;
-      }
-      const { clientX, clientY } = e;
-      const outside =
-        clientX < 1 || clientY < 1 || clientX > window.innerWidth - 1 || clientY > window.innerHeight - 1;
-      if (!outside) {
-        // 仍在视口内：除非下方没有任何页面元素，否则视为误报
-        const el = document.elementFromPoint(clientX, clientY);
-        if (el) return;
-      }
-      reset();
-    };
-    const onBlur = () => {
-      if (document.hidden) reset();
-    };
-    const onVis = () => {
-      if (document.hidden) reset();
-    };
-    const root = document.documentElement;
-    root.addEventListener('pointerleave', onLeave);
-    window.addEventListener('blur', onBlur);
-    document.addEventListener('visibilitychange', onVis);
-    return () => {
-      root.removeEventListener('pointerleave', onLeave);
-      window.removeEventListener('blur', onBlur);
-      document.removeEventListener('visibilitychange', onVis);
-    };
-  }, []);
-
+  // §107：首页不再有可跟手的球。这个 island 只剩「加载页退场舞台」一个职责：
+  //   窄屏 / 减动效时整场不挂载，并明确告诉加载页（__ballNA）不必等球。
   useEffect(() => {
     const small = matchMedia('(max-width: 899px)');
     const rm = matchMedia('(prefers-reduced-motion: reduce)');
     const upd = () => {
       const on = !small.matches && !rm.matches;
       setOk(on);
-      // §102：把「挂不挂」明确告诉加载页 —— 窄屏/减动效时它不该傻等球就绪，
-      // 否则白等满 BALL_WAIT_MS 才放行。
       window.__ballDecided = true;
       window.__ballNA = !on;
       // 加载页在场：球先藏起来（scale 0），等它的过渡把 scale 推上去。
-      // 无加载页时 __plPending 不存在 —— 同会话二次进入 / 历史返回都照常显示。
       if (window.__plPending && typeof window.__lensScale !== 'number') window.__lensScale = 0;
     };
     upd();
@@ -605,14 +341,6 @@ export default function FluidGlass() {
     };
   }, []);
 
-  // §69.9：html.fg-on 随 island 生命周期挂/摘 —— 它是「DOM 标题隐藏」的唯一开关。
-  //   不能用首屏 inline script 挂类：Astro ViewTransitions 历史返回会恢复
-  //   <html> 类状态、把该类抹掉 → 双层标题（bug 实证）。
-  useEffect(() => {
-    document.documentElement.classList.toggle('fg-on', ok);
-    return () => document.documentElement.classList.remove('fg-on');
-  }, [ok]);
-
   if (!ok) return null;
 
   return (
@@ -623,7 +351,7 @@ export default function FluidGlass() {
       camera={{ position: [0, 0, 20], fov: 15 }}
       gl={{ alpha: true, powerPreference: 'high-performance' }}
     >
-      <Lens follow={pt} />
+      <Lens />
     </Canvas>
   );
 }

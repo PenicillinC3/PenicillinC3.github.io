@@ -572,11 +572,6 @@ const bootJs = `
   // 呼出 / 褪光学 / 撤场 的时长（ms）。§105：合计 2.7s → 1.6s（用户反馈加载页等太久）。
   // ⚠ 三者是**串行**的（球在光学降到 50% 时触发，见 T_HALF），改一个要连着看总时长。
   var T_CALL = 1000, T_FADE = 200, T_OUT = 400;
-  // 撤场结束后，首页那颗常态小球要不要长回来。
-  // ⚠ 加载页的球与首页的球是**两个独立的 mesh**（见 FluidGlass 的 LoadingBall）：
-  //   这颗撤走时不会带走首页那颗的任何状态，首页那颗也不读 __lens*。
-  //   首页设计里球是主角（§69），所以线上留 true；预览页 dev-ball 是 false。
-  var HOME_BALL = true;
 
   function worldPerPx() {
     return (2 * Math.tan((FOV * Math.PI) / 360) * (CAM_Z - LENS_Z)) / innerHeight;
@@ -598,8 +593,7 @@ const bootJs = `
     paintCounts();
     window.__plPlate = makePlate();         // 烘版面：过渡期球折的就是加载页
     window.__lensScene = 0;                 // 0 = 球里是加载页，1 = 首页场景
-    window.__lensBall = true;               // 加载页那颗球上场（首页那颗整体让位）
-    window.__lensTransition = true;         // 首页那颗锁视口中心、不跟手（它此刻不可见）
+    window.__lensBall = true;               // 加载页那颗球上场（§107 起首页已无球）
     // 快照：停掉还在跑的 CSS 动画，画面彻底静止。
     // ⚠ 只停 grain 的动画 —— **别再把 scene.style.filter 清成 'none'**：
     //   模糊终点是 BLUR_END(≈0.83px) 而不是 0，清掉等于交班瞬间整页「咔」地变清晰。
@@ -608,6 +602,13 @@ const bootJs = `
     // 撤下 DOM 层：屏幕交给 WebGL（底板与刚烘的版面逐像素一致），球的折射才够得着它。
     if (el.isConnected) el.remove();
     document.body.style.overflow = '';
+    // §107：交班期间首页 DOM 必须让位 —— TechText / 顶栏 / 页脚在 canvas 之上（z1/z60），
+    // 不隐藏会浮在 WebGL 底板前面。只在球真的就绪时加：窄屏/减动效没有 canvas，
+    // 加了只会白屏 1.6s。10s 安全计时器兜底，防交班异常导致首页永久不可见。
+    if (window.__ballReady) {
+      document.documentElement.classList.add('pl-live');
+      setTimeout(function () { document.documentElement.classList.remove('pl-live'); }, 10000);
+    }
 
     var scaleFull = BALL_RADIUS_PX * worldPerPx();
     var tA = performance.now();
@@ -641,10 +642,6 @@ const bootJs = `
       var oo = 0;
       if (ms > T_CALL + T_FADE) {
         window.__lensBall = false;                 // 球：立即退场
-        // ⚠ __homeGrow 必须与上一行**同时**置零。首页那颗的可见性只看 __lensBall，
-        //   置零晚一步（比如放到 settle 里）中间那 700ms 它就已经可见、而 __homeGrow
-        //   还是 undefined（= 满尺寸）—— 屏幕上就是「删完之后首页玻璃球闪一下」。
-        window.__homeGrow = 0;
         oo = smooth(Math.min(1, (ms - T_CALL - T_FADE) / T_OUT));
         window.__lensScene = oo;
         // ⚠ 洞**不跟着收**，保持满洞。收了的话底板上「没被挖掉」的面积会重新长回来 ——
@@ -686,22 +683,10 @@ const bootJs = `
       schedule();
     }
 
-    // ④ 收尾：把球交还给 island 自己管。
-    //    HOME_BALL=true → 由零长回首页那颗常态小球（scale 0.10），光学同步恢复；
-    //    =false → 直接把球撤掉，首页不留球。
+    // ④ 收尾（§107）：首页已没有球 —— 摘掉交班遮罩让首页淡入，然后开始后台预取。
     function settle() {
-      // 首页那颗**从首页自己长出来**（不是加载页那颗缩回去）：只推 __homeGrow 0→1，
-      // 尺寸由 FluidGlass 用它乘 LENS_PROPS.scale 得到。加载页那几个量一概不碰。
-      if (!HOME_BALL) { window.__lensTransition = false; idlePrefetch(); return; }
-      window.__lensTransition = false;      // 它就是首页那颗了：正常跟手
-      var DUR = 800, tB = performance.now();   // __homeGrow 已在撤场开始时置零
-      (function step(now) {
-        var k = smooth(Math.min(1, (now - tB) / DUR));
-        window.__homeGrow = k;
-        if (k < 1) { requestAnimationFrame(step); return; }
-        delete window.__homeGrow;           // 交还给 island：此后就是常态那颗球
-        idlePrefetch();                     // 首页已渲染完 → 此刻才开始后台拉子页
-      })(performance.now());
+      document.documentElement.classList.remove('pl-live'); // 首页 DOM 淡入
+      idlePrefetch();                                       // 首页已渲染完 → 拉子页
     }
   }
 

@@ -4,7 +4,7 @@ Apple 液态玻璃风格的静态个人站点。包含我的一些思考见解�
 
 内容全部是 Markdown 文件，推送到 GitHub 即自动构建部署到 GitHub Pages。
 
-技术：Astro 5 · TypeScript · 纯 CSS（React 仅首页玻璃球一个 island，spec §69 特批；其余零框架）。设计依据见 `docs/superpowers/specs/`，实现计划见 `docs/superpowers/plans/`。
+技术：Astro 5 · TypeScript · 纯 CSS（React 仅首页两个 island：TechText 站名画布与加载页玻璃球，spec §107；其余零框架）。设计依据见 `docs/superpowers/specs/`，实现计划见 `docs/superpowers/plans/`。
 
 ## 本地开发
 
@@ -33,7 +33,7 @@ npm run preview # 本地预览构建产物
 
 ![项目结构](docs/structure-diagram.png)
 
-源码层：`src/content/`（六个内容集合：notes / musings / links / projects / photos / series）经 `src/lib/collections.ts`（唯一取数入口）供数给 `src/pages/`（十条路由）与 `src/layouts/`、`src/styles/`；页面调用 `src/components/` 的静态组件族（零框架）与三个交互运行时（FluidGlass 玻璃球 island、Preloader 加载页、Rays 射线 —— 全站仅有的 JS/WebGL）。字体子集管线（`scripts/subset-*.mjs`，prebuild 钩子自动跑）从 `_font/` 原件产出 `public/fonts/` 子集。推送 main → GitHub Actions 构建 → GitHub Pages 发布。
+源码层：`src/content/`（六个内容集合：notes / musings / links / projects / photos / series）经 `src/lib/collections.ts`（唯一取数入口）供数给 `src/pages/`（十条路由）与 `src/layouts/`、`src/styles/`；页面调用 `src/components/` 的静态组件族（零框架）与交互运行时：`HomeTitle`/`TechText`（首页站名 Canvas 2D 画布）、`FluidGlass`（仅首访加载页退场时的玻璃球）、`Preloader` 加载页、`Rays` 射线 —— 全站仅有的 JS/WebGL。字体子集管线（`scripts/subset-*.mjs`，prebuild 钩子自动跑）从 `_font/` 原件产出 `public/fonts/` 子集。推送 main → GitHub Actions 构建 → GitHub Pages 发布。
 
 ## 内容许可
 
