@@ -1100,10 +1100,12 @@ three 栈入口。所以本次 = 拆掉「首页球 + 场景文字」，保留�
   无双层标题，island 加载失败时回退 DOM 标题。
 - `.title-stage` 尺寸 = 原 `h1` 行盒：高 `calc(clamp(1.9rem, 11vw, 6.6rem) * 1.15)`，
   宽 `min(92vw, 1120px)`。TechText 的 `0.66 × 容器高` 自适应落点约等于原视觉字号。
-- **字体**：`fontFamily` 传 `"Song Web", "华文中宋", "STZhongsong", "Songti SC", "SimSun", serif`
-  （与 `--font-song` 同栈），`fontWeight 500`、`letterSpacing 0.03`、`accentColor #2f62e6`。
-  其余参数用组件默认：`sweep` / `reveal:'letter'` / `specks 15` / `labels` / `draggable` /
-  `clickKick`。
+- **字体与颜色**：`fontFamily` 传 `"Song Web", "华文中宋", "STZhongsong", "Songti SC", "SimSun", serif`
+  （与 `--font-song` 同栈），`fontWeight 500`、`letterSpacing 0.04`、**`sweep={false}`**
+  （不自动扫掠，只有鼠标进入标题区域才产生动画，移开即收尾停止 rAF）。
+  `accentColor` 不传 → 组件默认 `currentColor`，而 `.tech-layer` 继承 `--text-1` ——
+  虚线轮廓、选中框、尺寸标签、specks 全部与站名同色（不再用蓝色 accent）。
+  其余参数用组件默认：`reveal:'letter'` / `specks 15` / `labels` / `draggable` / `clickKick`。
 - 层级：标题层在 `.welcome` 内（`z1`），`pointer-events:auto` 供拖拽与悬停；按钮区独立可点。
   画布垫底（`.glass-scene` z0）不变。
 

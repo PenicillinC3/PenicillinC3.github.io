@@ -24,14 +24,16 @@ export default function HomeTitle() {
     <div className="title-stage">
       <h1 className="name" aria-label={site.title}>{site.title}</h1>
       <div className="tech-layer" aria-hidden="true">
+        {/* §107：线框/选中框/specks 全部跟随文字色（currentColor = --text-1），
+            不再用蓝色 accent；sweep 关闭 —— 只有鼠标在标题上时才动。 */}
         <TechText
           text={site.title}
           fontFamily={SONG_STACK}
           fontWeight={500}
           fontSize={200}
           letterSpacing={0.04}
-          accentColor="#2f62e6"
           align="center"
+          sweep={false}
           onReady={onReady}
         />
       </div>
