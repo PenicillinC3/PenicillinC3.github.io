@@ -34,6 +34,7 @@ export default function HomeTitle() {
           letterSpacing={0.04}
           align="center"
           sweep={false}
+          idleChar="C"
           onReady={onReady}
         />
       </div>

@@ -69,6 +69,7 @@ const TechText = ({
   intro = 'none',
   introDuration = 2,
   guides = false,
+  idleChar = '',
   className = '',
   style,
   onReady
@@ -105,7 +106,8 @@ const TechText = ({
       clickKick,
       intro,
       introDuration,
-      guides
+      guides,
+      idleChar
     };
     wakeRef.current();
   });
@@ -776,7 +778,16 @@ const TechText = ({
         });
       }
 
-      const focus = introducing ? typing : dragging >= 0 ? dragging : active ? glyphAt(lens.x, lens.y) : -1;
+      // §107：鼠标不在任何字形上时，让 idleChar 那颗保持「被选中」的揭示动画
+      // （虚线轮廓 + 选中框 + specks）；悬停/拖拽时仍以鼠标位置为准。
+      // reduced-motion 下不启用静止动画（与 sweep 的处理一致）。
+      const hovered = active && !introducing ? glyphAt(lens.x, lens.y) : -1;
+      const idleIndex =
+        !introducing && !reducedMotion && dragging < 0 && s.idleChar
+          ? glyphs.findIndex(glyph => glyph.char === s.idleChar)
+          : -1;
+      const rest = hovered < 0 && idleIndex >= 0 ? idleIndex : -1;
+      const focus = introducing ? typing : dragging >= 0 ? dragging : hovered >= 0 ? hovered : rest;
       if (focus >= 0 && s.selection) {
         const glyph = glyphs[focus];
         const bx1 = glyph.box.x1 + glyph.offset.x - 6;
@@ -883,7 +894,7 @@ const TechText = ({
         (guideAlpha > 0.005 && guideAlpha < 0.995) ||
         Math.abs(presence - (s.reveal === 'area' && active && dragging < 0 ? 1 : 0)) > 0.002 ||
         (frame.alpha > 0.01 && frame.alpha < 0.99);
-      if ((active || settling) && visible && alive) raf = requestAnimationFrame(tick);
+      if ((active || settling || rest >= 0) && visible && alive) raf = requestAnimationFrame(tick);
     };
 
     const wake = () => {

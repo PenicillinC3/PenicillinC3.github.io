@@ -1106,6 +1106,11 @@ three 栈入口。所以本次 = 拆掉「首页球 + 场景文字」，保留�
   `accentColor` 不传 → 组件默认 `currentColor`，而 `.tech-layer` 继承 `--text-1` ——
   虚线轮廓、选中框、尺寸标签、specks 全部与站名同色（不再用蓝色 accent）。
   其余参数用组件默认：`reveal:'letter'` / `specks 15` / `labels` / `draggable` / `clickKick`。
+- **静止态（`idleChar="C"`）**：鼠标不在任何字形上时，大写 **C** 保持「被选中」的揭示
+  动画（虚线轮廓 + 选中框 + specks 持续跑）；鼠标悬停到别的字形则以鼠标为准，拖拽同理。
+  `reduced-motion` 下不启用静止动画（与 sweep 一致）。实现是在 `TechText` 里加
+  `idleChar` 参数：`hovered < 0` 时把 `focus` 回落到该字形，并让 rAF 在 `rest >= 0`
+  时继续调度 —— 否则 specks 会停在最后一帧。
 - 层级：标题层在 `.welcome` 内（`z1`），`pointer-events:auto` 供拖拽与悬停；按钮区独立可点。
   画布垫底（`.glass-scene` z0）不变。
 
