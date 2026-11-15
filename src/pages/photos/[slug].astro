@@ -15,22 +15,27 @@ export async function getStaticPaths() {
 }
 
 interface Props {
-  roll: { entry: CollectionEntry<'series'>; photos: CollectionEntry<'photos'>[]; cover: CollectionEntry<'photos'> };
+  roll: { entry: CollectionEntry<'series'>; photos: CollectionEntry<'photos'>[]; bodyPhotos: CollectionEntry<'photos'>[]; cover: CollectionEntry<'photos'> };
 }
 const { roll } = Astro.props;
-const { entry: s, photos } = roll;
+const { entry: s, photos, bodyPhotos } = roll;
 
-// —— §81 图文交错 ——
+// —— §81 图文交错（§108：只有 inBody 的照片参与）——
 // 卷 md 里独占一行的 ![[照片slug]] = 该照片卡片就地插入此处（照片说明由照片自己
 // 的 md 提供）；未被标记的照片按顺序自动补到正文之后再按日期排进底部网格。
 // 无任何标记时行为与旧版完全一致（正文块 + 底部照片网格）。
+// §108：inBody: false 的照片不参与交错、也不进照片区 —— 但它们仍属本卷
+//   （可当封面、算进画廊张数），写进 ![[...]] 会被下面拦下并给出明确提示。
 const MARK_RE = /^!\[\[([a-z0-9\-/]+)\]\]$/gim; // §99：允许 卷名/文件名（glob 集合 id 形态）
 const marks = [...(s.body ?? '').matchAll(MARK_RE)];
-const photoBySlug = new Map(photos.map((p) => [p.id, p])); // §99：id 为键
+const photoBySlug = new Map(bodyPhotos.map((p) => [p.id, p])); // §99：id 为键；§108：只收 inBody
 for (const m of marks) {
-  if (!photoBySlug.has(m[1])) {
-    throw new Error(`[photos] 卷 ${s.slug} 的正文引用了不属于本卷的照片：${m[1]}`);
-  }
+  if (photoBySlug.has(m[1])) continue;
+  throw new Error(
+    photos.some((p) => p.id === m[1])
+      ? `[photos] 卷 ${s.slug} 正文引用的照片 ${m[1]} 标了 inBody: false —— 想让它出现在正文里，删掉照片 md 里的 inBody: false`
+      : `[photos] 卷 ${s.slug} 的正文引用了不属于本卷的照片：${m[1]}`,
+  );
 }
 const marked = new Set(marks.map((m) => m[1]));
 
@@ -54,12 +59,13 @@ if (!pureProse && tail.trim()) {
   const r = await md.render(tail);
   parts.push({ kind: 'md', html: r.code });
 }
-const restPhotos = photos.filter((p) => !marked.has(p.id));
+// §108：正文区只排 inBody 的照片；被隐藏的仍算本卷（封面/张数照旧）
+const restPhotos = bodyPhotos.filter((p) => !marked.has(p.id));
 const { Content } = pureProse ? await render(s) : { Content: null };
 
 // 每张照片的展示图（卷备忘页内最大宽度）
 const imgs = await Promise.all(
-  photos.map(async (p) => {
+  bodyPhotos.map(async (p) => {
     // §76：压缩 —— 去掉 2400 档（展示宽 ≤1200px，1600 已覆盖 1.33x DPR，2x 场景
     //   由 1600 上采样可接受），quality 86→80
     const g = await memoImage(p.data.image);
@@ -85,7 +91,7 @@ const imgBySlug = new Map(imgs.map((it) => [it.p.id, it]));
         {formatDate(s.data.date)}
         {s.data.location && <span class="sep">·</span>}
         {s.data.location}
-        <span class="sep">·</span>共 {photos.length} 张
+        <span class="sep">·</span>共 {bodyPhotos.length} 张
       </p>
     </header>
     {/* §81：无 ![[slug]] 标记 → 旧路径（原生 Content）；有标记 → 文字段与照片按标记交错 */}
@@ -115,7 +121,7 @@ const imgBySlug = new Map(imgs.map((it) => [it.p.id, it]));
   .memo { display: grid; grid-template-columns: minmax(0, 1fr); gap: clamp(22px, 3vw, 30px); }
   .memo > * { min-width: 0; }
   /* §79：备忘正文与个人笔记页同宽（Post.astro 同款 .prose.body 取消 68ch 窄栏）
-     §80：正文/照片说明字号略微调大 —— 华文中宋小字号在暗底上笔画细、毛边感
+     §80：正文/照片说明字号略微调大 —— 衬线体小字号在暗底上笔画细、毛边感
      明显，放大后显著缓解（锯齿观感） */
   .prose.memobody {
     max-width: none;

@@ -19,7 +19,7 @@ const covers = await Promise.all(
       date: r.entry.data.date.replaceAll('-', '.'),
       location: r.entry.data.location ?? '',
       workName: r.entry.data.workName ?? '', // §75：填了则字幕显示作品名
-      count: r.photos.length,
+      count: r.bodyPhotos.length, // §108：与备忘页「共 N 张」同口径（只数实际展示的）
       wide: w / h > 1.55,
       src: big.src,
       srcset: srcsetOf(big), // §101 修：此前读 attributes.srcset（不存在）→ 恒 undefined

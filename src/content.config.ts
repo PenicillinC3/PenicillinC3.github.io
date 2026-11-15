@@ -78,6 +78,10 @@ export const collections = {
         location: z.string().optional(),
         album: z.string().optional(),
         series: z.string().optional(), // 所属卷（对应 series slug），有则挂靠胶片
+        // §108：这张照片要不要出现在卷备忘页的正文/照片区。默认 true。
+        //   典型用途：只当卷封面用、不想在备忘页里再出现一次（封面仍可在画廊展示）。
+        //   设成 false 的照片不能再用 ![[卷名/文件名]] 标记插进正文（构建期报错）。
+        inBody: z.boolean().default(true),
         camera: z
           .object({
             body: z.string().optional(),

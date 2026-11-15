@@ -97,7 +97,10 @@ export async function photoEntries(): Promise<CollectionEntry<'photos'>[]> {
 
 export interface SeriesRoll {
   entry: CollectionEntry<'series'>;
+  /** 卷内全部照片（含只当封面用的）—— 封面查找、画廊张数用这个 */
   photos: CollectionEntry<'photos'>[];
+  /** §108：备忘页正文/照片区实际展示的照片（inBody: false 的不在其中） */
+  bodyPhotos: CollectionEntry<'photos'>[];
   cover: CollectionEntry<'photos'>;
 }
 
@@ -119,6 +122,6 @@ export async function seriesRolls(): Promise<SeriesRoll[]> {
     if (!cover) {
       throw new Error(`[series] ${s.slug} 卷内无照片（photos 需带 series: ${s.slug}）`);
     }
-    return { entry: s, photos, cover };
+    return { entry: s, photos, bodyPhotos: photos.filter((p) => p.data.inBody !== false), cover };
   });
 }
