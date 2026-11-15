@@ -20,9 +20,11 @@ function variants(g: { srcSet: { values: Array<{ url: string }> } }): string[] {
  *   skip = 只被加载页 **内联成 base64** 用，作为独立文件从不会被任何页面请求，
  *          放进清单纯属白下（实测：helv-swiss 7KB + maple-pre 12KB）。
  */
-const FONT_TIER: Record<string, 0 | 1 | 4 | 'skip'> = {
-  'maple-ui.woff2': 0,        // 首页 DOM 文案（导航/按钮/页脚）
-  'maple-mono.woff2': 1,      // 每个内容页的正文 —— 后台队列里排第一
+const FONT_TIER: Record<string, 0 | 1 | 3 | 4 | 'skip'> = {
+  'maple-ui.woff2': 0,          // 首页 DOM 文案（导航/按钮/页脚）
+  'anthropic-serif.woff2': 0,   // §111 首页站名（Canvas TechText 首帧要等它）
+  'source-han-serif.woff2': 3,  // §111 中文衬线：摄影栏目 + 站名中文回退
+  'maple-mono.woff2': 1,        // 每个内容页的正文 —— 后台队列里排第一
   'helv-swiss.woff2': 'skip',
   'maple-pre.woff2': 'skip',
 };
@@ -31,10 +33,13 @@ const FONT_TIER: Record<string, 0 | 1 | 4 | 'skip'> = {
  * 分两批返回（§103 / §105）：
  *
  *   critical —— **首页自己 + 首访加载页的球**要用的，加载页严格以此为退场条件：
- *               `/`（HTML）+ maple-ui（DOM 文案）+ lens.glb（加载页玻璃球模型）。
- *               ⚠ §107 起站名由 Canvas TechText 画（系统/嵌入式字体，无额外文件），
- *                 `song-3d.ttf` 不再产出、不再预取。实测 critical ≈ 57KB，
- *                 且首页一张图都不请求。
+ *               `/`（HTML）+ maple-ui（DOM 文案）+ anthropic-serif（站名字形）
+ *               + lens.glb（加载页玻璃球模型）。
+ *               ⚠ §107 删掉了 song-3d.ttf（站名改 Canvas）；§109 站名换成
+ *                 Anthropic Serif，多回一份子集 —— 它必须在 critical，
+ *                 否则 TechText 首帧会先用回退字体画一遍再重排。
+ *               ⚠ §111 起**中文字体不进 critical**：站名是纯拉丁，中文衬线只在
+ *                 摄影栏目用（tier 3）。实测 critical ≈ 78KB，首页一张图都不请求。
  *
  *   deferred —— 首页渲染完、主线程空闲后才在后台拉的，**数组顺序即优先级**。
  *               分四档：① 正文字体 → ② 栏目首页 HTML → ③ 卷封面 + 粗体
@@ -79,7 +84,7 @@ export async function prefetchPlan(): Promise<{ critical: string[]; deferred: st
     const tier = FONT_TIER[f] ?? 4;
     if (tier === 'skip') continue;
     if (tier === 0) { critical.add(`/fonts/${f}`); seen.add(`/fonts/${f}`); continue; }
-    (tier === 1 ? t1 : t4).push(`/fonts/${f}`);
+    (tier === 1 ? t1 : tier === 3 ? t3 : t4).push(`/fonts/${f}`);
   }
 
   // ② 栏目首页 HTML
@@ -96,8 +101,9 @@ export async function prefetchPlan(): Promise<{ critical: string[]; deferred: st
   for (const e of musings) t4.push(`/musings/${e.slug}/`);
   for (const r of rolls) t4.push(`/photos/${r.entry.slug}/`);
 
-  // ⑤ 备忘页大图及全部档位
+  // ⑤ 备忘页大图及全部档位（§108：inBody: false 的照片不进备忘页，别预取）
   for (const p of photos) {
+    if (p.data.inBody === false) continue;
     const g = await memoImage(p.data.image);
     t4.push(g.src, ...variants(g));
   }

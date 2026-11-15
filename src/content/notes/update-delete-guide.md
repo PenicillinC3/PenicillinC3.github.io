@@ -104,7 +104,7 @@ git push
 | `src/pages/` 里的文件                                                   | **别碰** —— 列表页/详情页是程序，删了网站结构就坏了                         |
 | `node_modules/`、`dist/`、`.astro/` 文件夹                              | **别手动删** —— 构建时自动生成                                              |
 | 根目录 `img/` 文件夹（原始大照片）                                      | **别删** —— 不进 git，删了无法从历史找回，等于丢原片                        |
-| 根目录 `font/` 文件夹（字体原件，`STZHONGS.TTF`、`MapleMono-*.ttf` 等） | **别删** —— `npm run fonts:subset` 靠它们重建网站字体，删了该命令会直接报错 |
+| 根目录 `_font/` 文件夹（字体原件，`AnthropicSerif-*.otf`、`SourceHanSerif*.ttf`、`MapleMono-*.ttf` 等） | **别删** —— `npm run fonts:subset` 靠它们重建网站字体，删了该命令会直接报错 |
 | `public/fonts/` 里的字体子集                                            | 别手动删单个 —— 需要更新就跑 `npm run fonts:subset` 自动重建                |
 
 一条内容"还在不在网站上"，以 `npm run dev` 的本地预览（或线上网址）为准，别凭文件夹判断 —— 有些文件（没挂卷的照片）本来就只在硬盘上、不上网站。

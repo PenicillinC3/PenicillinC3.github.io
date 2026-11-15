@@ -10,7 +10,7 @@
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
-    "fonts:subset": "node scripts/subset-song.mjs && node scripts/subset-maple.mjs"
+    "fonts:subset": "node scripts/subset-serif.mjs && node scripts/subset-maple.mjs"
   },
   "dependencies": {
     "@astrojs/react": "^4.4.2",

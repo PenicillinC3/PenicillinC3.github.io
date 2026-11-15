@@ -5,15 +5,31 @@
   box-sizing: border-box;
 }
 
-/* 华文中宋子集（spec §28）：12MB TTF → 摄影栏目用字 51KB woff2。
-   系统装有华文中宋/STZhongsong 时走 local 不下载；否则回退子集字体；
-   子集外字形按 --font-song 栈逐字回退到系统宋体。子集更新：npm run fonts:subset */
+/* §111 展示用衬线体 —— 两套字体共用一份字符集，浏览器**逐字**挑选：
+   拉丁字母/数字/标点先命中 Anthropic Serif，汉字与全角标点落到思源宋体。
+   字体栈必须 Anthropic 在前（见 tokens.css 的 --font-serif）。
+   两者都由 scripts/subset-serif.mjs 产出，npm run fonts:subset 重建。 */
+
+/* Anthropic Serif（Display 面，纯拉丁）—— 系统装了就走 local，不下载 */
 @font-face {
-  font-family: "Song Web";
-  src: local("华文中宋"), local("STZhongsong"),
-    url("/fonts/stzhongsong.woff2") format("woff2");
+  font-family: "Anthropic Serif Web";
+  src: local("Anthropic Serif Display"), local("AnthropicSerifDisplay-Regular"),
+    url("/fonts/anthropic-serif.woff2") format("woff2");
   font-display: swap;
   font-weight: 100 900;
+  font-style: normal;
+}
+
+/* 思源宋体 SC（可变字重 250–900，默认 250 = ExtraLight）——
+   ⚠ 这是**可变字体**：子集必须保留 fvar/gvar，subset-font 默认保留。
+   页面用 400，浏览器现场实例化；别把 font-weight 写成 250 900 之外的范围。 */
+@font-face {
+  font-family: "Source Han Serif Web";
+  src: local("Source Han Serif SC"), local("SourceHanSerifSC-VF"),
+    url("/fonts/source-han-serif.woff2") format("woff2");
+  font-display: swap;
+  font-weight: 250 900;
+  font-style: normal;
 }
 
 /* MapleUI（§90 首页提速）：站点框架文案（名称/标语/导航/页脚/按钮）的极小
@@ -146,6 +162,12 @@ img { max-width: 100%; height: auto; display: block; }
   display: flex;
   flex-direction: column;
   padding-block: 0;
+  /* §109：必须显式给宽度。body 是 flex 纵向容器，main 作为 flex 子项本应被
+     align-items:stretch 拉满；但 .wrap 的 `margin-inline: auto` 会**关掉 stretch**
+     → 宽度退化成 max-content。以前首页的 DOM 大标题（11vw）自带足够的内容宽度，
+     看不出来；站名换成 Canvas 后没有内在宽度，整条链塌到按钮宽（实测 335px），
+     TechText 的 width:100% 也跟着塌。width:100% 让它重新吃满可用宽。 */
+  width: 100%;
 }
 
 /* —— 玻璃 v2（LGGC 配方白底化：极淡填充 + 发丝描边 + 灰阶轻投影） —— */
@@ -372,7 +394,7 @@ body.film-on .foot .inner {
 
 /* —— 暗房页（spec §21.1）：photos 模块页面 dark —— */
 body.page-dark {
-  font-family: var(--font-song); /* spec §28：摄影首页及其分页以华文中宋为正文字形 */
+  font-family: var(--font-serif); /* §111：思源宋体（中文）+ Anthropic Serif（拉丁），取代 §28 的华文中宋 */
   --canvas: #0b0c10;
   --grid-line: rgba(255, 255, 255, 0.035);
   --text-1: #eceef4;

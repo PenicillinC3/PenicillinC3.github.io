@@ -11,7 +11,11 @@ import { useCallback, useEffect } from 'react';
 import TechText from './TechText.jsx';
 import { site } from '../site.config';
 
-const SONG_STACK = '"Song Web", "华文中宋", "STZhongsong", "Songti SC", "SimSun", serif';
+// §111：站名与全站展示衬线体同栈 —— 拉丁走 Anthropic Serif，中文（理论上不会出现）
+// 落到思源宋体。**顺序即规则**：浏览器逐字回退，Anthropic 没有汉字。
+// ⚠ 名字必须与 base.css 里 @font-face 的 family 完全一致，否则 Canvas 静默回退。
+const TITLE_STACK =
+  '"Anthropic Serif Web", "Source Han Serif Web", "Source Han Serif SC", "Noto Serif SC", serif';
 
 export default function HomeTitle() {
   const onReady = useCallback(() => {
@@ -28,11 +32,12 @@ export default function HomeTitle() {
             不再用蓝色 accent；sweep 关闭 —— 只有鼠标在标题上时才动。 */}
         <TechText
           text={site.title}
-          fontFamily={SONG_STACK}
-          fontWeight={500}
+          fontFamily={TITLE_STACK}
+          fontWeight={400}
           fontSize={200}
-          letterSpacing={0.04}
+          letterSpacing={0.02}
           align="center"
+          pad={36}
           sweep={false}
           idleChar="C"
           onReady={onReady}

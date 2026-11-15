@@ -70,6 +70,7 @@ const TechText = ({
   introDuration = 2,
   guides = false,
   idleChar = '',
+  pad = 0,
   className = '',
   style,
   onReady
@@ -107,7 +108,8 @@ const TechText = ({
       intro,
       introDuration,
       guides,
-      idleChar
+      idleChar,
+      pad
     };
     wakeRef.current();
   });
@@ -222,6 +224,7 @@ const TechText = ({
         s.dashGap,
         s.strokeWidth,
         s.lineStyle,
+        s.pad,
         width,
         height,
         dpr
@@ -234,24 +237,31 @@ const TechText = ({
         document.fonts.load(wanted, s.text).then(refreshFonts, refreshFonts);
       }
 
+      /* §109：pad = 画布内缩量（px）。字形排版全部落在 inset 后的盒子内，
+         画布边缘因此空出一圈给选中框角标与 specks —— 否则粒子撒到画布外会被
+         canvas 直接裁掉，看起来像撞上一堵空气墙。 */
+      const padPx = Math.max(0, Number(s.pad) || 0);
+      const boxW = Math.max(1, width - padPx * 2);
+      const boxH = Math.max(1, height - padPx * 2);
+
       const probe = scratchCtx;
       setFont(probe, s, s.fontSize);
       let m = probe.measureText(s.text);
       const fit = Math.min(
         1,
-        (width * 0.9) / Math.max(m.actualBoundingBoxLeft + m.actualBoundingBoxRight, 1),
-        (height * 0.66) / Math.max(m.actualBoundingBoxAscent + m.actualBoundingBoxDescent, 1)
+        (boxW * 0.9) / Math.max(m.actualBoundingBoxLeft + m.actualBoundingBoxRight, 1),
+        (boxH * 0.66) / Math.max(m.actualBoundingBoxAscent + m.actualBoundingBoxDescent, 1)
       );
       const size = s.fontSize * fit;
       setFont(probe, s, size);
       m = probe.measureText(s.text);
       const inkWidth = m.actualBoundingBoxLeft + m.actualBoundingBoxRight;
       const inkHeight = m.actualBoundingBoxAscent + m.actualBoundingBoxDescent;
-      const margin = width * 0.05;
+      const margin = boxW * 0.05;
       const start =
-        s.align === 'left' ? margin : s.align === 'right' ? width - margin - inkWidth : (width - inkWidth) / 2;
+        s.align === 'left' ? padPx + margin : s.align === 'right' ? width - padPx - margin - inkWidth : padPx + (boxW - inkWidth) / 2;
       const x = start + m.actualBoundingBoxLeft;
-      const baseline = (height - inkHeight) / 2 + m.actualBoundingBoxAscent;
+      const baseline = padPx + (boxH - inkHeight) / 2 + m.actualBoundingBoxAscent;
       const xHeight = baseline - probe.measureText('x').actualBoundingBoxAscent;
       const capHeight = baseline - probe.measureText('H').actualBoundingBoxAscent;
       const ascender = baseline - probe.measureText('d').actualBoundingBoxAscent;

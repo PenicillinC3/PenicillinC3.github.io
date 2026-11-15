@@ -57,12 +57,22 @@ import { site } from '../site.config';
   }
 
   /* —— 站名舞台（React island 渲染，需全局选择器）——
-     高度 = 原 h1 行盒（clamp × 1.15）；TechText 按 0.66×容器高自适应，
-     落点与旧视觉字号基本一致。宽度给足，窄屏由 92vw 收缩。 —— */
+     §109：高度 = 原 h1 行盒（clamp × 1.15）**再上下各留 36px**。
+     TechText 的 pad 与这里必须成对：画布多出来的 36px 让选中框角标和 specks
+     有地方飞，否则撒到画布外会被裁掉（看着像撞空气墙）。里面那圈布局盒仍是
+     原来的 121px，所以字形大小没变。改这里记得同步 pad。 —— */
   :global(.title-stage) {
     position: relative;
-    width: min(92vw, 1120px);
-    height: calc(clamp(1.9rem, 11vw, 6.6rem) * 1.15);
+    /* §109：100% + max-width，而不是 min(92vw, …) —— 92vw 按**视口**算，不含
+       scrollbar-gutter 预留的 15px，窄屏上会比 .main 的内容盒宽出约 20px，
+       把整页顶出横向滚动条。这里跟随父级可用宽度，两侧留白交给 .wrap 的 gutter。 */
+    width: 100%;
+    max-width: 1120px;
+    height: calc(clamp(1.9rem, 11vw, 6.6rem) * 1.15 + 72px);
+    /* §110：站名专用墨色（比正文 --text-1 #17191f 更深更暖）。必须写在 .title-stage
+       上而不是 .name：TechText 的线框/specks 取的是容器的 currentColor，
+       只改 h1 会出现「字变了、框没变」。 */
+    color: #141413;
     pointer-events: auto; /* 悬停揭示 / 拖拽字母 */
   }
   :global(.title-stage .name) {
@@ -71,13 +81,13 @@ import { site } from '../site.config';
     margin: 0;
     display: grid;
     place-items: center;
-    font-family: var(--font-song);
+    font-family: var(--font-title);
     /* §91：窄屏由 11vw 主导，避免 clamp 下限把长站名撑出视口 */
     font-size: clamp(1.9rem, 11vw, 6.6rem);
-    font-weight: 500;
+    font-weight: 400;
     line-height: 1.15;
-    letter-spacing: 0.04em;
-    color: var(--text-1);
+    letter-spacing: 0.02em;
+    color: inherit; /* §110：跟随 .title-stage 的站名墨色（无 JS 回退时与画布同色） */
     transition: opacity 0.25s ease-out;
   }
   :global(.tech-layer) {
@@ -119,7 +129,18 @@ import { site } from '../site.config';
   }
   .stack {
     display: grid;
+    /* §109：显式单列（撑满可用宽），否则 auto 轨道按内容定宽 —— width:100%
+       的 .title-stage 会退化到跟 .acts 一样宽（实测 279px） */
+    grid-template-columns: minmax(0, 1fr);
     justify-items: center;
+    width: 100%;
+  }
+  /* §109：Astro 的 island 外壳才是 .stack 的栅格子项；它默认 width:auto 会
+     shrink-to-fit，里面的 .title-stage{width:100%} 于是量到「内容宽度」。
+     必须把外壳也撑满，画布才有全宽可用。 */
+  .stack > :global(astro-island) {
+    width: 100%;
+    display: block;
   }
   .tagline {
     margin: clamp(14px, 3vh, 26px) 0 0;

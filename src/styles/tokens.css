@@ -50,7 +50,7 @@
   --prism-d: rgba(120, 224, 190, 0.45);
   --prism-dur: 6s;
 
-  /* 字体（spec §29/§57）：MapleMono = 全站正文（摄影页 page-dark 覆写为华文中宋）；
+  /* 字体（spec §29/§57）：MapleMono = 全站正文（摄影页 page-dark 覆写为衬线栈，§111）；
      代码 = JetBrains Mono 打头：拉丁字形它全包；
      §57 起 --font-mono 链紧随正体 Maple —— JetBrains 缺中文字形，代码里的中文
      （字符串/标识符等非注释部分）逐字落正体 Maple；--font-comment 注释栈不变，
@@ -61,7 +61,14 @@
     "HarmonyOS Sans SC", "Microsoft YaHei", system-ui, sans-serif;
   --font-mono: "JetBrains Mono Web", "MapleMono Web", ui-monospace, "SF Mono", Consolas, "Cascadia Mono", monospace;
   --font-comment: "JetBrains Mono Web", "MapleMono Italic Web", ui-monospace, "SF Mono", Consolas, monospace; /* 注释（spec §32）：中文逐字落斜体 Maple */
-  --font-song: "Song Web", "华文中宋", "STZhongsong", "Songti SC", "SimSun", serif; /* 展示用（spec §28） */
+  /* §111 展示用衬线栈：拉丁 → Anthropic Serif，中文 → 思源宋体。
+     **顺序即规则** —— 浏览器逐字回退，Anthropic 没有汉字，所以汉字自动落到思源宋体。
+     两者共用同一份子集字符集（scripts/subset-serif.mjs）。 */
+  --font-serif: "Anthropic Serif Web", "Source Han Serif Web", "Source Han Serif SC",
+    "Noto Serif SC", "Songti SC", "SimSun", serif;
+  --font-song: var(--font-serif); /* 旧名保留：摄影栏目仍在用（spec §28 的语义已被 §111 取代） */
+  /* §109 首页站名：与 --font-serif 同栈，单独命名是为了「以后可能只想改站名」 */
+  --font-title: var(--font-serif);
 
   /* 动效 */
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
