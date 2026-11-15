@@ -1135,3 +1135,142 @@ three 栈入口。所以本次 = 拆掉「首页球 + 场景文字」，保留�
 `npm run build` 15 页 0 error / 0 warning；全路由 200、`/nope-xyz` 404；
 人工检查首访交班无闪烁、桌面/窄屏标题正确、拖拽与按钮不冲突、reduced-motion 不自动扫掠、
 禁用 JS 时 `h1` 可见；确认 `dist` 不再产出 `song-3d.ttf`、预取清单无该项。
+
+## §108（2026-11-13）照片可选「只当封面、不进备忘页」—— `inBody`
+
+用户问：照片放进卷里就一定会在备忘页正文出现吗？封面不想进正文怎么办。
+
+**原行为**：凡 `series:` 挂了卷的照片都会进备忘页 —— 没被 `![[...]]` 标记的自动补到正文后，
+所以「当封面」和「出现在备忘页」是绑死的，没有退路。
+
+**改法**：photos 集合新增可选字段 **`inBody: z.boolean().default(true)`**。设 `false` 的照片：
+- 仍属本卷 —— 可以被 `cover:` 指向、封面字幕照常用它的 `date`/`location`，`seriesRolls().photos` 里也还在；
+- **不进**备忘页正文、也不进底部照片区；
+- 备忘页「共 N 张」与画廊 dock 的张数都按**实际展示的张数**算（`bodyPhotos`），所以不会出现「说 3 张只见 2 张」；
+- 若在卷正文里写 `![[它]]`，构建期报错并明说「该照片标了 inBody: false」—— 不静默丢图。
+
+**实现要点**：`SeriesRoll` 增加 `bodyPhotos`（= `photos.filter(p => p.data.inBody !== false)`），
+备忘页与画廊计数都改读它；`prefetch-manifest` 的「备忘页大图」那档也跳过 `inBody: false` 的照片
+（不进页面就别预取，省一份流量）。`photos`（全量）保留给封面查找与画廊。
+
+**为什么不复用 draft**：`draft` 是「整条内容不发布」，而封面照片本身是公开内容（要上画廊、
+要被 `cover:` 引用）—— 两者语义不同，硬塞会破坏 `seriesRolls` 的封面查找。
+
+**验收**：给示例卷的封面加 `inBody: false` 后 build 仍有 0 warning；备忘页照片卡片 0 张、
+「共 0 张」；画廊封面与 3 个响应式档位仍在；把该行删掉后恢复正常。示例文件已还原。
+
+## §109（2026-11-14）首页站名换 Anthropic Serif + 修粒子被裁
+
+两件事：站名字体换成 Anthropic Serif；用户反馈「粒子和空气墙一样，碰到边缘就没了」。
+
+### 字体
+
+`_font/AnthropicSerif-Display-Regular.otf`（本机 `%LOCALAPPDATA%\Microsoft\Windows\Fonts\
+AnthropicSerif-Display-Regular-Static.otf`，family = `Anthropic Serif Display`）→
+`scripts/subset-anthropic.mjs` 切出 `public/fonts/anthropic-serif.woff2`（95 字形 / 20KB），
+已挂进 `fonts:subset`（→ prebuild / predev）。
+
+- `base.css` 新增 `@font-face "Anthropic Serif Web"`，`local()` 优先；
+- `tokens.css` 新增 `--font-title`（Anthropic → Song 回退），`.name` 与 TechText 共用；
+- `prefetch-manifest` 把 `anthropic-serif.woff2` 放在 **tier 0（critical）**：
+  站名首帧就要它，晚到会让 TechText 用回退字体画一遍再重排。
+- ⚠ 这是**纯拉丁字体**，只用于站名；中文（tagline/导航/正文）继续 Maple/Song。
+
+### 粒子被裁 = 字形的「选中框」太贴画布边
+
+specks 是从选中字形的虚线框往外撒的（横向 4–21px + 粒子自身半径）。原布局把字撑到
+容器 **0.66 倍高**、上下各只剩约 20px，撒出去的粒子直接落在 canvas 外被裁掉 ——
+看起来就是「撞到一堵空气墙」。修法不是缩小粒子，而是**给画布留白**：
+
+- `TechText` 新增 `pad` 参数（默认 0）：排版盒按 `width/height - 2*pad` 计算，
+  字形居中于内缩后的盒子，边缘空出一圈。
+- 首页 `.title-stage` 高度 `+72px`、`pad={36}` —— 两者必须成对；布局盒仍是原来的
+  121px，**字形大小不变**，只是画布变大。
+- 验收探针：采样 6 帧，透明像素的外接框四边都不贴 canvas 边界（`edgeTop/Bottom/Left/Right` 全 false）。
+
+### 附带修掉的两个布局塌陷（都是「DOM 大标题没了」的连锁反应）
+
+换成 Canvas 后站名不再有内在宽度，暴露出两处原本被大标题掩盖的问题：
+
+1. **`.main` 只有 335px 宽**（1440 视口）。`body` 是 flex 纵向容器，main 本该被
+   stretch 拉满；但 `.wrap { margin-inline: auto }` 的 `auto` 外边距**会关掉 stretch**，
+   宽度退化成 max-content。修法：`.main:has(.welcome) { width: 100% }`。
+2. **`min(92vw, 1120px)` 会把页面顶出横向滚动条**（390px 窄屏实测 scrollWidth 395）。
+   `vw` 不含 `scrollbar-gutter` 预留的 15px。修法：`.title-stage` 改 `width:100%`
+   + `max-width:1120px`，让宽度跟随父级内容盒。
+3. 顺带：`.stack` 显式 `grid-template-columns: minmax(0,1fr)` + 撑满 Astro island 外壳
+   —— 否则 auto 轨道按内容定宽，`width:100%` 的子项跟着缩。
+
+**验收**：build 14 页 0 warning；桌面画布 1104×193、移动 678×242；三档（桌面/移动/
+reduced-motion）`overflowX` 全 false；无 console 错误；Anthropic Serif 实际加载
+（`document.fonts.check` true，测宽 570.2 与本地字体一致）。
+
+## §110（2026-11-14）站名专用墨色 `#141413`
+
+用户指定首页大标题颜色为 `#141413`（比正文 `--text-1 #17191f` 更深、略暖）。
+
+写在 `.title-stage` 上、`.name` 改 `color: inherit`：
+
+- TechText 的字色与线框/specks 都取**容器的 `currentColor`**。只改 `h1` 的话，
+  画布里的虚线框和角标仍是旧颜色 —— 会出现「字变了、框没变」。
+- `.name` 是画布的首帧画完前的可见回退，`inherit` 让它与画布同色，切换时无色差。
+- 只影响首页站名，不新增 token（正文/导航仍是 `--text-1`）。
+
+**验收**：`getComputedStyle(.title-stage).color` = `rgb(20, 20, 19)`；画布最暗不透明像素
+`rgb(20,20,19)`；截图目视一致。
+
+## §111（2026-11-15）展示衬线体换代 —— 华文中宋 → 思源宋体（中文）+ Anthropic Serif（拉丁）
+
+用户要求：**原来用华文中宋的地方**，中文改思源宋体、英文改 Anthropic Serif。
+
+华文中宋（`STZHONGS.TTF`，§28 引入）只有一个用途：摄影栏目（画廊 + 卷备忘页）的正文。
+它同时承担中英文两种字形，但两样都不是最合适的 —— 中文的宋体骨架不如思源宋体规整，
+拉丁则完全不如 Anthropic 自己的 Serif。
+
+### 做法：一套字符集，两套字体，靠**回退顺序**分工
+
+浏览器对字体栈是**逐字**解析的，不是「一个字体管到底」：
+`--font-serif` 首项 Anthropic（无汉字）→ 汉字自动落到次项思源宋体。
+所以不需要按语言切 class 或分段包 `<span>`，一个声明就够。
+
+```css
+--font-serif: "Anthropic Serif Web", "Source Han Serif Web", "Source Han Serif SC",
+  "Noto Serif SC", "Songti SC", "SimSun", serif;
+--font-song: var(--font-serif);  /* 旧名保留（摄影栏目仍引用） */
+--font-title: var(--font-serif); /* §109 站名 */
+```
+
+⚠ **顺序即规则**：把思源宋体放前面，拉丁也会被它抢走（它含拉丁字形），
+Anthropic 就永远用不上了。
+
+### 子集管线
+
+新增 `scripts/subset-serif.mjs` 同时产出两份，**共用一份字符集**
+（摄影栏目 UI 文案 + series/photos 的 md + 模板拼出的字 + 全 ASCII + 常用中文标点）：
+
+| 文件 | 源 | 大小 |
+|---|---|---|
+| `anthropic-serif.woff2` | `_font/AnthropicSerif-Display-Regular.otf` | 21 KB |
+| `source-han-serif.woff2` | `_font/SourceHanSerifSC-VF.otf.ttf` | 212 KB |
+
+- 思源宋体是**可变字体**（wght 250–900，默认 250 = ExtraLight），子集保留 fvar/gvar，
+  页面用 400 由浏览器现场实例化 —— 不需要额外切静态面。
+- `scripts/subset-song.mjs` 与 `scripts/subset-anthropic.mjs`（§109）**删除**，合并进
+  `subset-serif.mjs`；`fonts:subset` 改为 `subset-serif → subset-maple`。
+- `public/fonts/stzhongsong.woff2` 删除。
+
+### 预取分档
+
+- `anthropic-serif.woff2` → **tier 0（critical）**：首页站名首帧就要它。
+- `source-han-serif.woff2` → **tier 3**：只有摄影栏目用，跟着卷封面一起排。
+  首页是纯拉丁站名，**不该为中文衬线付 212KB** —— 这是 §105 定下的「critical 只放首页自己」。
+- 为此 `FONT_TIER` 的档位类型扩成 `0 | 1 | 3 | 4 | 'skip'`。
+
+### 验收
+
+- build 14 页 0 warning；全路由 200。
+- 像素哈希交叉验证逐字回退确实生效：
+  - 汉字在 `"Anthropic Serif Web"` 下 → 4013 个着色像素（系统回退），
+    在 `"Source Han Serif Web"` 下 → 3168，**与两字体栈的结果完全相同**；
+  - 拉丁 `C3D90` 两字体栈结果 = Anthropic 单独结果（1730），≠ 思源宋体（1291）。
+- `document.fonts` 里两套都为 `loaded`；笔记页正文仍是 Maple（未被波及）。
