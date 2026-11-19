@@ -80,9 +80,34 @@ function makeGridTexture() {
      window.__lensZ       球心 z（球大时后推，别把相机吞进去）
      window.__lensOptics  光学强度（褪光学那段 1 → 0）
    只在 __lensBall 为 true 时可见；关掉即整体消失，不留任何状态给首页那颗。 */
-const LoadingBall = memo(function LoadingBall({ buffer, geo }) {
+const LoadingBall = memo(function LoadingBall({ buffer, geo, warmed }) {
   const mesh = useRef();
   const mat = useRef();
+  const { gl, camera, scene } = useThree();
+
+  useEffect(() => {
+    if (!window.__plPending || window.__ballReady || !mesh.current || !mat.current) return;
+    let cancelled = false;
+    const ball = mesh.current;
+    // drei 把 anisotropy prop 用作模糊量，Three 的物理各向异性要在实际材质上设置。
+    mat.current.anisotropy = LENS_PROPS.anisotropy;
+
+    // 在加载层下面完成编译和首次绘制。有些驱动会把链接工作推迟到首次绘制。
+    gl.compileAsync(ball, camera, scene).then(() => {
+      if (cancelled || !document.getElementById('pl')) return;
+      ball.visible = true;
+      try {
+        gl.render(scene, camera);
+      } finally {
+        ball.visible = false;
+      }
+      warmed.current = true;
+    }).catch(() => {
+      if (!cancelled) window.__ballNA = true;
+    });
+    return () => { cancelled = true; };
+  }, [gl, camera, scene, warmed]);
+
   useFrame(() => {
     const on = window.__lensBall === true;
     const sc = typeof window.__lensScale === 'number' ? window.__lensScale : 0;
@@ -94,13 +119,14 @@ const LoadingBall = memo(function LoadingBall({ buffer, geo }) {
       }
     }
     const m = mat.current;
-    if (!m) return;
+    if (!on || !m) return;
     const opt = typeof window.__lensOptics === 'number' ? window.__lensOptics : 1;
     const tgt = {
       ior: 1 + (LENS_PROPS.ior - 1) * opt,
       thickness: LENS_PROPS.thickness * opt,
       chromaticAberration: LENS_PROPS.chromaticAberration * opt,
-      anisotropy: LENS_PROPS.anisotropy * opt,
+      // 保持同一个 shader 变体。这个下限在褪光学后不可见，但避免切换时重新编译。
+      anisotropy: Math.max(1e-6, LENS_PROPS.anisotropy * opt),
     };
     for (const k in tgt) if (k in m) m[k] = tgt[k];
     const u = m.uniforms;
@@ -131,6 +157,8 @@ const Lens = memo(function Lens() {
   const { viewport: vp } = useThree();
   const [scene] = useState(() => new THREE.Scene());
   const framesRef = useRef(0);
+  const ballWarmed = useRef(false);
+  const plateFrame = useRef(null);
   /* §102 中心镂空 —— ⚠ **不要用 onBeforeCompile 往 MeshTransmissionMaterial 里注入 discard**。
      试过并已回退：球会发黑 / 炸开。原因是那个材质由 drei 深度定制（多趟渲染 +
      屏幕空间折射），注入片元丢弃会破坏它的渲染管线；更糟的是补丁**是永久的**。
@@ -159,11 +187,15 @@ const Lens = memo(function Lens() {
     gl.setRenderTarget(buffer);
     gl.render(scene, camera);
     gl.setRenderTarget(null);
+    // LoadingPlate 在负优先级更新。下一次 DOM 帧才能撤下覆盖层。
+    if (plateFrame.current && window.__plPlatePresented !== plateFrame.current && !gl.getContext().isContextLost()) {
+      window.__plPlatePresented = plateFrame.current;
+    }
 
     gl.setClearColor(0xffffff, 1); // 官方紫底 #5227ff → 定制白底
 
-    // 折射管线确实出过帧了 —— 加载页等这个信号才放行（§102）
-    if (++framesRef.current === 3) window.__ballReady = true;
+    // 折射管线出帧且玻璃程序已预编译后，加载页才接入过渡（§102）。
+    if (++framesRef.current >= 3 && ballWarmed.current) window.__ballReady = true;
   });
 
   return (
@@ -172,7 +204,7 @@ const Lens = memo(function Lens() {
         <>
           <Backdrop />
           {/* §102：加载页底板，盖在最前；过渡时淡出，球里就由加载页换成网格 */}
-          <LoadingPlate />
+          <LoadingPlate frameSource={plateFrame} />
         </>,
         scene,
       )}
@@ -182,7 +214,7 @@ const Lens = memo(function Lens() {
         <meshBasicMaterial map={buffer.texture} transparent />
       </mesh>
       {/* §107：只剩加载页那颗球（首页那颗已删除） */}
-      <LoadingBall buffer={buffer} geo={nodes.Cylinder?.geometry} />
+      <LoadingBall buffer={buffer} geo={nodes.Cylinder?.geometry} warmed={ballWarmed} />
     </>
   );
 });
@@ -195,39 +227,45 @@ const Lens = memo(function Lens() {
    这张 canvas 只在过渡开始时画一次：那时进度恒为 100%，画面是静止的。 */
 const PLATE_Z = 5;   // 底板平面所在深度（网格 z0 与 3D 文字 z3 之前、球 z15 之后）
 
-/* §102 背景挖洞：底板中央开一个圆洞，洞里透出底板**后面的场景**（Backdrop 网格）。
-   走 alphaMap —— meshBasicMaterial 原生支持，不动 shader、不动球的几何。
-   ⚠ 圆必须把宽高比烘进图里：alphaMap 的 UV 铺满整块底板，而底板是按视口宽高铺的，
-   所以屏幕上的正圆在 UV 空间是椭圆 —— 直接画圆会得到一圈随窗口比例拉伸的洞。 */
-const HOLE_TEX_W = 512;
-function makeHoleAlpha(holePx) {
-  const w = HOLE_TEX_W;
-  const h = Math.max(2, Math.round((HOLE_TEX_W * window.innerHeight) / window.innerWidth));
-  const c = document.createElement('canvas');
-  c.width = w; c.height = h;
-  const ctx = c.getContext('2d');
-  ctx.fillStyle = '#fff';                     // 白 = 不透明（alphaMap 取绿通道）
-  ctx.fillRect(0, 0, w, h);
-  const r = (holePx * w) / window.innerWidth; // 屏幕像素 → texel
-  const g = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, r);
-  g.addColorStop(0, '#000');
-  g.addColorStop(0.88, '#000');
-  g.addColorStop(1, '#fff');                  // 留一点羽化，硬边会看到台阶
-  ctx.fillStyle = g;
-  ctx.beginPath();
-  ctx.arc(w / 2, h / 2, r, 0, Math.PI * 2);
-  ctx.fill();
-  return c;
+/* 遮罩只栅格化一次。UV 平移与缩放让洞始终居中，并把半径从 CSS 像素换算
+   到平面的宽、高轴。贴图四边留白，ClampToEdge 让圆外保持不透明。 */
+const HOLE_TEX_SIZE = 512;
+const HOLE_TEX_RADIUS = HOLE_TEX_SIZE / 2 - 1;
+const HOLE_UV_DIAMETER = (2 * HOLE_TEX_RADIUS) / HOLE_TEX_SIZE;
+
+function makeHoleAlpha() {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = HOLE_TEX_SIZE;
+  const ctx = canvas.getContext('2d');
+  const center = HOLE_TEX_SIZE / 2;
+  const gradient = ctx.createRadialGradient(center, center, 0, center, center, HOLE_TEX_RADIUS);
+  gradient.addColorStop(0, '#000');
+  gradient.addColorStop(0.88, '#000');
+  gradient.addColorStop(1, '#fff');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, HOLE_TEX_SIZE, HOLE_TEX_SIZE);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  texture.generateMipmaps = false;
+  return texture;
 }
 
-function LoadingPlate() {
+function LoadingPlate({ frameSource }) {
   const mesh = useRef();
   const mat = useRef();
   const texRef = useRef(null);
-  const holeRef = useRef({ px: -1, tex: null });   // { 上次的洞径屏幕像素, alpha 纹理 }
+  const holeRef = useRef(null);
+
+  useEffect(() => () => {
+    texRef.current?.dispose();
+    holeRef.current?.dispose();
+    texRef.current = null;
+    holeRef.current = null;
+  }, []);
 
   useFrame((state) => {
-    const { viewport, camera } = state;
+    const { viewport, camera, size } = state;
     // ⚠ 必须用**本平面所在深度**的视口，不能用 useThree 的 viewport（那是 z=0 处的）。
     // 透视下越靠近相机可视世界范围越小：z=0 高 5.27，z=5 只有 3.95（0.75 倍）。
     // 拿 z=0 的尺寸去铺 z=5 的平面 → 大 1.333 倍，交班瞬间整页「莫名放大」。
@@ -244,31 +282,35 @@ function LoadingPlate() {
       t.generateMipmaps = false;
       if (texRef.current) texRef.current.dispose();   // 换新前释放旧的，别漏显存
       texRef.current = t;
-      if (mat.current) { mat.current.map = t; mat.current.needsUpdate = true; }
     }
-    // 圆洞：洞径由外部给（window.__lensHolePx，屏幕像素），随玻璃球半径变化。
-    // 只在变化超过 1px 时重建纹理 —— 拖滑块时每帧重建会一直分配显存。
-    const holePx = typeof window.__lensHolePx === 'number' ? window.__lensHolePx : 0;
-    if (mat.current) {
+    if (mat.current && texRef.current && mat.current.map !== texRef.current) {
+      holeRef.current ??= makeHoleAlpha();
+      mat.current.map = texRef.current;
+      mat.current.alphaMap = holeRef.current;
+      mat.current.needsUpdate = true;
+    }
+    const holePx = window.__lensHolePx ?? 0;
+    const hole = holeRef.current;
+    if (hole) {
       if (holePx > 1) {
-        if (!holeRef.current.tex || Math.abs(holeRef.current.px - holePx) > 1) {
-          if (holeRef.current.tex) holeRef.current.tex.dispose();
-          holeRef.current = { px: holePx, tex: new THREE.CanvasTexture(makeHoleAlpha(holePx)) };
-          mat.current.alphaMap = holeRef.current.tex;
-          mat.current.needsUpdate = true;
-        }
-      } else if (mat.current.alphaMap) {
-        mat.current.alphaMap = null;            // 归零即回到实心底板
-        mat.current.needsUpdate = true;
+        const repeatX = size.width * HOLE_UV_DIAMETER / (2 * holePx);
+        const repeatY = size.height * HOLE_UV_DIAMETER / (2 * holePx);
+        hole.repeat.set(repeatX, repeatY);
+        hole.offset.set((1 - repeatX) / 2, (1 - repeatY) / 2);
+      } else {
+        // 还没开洞时，全底板采同一个白色角点。
+        hole.repeat.set(0, 0);
+        hole.offset.set(0, 0);
       }
     }
     if (mesh.current) mesh.current.scale.set(vp.width, vp.height, 1);
     if (mat.current && mesh.current) {
       const s = typeof window.__lensScene === 'number' ? window.__lensScene : 0;
       mat.current.opacity = 1 - s;
-      mesh.current.visible = !!texRef.current && s < 0.995;
+      mesh.current.visible = !!src && mat.current.map === texRef.current && s < 0.995;
+      frameSource.current = mesh.current.visible ? src : null;
     }
-  });
+  }, -1);
 
   return (
     <mesh ref={mesh} position={[0, 0, PLATE_Z]} visible={false}>

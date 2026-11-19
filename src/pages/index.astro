@@ -46,7 +46,6 @@ import { site } from '../site.config';
     position: relative;
     z-index: 1; /* 盖过垫底 canvas */
     pointer-events: none; /* 空白区穿透；标题层与按钮各自重开 */
-    transition: opacity 0.25s ease-out; /* pl-live 交班隐藏 */
   }
   .acts {
     pointer-events: auto;
@@ -105,18 +104,12 @@ import { site } from '../site.config';
     opacity: 1;
   }
 
-  /* —— 加载页交班（§107）——
-     transition() 删掉 DOM 加载层、由 WebGL 底板接管的那 1.6s 里，首页 DOM
-     （标题 / tagline / 按钮 / 顶栏 / 页脚）必须让位，否则会浮在底板之上。
-     settle() 摘掉 pl-live 后淡入；另有 10s 安全计时器兜底。 —— */
-  :global(html.pl-live .welcome),
-  :global(html.pl-live .topbar),
-  :global(html.pl-live body > footer) {
-    opacity: 0;
-  }
-  :global(.topbar),
-  :global(body > footer) {
-    transition: opacity 0.25s ease-out;
+  /* 交班时把 WebGL 底板盖在真实首页上。球心羽化开口透出下方页面，玻璃边缘由 WebGL 保留。 */
+  :global(html.pl-live) .glass-scene {
+    z-index: 100;
+    mask-image: radial-gradient(circle at center,
+      transparent calc(var(--pl-reveal, 0px) * 0.82),
+      #000 var(--pl-reveal, 0px));
   }
 
   .welcome {
