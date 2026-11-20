@@ -1,0 +1,104 @@
+<style is:inline>
+  html.theme-reveal [data-slider] { view-transition-name: none; }
+  html.theme-reveal::view-transition-group(root),
+  html.theme-reveal::view-transition-old(root) { animation: none; }
+  html.theme-reveal::view-transition-old(root),
+  html.theme-reveal::view-transition-new(root) { mix-blend-mode: normal; }
+  html.theme-reveal::view-transition-new(root) {
+    animation: reveal-theme 520ms cubic-bezier(.2, .65, .3, 1) both;
+  }
+
+  @keyframes reveal-theme {
+    from { clip-path: circle(0 at var(--theme-x) var(--theme-y)); }
+    to { clip-path: circle(var(--theme-radius) at var(--theme-x) var(--theme-y)); }
+  }
+</style>
+
+<script is:inline>
+  (() => {
+    const key = 'site-theme';
+    const system = matchMedia('(prefers-color-scheme: dark)');
+    const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+    const root = document.documentElement;
+    let preference;
+    let reveal;
+    try { preference = localStorage.getItem(key); } catch { /* Storage may be unavailable. */ }
+
+    function selectedTheme() {
+      return preference === 'light' || preference === 'dark'
+        ? preference
+        : system.matches ? 'dark' : 'light';
+    }
+
+    function apply(element = root) {
+      element.dataset.theme = selectedTheme();
+    }
+
+    function syncToggle(doc = document) {
+      doc.querySelector('[data-theme-toggle]')?.setAttribute(
+        'aria-pressed', String(doc.documentElement.dataset.theme === 'dark'),
+      );
+    }
+
+    function updateTheme() {
+      apply();
+      syncToggle();
+    }
+
+    function clearReveal() {
+      reveal = undefined;
+      root.classList.remove('theme-reveal');
+      root.style.removeProperty('--theme-x');
+      root.style.removeProperty('--theme-y');
+      root.style.removeProperty('--theme-radius');
+    }
+
+    function skipReveal() {
+      if (!reveal) return;
+      reveal.skipTransition();
+      clearReveal();
+    }
+
+    apply();
+    document.addEventListener('DOMContentLoaded', () => syncToggle(), { once: true });
+    system.addEventListener('change', updateTheme);
+    reducedMotion.addEventListener('change', () => {
+      if (reducedMotion.matches) skipReveal();
+    });
+    document.addEventListener('astro:after-preparation', skipReveal);
+    document.addEventListener('astro:before-swap', event => {
+      apply(event.newDocument.documentElement);
+      syncToggle(event.newDocument);
+    });
+    document.addEventListener('click', event => {
+      const button = event.target instanceof Element && event.target.closest('[data-theme-toggle]');
+      if (!button) return;
+      preference = selectedTheme() === 'dark' ? 'light' : 'dark';
+      try { localStorage.setItem(key, preference); } catch { /* The current tab retains its choice. */ }
+
+      if (reveal || reducedMotion.matches || !document.startViewTransition
+        || root.hasAttribute('data-astro-transition') || document.body.classList.contains('page-gallery')) {
+        skipReveal();
+        updateTheme();
+        return;
+      }
+
+      const box = button.getBoundingClientRect();
+      const x = box.left + box.width / 2;
+      const y = box.top + box.height / 2;
+      const radius = Math.ceil(Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y)));
+      root.style.setProperty('--theme-x', x + 'px');
+      root.style.setProperty('--theme-y', y + 'px');
+      root.style.setProperty('--theme-radius', radius + 'px');
+      root.classList.add('theme-reveal');
+
+      const transition = document.startViewTransition(updateTheme);
+      reveal = transition;
+      transition.ready.catch(() => {});
+      const finish = () => {
+        if (reveal === transition) clearReveal();
+      };
+      transition.finished.then(finish, finish);
+    });
+  })();
+</script>

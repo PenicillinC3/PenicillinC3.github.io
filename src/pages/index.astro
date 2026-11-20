@@ -1,24 +1,17 @@
 ---
 import Base from '../layouts/Base.astro';
-import FluidGlass from '../components/FluidGlass.jsx';
 import HomeTitle from '../components/HomeTitle.jsx';
 import { site } from '../site.config';
 ---
-<!-- 欢迎页（spec §107）：站名主视觉 = TechText（Canvas 2D 技术图风格）。
-     FluidGlass 已改成「加载页专用舞台」：首页不再显示玻璃球，它只负责首访
-     加载页退场时那颗球与底板；仍挂 client:idle 让它在过渡前就绪。
-     其余页面仍零框架。 -->
 <Base>
-  <div class="glass-scene" aria-hidden="true">
-    <!-- §78：idle 水合 —— chunk 与首屏抢主线程；空闲时再拉取。加载页会等
-         `__ballReady`（最多 BALL_WAIT_MS），等不到就走无球兜底。 -->
-    <FluidGlass client:idle />
-  </div>
   <section class="welcome">
     <div class="stack">
       <!-- §107：DOM h1 保语义/无 JS 回退；TechText 首帧画完后 html.tt-on
            让 h1 淡出、画布淡入（见 HomeTitle.jsx） -->
-      <HomeTitle client:load />
+      <div class="title-stage">
+        <h1 class="name">{site.title}</h1>
+        <HomeTitle client:load />
+      </div>
       <p class="tagline">{site.tagline}</p>
       <div class="acts">
         <!-- §100：两枚主入口在加载时即预取目标页，点击后立刻换页（不再有等待） -->
@@ -30,21 +23,9 @@ import { site } from '../site.config';
 </Base>
 
 <style>
-  /* —— 层叠（§69.1 教训保留）：canvas(fixed z0) 与 .welcome(z1) 须同处根级
-       堆叠上下文。勿给 .main 加 z-index/transform —— 那会把 fixed canvas 收进
-       main 自身堆叠上下文，内容反而压在 canvas 之下。
-       §107 起 canvas 只服务加载过渡，首页没有可交互的球 → 整层 pointer-events:none。 —— */
-  .glass-scene {
-    position: fixed;
-    inset: 0;
-    z-index: 0;
-    pointer-events: none;
-  }
-  .glass-scene canvas,
-  .glass-scene > div { display: block; }
   .welcome {
     position: relative;
-    z-index: 1; /* 盖过垫底 canvas */
+    z-index: 1;
     pointer-events: none; /* 空白区穿透；标题层与按钮各自重开 */
   }
   .acts {
@@ -52,7 +33,7 @@ import { site } from '../site.config';
   }
   :global(body:has(.welcome) > footer) {
     position: relative;
-    z-index: 1; /* 首页版权行：垫底 canvas 之上可见 */
+    z-index: 1;
   }
 
   /* —— 站名舞台（React island 渲染，需全局选择器）——
@@ -71,7 +52,7 @@ import { site } from '../site.config';
     /* §110：站名专用墨色（比正文 --text-1 #17191f 更深更暖）。必须写在 .title-stage
        上而不是 .name：TechText 的线框/specks 取的是容器的 currentColor，
        只改 h1 会出现「字变了、框没变」。 */
-    color: #141413;
+    color: var(--title-ink);
     pointer-events: auto; /* 悬停揭示 / 拖拽字母 */
   }
   :global(.title-stage .name) {
@@ -104,14 +85,6 @@ import { site } from '../site.config';
     opacity: 1;
   }
 
-  /* 交班时把 WebGL 底板盖在真实首页上。球心羽化开口透出下方页面，玻璃边缘由 WebGL 保留。 */
-  :global(html.pl-live) .glass-scene {
-    z-index: 100;
-    mask-image: radial-gradient(circle at center,
-      transparent calc(var(--pl-reveal, 0px) * 0.82),
-      #000 var(--pl-reveal, 0px));
-  }
-
   .welcome {
     flex: 1 1 auto;
     min-height: 0;
@@ -127,13 +100,6 @@ import { site } from '../site.config';
     grid-template-columns: minmax(0, 1fr);
     justify-items: center;
     width: 100%;
-  }
-  /* §109：Astro 的 island 外壳才是 .stack 的栅格子项；它默认 width:auto 会
-     shrink-to-fit，里面的 .title-stage{width:100%} 于是量到「内容宽度」。
-     必须把外壳也撑满，画布才有全宽可用。 */
-  .stack > :global(astro-island) {
-    width: 100%;
-    display: block;
   }
   .tagline {
     margin: clamp(14px, 3vh, 26px) 0 0;

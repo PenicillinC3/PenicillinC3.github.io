@@ -1,4 +1,6 @@
 ---
+import Moon from '@lucide/astro/icons/moon';
+import Sun from '@lucide/astro/icons/sun';
 import { site } from '../site.config';
 
 const path = Astro.url.pathname;
@@ -27,6 +29,10 @@ const isActive = (href: string) =>
       }
     </nav>
 
+    <button class="theme-btn" type="button" data-theme-toggle aria-pressed="false" aria-label="深色模式" title="切换深浅主题">
+      <Moon class="theme-moon" size={20} stroke-width={1.65} aria-hidden="true" />
+      <Sun class="theme-sun" size={20} stroke-width={1.65} aria-hidden="true" />
+    </button>
     <button class="menu-btn" type="button" data-menu-btn aria-expanded="false" aria-label="展开菜单">
       <span></span><span></span><span></span>
     </button>
@@ -223,25 +229,32 @@ const isActive = (href: string) =>
   refreshRest();
 
   // —— 移动端抽屉（§85：带展开/收起过渡动画）——
-  const menuBtn = document.querySelector<HTMLButtonElement>('[data-menu-btn]');
-  const drawer = document.querySelector<HTMLElement>('[data-menu]');
+  const currentDrawer = () => document.querySelector<HTMLElement>('[data-menu]');
+  const currentMenuButton = () => document.querySelector<HTMLButtonElement>('[data-menu-btn]');
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
   const setScrollLock = (on: boolean) => {
     document.body.style.overflow = on ? 'hidden' : '';
   };
   const openDrawer = () => {
+    const drawer = currentDrawer();
     if (!drawer) return;
     drawer.hidden = false;
     setScrollLock(true);
-    menuBtn?.setAttribute('aria-expanded', 'true');
+    currentMenuButton()?.setAttribute('aria-expanded', 'true');
     // 双 rAF：确保初始态先落一帧，过渡才会真正播放
     requestAnimationFrame(() =>
-      requestAnimationFrame(() => drawer.classList.add('is-open')),
+      requestAnimationFrame(() => {
+        if (drawer.isConnected && currentMenuButton()?.getAttribute('aria-expanded') === 'true') {
+          drawer.classList.add('is-open');
+        }
+      }),
     );
   };
   const closeDrawer = (refocus = false) => {
+    const drawer = currentDrawer();
     if (!drawer || drawer.hidden) return;
     setScrollLock(false);
+    const menuBtn = currentMenuButton();
     menuBtn?.setAttribute('aria-expanded', 'false');
     if (refocus) menuBtn?.focus();
     if (reduceMotion.matches) {
@@ -252,8 +265,8 @@ const isActive = (href: string) =>
     drawer.classList.remove('is-open');
     const done = (e: Event) => {
       if (e.target !== drawer) return;
-      drawer.hidden = true;
       drawer.removeEventListener('transitionend', done);
+      if (!drawer.classList.contains('is-open')) drawer.hidden = true;
     };
     drawer.addEventListener('transitionend', done);
     // 兜底：过渡事件未达（如被 display 中断）时定时收尾
@@ -261,16 +274,15 @@ const isActive = (href: string) =>
       if (!drawer.classList.contains('is-open')) drawer.hidden = true;
     }, 320);
   };
-  menuBtn?.addEventListener('click', () => {
-    if (!drawer) return;
-    if (drawer.classList.contains('is-open')) closeDrawer();
-    else openDrawer();
-  });
-  // 点击抽屉内链接：立即收起（随后跳转由 VT 接手），不做等待
-  drawer?.addEventListener('click', (e) => {
-    if ((e.target as HTMLElement).closest('.drawer-link')) {
-      drawer.classList.remove('is-open');
-      setScrollLock(false);
+  // Astro replaces the navigation elements during client-side swaps.
+  document.addEventListener('click', (e) => {
+    if (!(e.target instanceof Element)) return;
+    const button = e.target.closest('[data-menu-btn]');
+    if (button) {
+      if (button.getAttribute('aria-expanded') === 'true') closeDrawer();
+      else openDrawer();
+    } else if (e.target.closest('[data-drawer-link]')) {
+      closeDrawer();
     }
   });
   document.addEventListener('keydown', (e) => {
@@ -291,13 +303,21 @@ const isActive = (href: string) =>
     inset: 0 0 auto 0;
     z-index: 60;
     height: var(--nav-h);
-    /* 导航字体恒为全站 Maple（spec §38）：body.page-dark 会把正文字体切为衬线栈，
-       此处显式 var(--font-sans) 让摄影栏目导航与其他栏目一致 */
     font-family: var(--font-sans);
-    background: rgba(255, 255, 255, 0.72);
+    background: var(--nav-bg);
     -webkit-backdrop-filter: blur(14px) saturate(1.6);
     backdrop-filter: blur(14px) saturate(1.6);
     border-bottom: 1px solid var(--glass-border);
+  }
+  :global(body.page-gallery) .topbar {
+    --nav-bg: rgba(0, 0, 0, 0.72);
+    --text-1: #edeef0;
+    --text-2: #babdc3;
+    --glass-border: rgba(255, 255, 255, 0.14);
+    --glass-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.5);
+    --nav-active-bg: rgba(255, 255, 255, 0.075);
+    --nav-active-hl: rgba(255, 255, 255, 0.11);
+    --nav-active-border: rgba(255, 255, 255, 0.16);
   }
   .inner {
     position: relative;
@@ -354,9 +374,9 @@ const isActive = (href: string) =>
     transform: translate(var(--sx, 0px), -50%);
     border-radius: var(--radius-pill);
     background:
-      radial-gradient(130% 70% at 50% 0%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0) 55%),
-      rgba(255, 255, 255, 0.62);
-    border: 1px solid rgba(15, 23, 42, 0.08);
+      radial-gradient(130% 70% at 50% 0%, var(--nav-active-hl), transparent 55%),
+      var(--nav-active-bg);
+    border: 1px solid var(--nav-active-border);
     box-shadow: var(--glass-shadow);
     -webkit-backdrop-filter: blur(2px) saturate(1.35);
     backdrop-filter: blur(2px) saturate(1.35);
@@ -378,7 +398,7 @@ const isActive = (href: string) =>
     mix-blend-mode: screen;
   }
 
-  .menu-btn {
+  .theme-btn, .menu-btn {
     display: none;
     width: 38px;
     height: 38px;
@@ -388,6 +408,16 @@ const isActive = (href: string) =>
     color: var(--text-1);
     cursor: pointer;
   }
+  .theme-btn {
+    display: grid;
+    place-items: center;
+    flex: 0 0 38px;
+    margin-left: auto;
+    padding: 0;
+  }
+  .theme-sun { display: none; }
+  :global([data-theme="dark"]) .theme-sun { display: block; }
+  :global([data-theme="dark"]) .theme-moon { display: none; }
   .menu-btn span { display: block; width: 18px; height: 2px; margin: 3px auto; background: currentColor; border-radius: 2px; }
 
   /* 移动端抽屉 */
@@ -399,7 +429,7 @@ const isActive = (href: string) =>
     max-height: calc(100dvh - var(--nav-h));
     /* §84：底部叠加 iPhone 安全区 */
     padding: 18px var(--gutter) calc(24px + env(safe-area-inset-bottom));
-    background: rgba(255, 255, 255, 0.96);
+    background: var(--drawer-bg);
     /* 下拉面板收口：下缘圆角 + 发丝边 + 投影，与玻璃语言一致 */
     border-bottom: 1px solid var(--glass-border);
     border-radius: 0 0 var(--radius-m) var(--radius-m);
@@ -455,21 +485,14 @@ const isActive = (href: string) =>
   .drawer-link:hover { color: var(--text-1); text-decoration: none; }
   .drawer-link.is-active {
     color: var(--text-1);
-    background: radial-gradient(140% 100% at 50% 0%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.65) 60%);
-    border: 1px solid rgba(15, 23, 42, 0.08);
+    background: radial-gradient(140% 100% at 50% 0%, var(--nav-active-hl), var(--nav-active-bg) 60%);
+    border: 1px solid var(--nav-active-border);
     box-shadow: var(--glass-shadow);
-  }
-  /* §92：暗色页（摄影栏目）抽屉激活项 —— 亮白玻璃底在暗色抽屉上刺眼，
-     改暗色玻璃胶囊（近黑半透 + 发丝描边），文字沿用暗色 token 的浅色 */
-  body.page-dark .drawer-link.is-active {
-    background: rgba(9, 10, 14, 0.55);
-    border-color: rgba(255, 255, 255, 0.14);
-    box-shadow: var(--glass-shadow), 0 0 18px -6px rgba(0, 0, 0, 0.6);
   }
 
   @media (max-width: 880px) {
     .links { display: none; }
-    .menu-btn { display: block; margin-left: auto; }
+    .menu-btn { display: block; }
   }
   @media (min-width: 881px) {
     .drawer { display: none; }

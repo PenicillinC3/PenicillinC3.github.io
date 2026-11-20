@@ -186,7 +186,7 @@ img { max-width: 100%; height: auto; display: block; }
 
 /* 降级：无 backdrop-filter → 近实心白面板（spec §14 同款） */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .glass { background: rgba(255, 255, 255, 0.92); }
+  .glass { background: var(--glass-bg-strong); }
 }
 
 /* —— 棱光色散环（spec §14.3）：1px 低饱和渐变描边，交互态浮现 —— */
@@ -266,7 +266,7 @@ img { max-width: 100%; height: auto; display: block; }
 .btn--primary {
   background: var(--accent);
   border-color: transparent;
-  color: #fff;
+  color: var(--accent-ink);
   box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 28%, transparent);
 }
 .btn--primary:hover { filter: brightness(1.05); }
@@ -392,70 +392,10 @@ body.film-on .foot .inner {
   box-shadow: var(--glass-inset), var(--glass-shadow), 0 0 44px -6px color-mix(in srgb, var(--accent) 45%, transparent);
 }
 
-/* —— 暗房页（spec §21.1）：photos 模块页面 dark —— */
-body.page-dark {
-  font-family: var(--font-serif); /* §111：思源宋体（中文）+ Anthropic Serif（拉丁），取代 §28 的华文中宋 */
-  --canvas: #0b0c10;
-  --grid-line: rgba(255, 255, 255, 0.035);
-  --text-1: #eceef4;
-  --text-2: #b4bacb;
-  --text-3: #7e8598;
-  --accent: #ff6b6b;
-  --link-underline: rgba(255, 107, 107, 0.4);
-  --glass-bg: rgba(12, 13, 18, 0.4);
-  --glass-border: rgba(255, 255, 255, 0.12);
-  --glass-inset:
-    inset 3px 3px 7px -2px rgba(0, 0, 0, 0.5),
-    inset -3px -3px 7px -2px rgba(255, 255, 255, 0.1);
-}
-/* §104 日光版（用户指定）：**只作用于摄影栏目的子页（卷备忘页）**，
-   画廊首页保持原暗房。用 :has(.memohead) 圈定 —— 备忘页头部带 .memohead，
-   画廊首页没有；不新加 class、不动任何布局与组件。
-   ⚠ 必须整组一起翻：白底 + 原来的亮色正文 = 字直接看不见。
-   胶片画面 / 玻璃卡等**内容**的深色不受影响，翻的只是底与字。 */
-body.page-dark:has(.memohead) {
-  --canvas: #ffffff;
-  --grid-line: transparent;            /* 子页不要装饰网格（用户要求）*/
-  --text-1: #17191f;
-  --text-2: #565d6e;
-  --text-3: #7e8598;
-  --glass-bg: rgba(255, 255, 255, 0.62);
-  --glass-border: rgba(15, 23, 42, 0.1);
-  --glass-inset:
-    inset 3px 3px 7px -2px rgba(15, 23, 42, 0.06),
-    inset -3px -3px 7px -2px rgba(255, 255, 255, 0.9);
-}
-body.page-dark:has(.memohead) .topbar {
-  background: rgba(255, 255, 255, 0.72);
-  border-bottom: 1px solid rgba(15, 23, 42, 0.1);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    inset 0 -1px 0 rgba(15, 23, 42, 0.06),
-    0 14px 32px -22px rgba(15, 23, 42, 0.25);
-}
-body.page-dark:has(.memohead) .drawer { background: #ffffff; }
-
-/* §71：摄影作品集页及其子页（= 全部 page-dark）顶栏材质 = 玻璃面板（用户选定，
-   与站点 .glass/.btn 同语言）：半透明深底自带明度层次（0–56px 上带背后无内容，
-   纯黑近黑玻璃会隐形 —— §70 系列教训）+ 上缘内高光/下缘内影对仗 + 发丝描边 +
-   下投影。§70-6/7/8 的角渐变与光晕伪层全部作废删除。blur 保留供内容滚动透景 */
-body.page-dark .topbar {
-  background: rgba(20, 22, 29, 0.58);
-  -webkit-backdrop-filter: blur(14px) saturate(1.5);
-  backdrop-filter: blur(14px) saturate(1.5);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.42),
-    0 14px 32px -22px rgba(0, 0, 0, 0.8);
-}
-body.page-dark .drawer { background: #0d0e13; }
-/* Nav .slider 顶部高光硬编码白（Nav.astro）→ 暗色覆写为暗红辉光水滴（spec §25.2） */
-body.page-dark .slider {
-  background: radial-gradient(130% 70% at 50% 0%, rgba(255, 90, 80, 0.17), transparent 55%),
-    rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 107, 107, 0.34);
-  box-shadow: var(--glass-shadow), 0 0 22px -4px rgba(255, 70, 70, 0.45);
+/* Photography keeps its serif typography and grid-free background. */
+body.page-photography {
+  font-family: var(--font-serif);
+  --grid-line: transparent;
 }
 
 /* —— 沉浸页（spec §21.2）：无边框全屏，隐藏页脚，容器去宽度上限 —— */
@@ -475,6 +415,7 @@ html:has(body.page-gallery) {
   scrollbar-gutter: auto; /* 画廊锁死不滚动，无需（也不应）预留滚动条槽 */
 }
 body.page-gallery {
+  --canvas: #0a0b10;
   height: 100%;
   overflow: hidden;
 }

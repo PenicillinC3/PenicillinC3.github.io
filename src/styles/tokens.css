@@ -1,5 +1,4 @@
-/* 设计 token v2 —— 纯白单主题（spec §14）。无暗色分支。
-   旧组件引用的历史名（--glass-radius/--glass-hl/--glass-border 等）以别名/新值保留。 */
+/* Shared light and dark palette. */
 :root {
   color-scheme: light;
 
@@ -11,7 +10,20 @@
   --text-2: #565d6e;
   --text-3: #8b91a3;
   --accent: #2f62e6;
+  --accent-ink: #ffffff;
+  --title-ink: #141413;
   --link-underline: rgba(47, 98, 230, 0.35);
+  --nav-bg: rgba(255, 255, 255, 0.72);
+  --drawer-bg: #fdfdfd;
+  --nav-active-bg: rgba(255, 255, 255, 0.68);
+  --nav-active-hl: rgba(255, 255, 255, 0.95);
+  --nav-active-border: rgba(15, 23, 42, 0.08);
+  --entry-canvas: #ffffff;
+  --entry-ink: #17191f;
+  --entry-code: #515663;
+  --entry-blue: #2357b3;
+  --entry-green: #326624;
+  --entry-orange: #963c13;
 
   /* 玻璃 v3.1（全透，spec §17）：面板零填充，网格/背景无滤镜直透（仅 1px 软化保持“玻璃片”读感） */
   --glass-bg: rgba(255, 255, 255, 0);
@@ -50,7 +62,7 @@
   --prism-d: rgba(120, 224, 190, 0.45);
   --prism-dur: 6s;
 
-  /* 字体（spec §29/§57）：MapleMono = 全站正文（摄影页 page-dark 覆写为衬线栈，§111）；
+  /* 字体（spec §29/§57）：MapleMono = 全站正文（摄影页使用衬线栈，§111）；
      代码 = JetBrains Mono 打头：拉丁字形它全包；
      §57 起 --font-mono 链紧随正体 Maple —— JetBrains 缺中文字形，代码里的中文
      （字符串/标识符等非注释部分）逐字落正体 Maple；--font-comment 注释栈不变，
@@ -79,4 +91,35 @@
   --nav-h: 56px;
   --maxw: 1160px;
   --gutter: clamp(18px, 4vw, 28px);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --canvas: #101112;
+  --grid-line: rgba(255, 255, 255, 0.055);
+  --text-1: #edeef0;
+  --text-2: #babdc3;
+  --text-3: #999ea7;
+  --accent: #91b6ff;
+  --accent-ink: #111a29;
+  --title-ink: #f4f2ee;
+  --link-underline: rgba(145, 182, 255, 0.5);
+  --glass-bg: rgba(255, 255, 255, 0.045);
+  --glass-bg-strong: #202224;
+  --glass-border: rgba(255, 255, 255, 0.14);
+  --glass-hl: rgba(255, 255, 255, 0.08);
+  --glass-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.5);
+  --glass-shadow-lg: 0 18px 36px -10px rgba(0, 0, 0, 0.65);
+  --glass-inset: inset 1px 1px 3px rgba(255, 255, 255, 0.07), inset -1px -1px 3px rgba(0, 0, 0, 0.35);
+  --nav-bg: rgba(24, 25, 27, 0.72);
+  --drawer-bg: #191a1d;
+  --nav-active-bg: rgba(255, 255, 255, 0.075);
+  --nav-active-hl: rgba(255, 255, 255, 0.11);
+  --nav-active-border: rgba(255, 255, 255, 0.16);
+  --entry-canvas: #000000;
+  --entry-ink: #edeee9;
+  --entry-code: #b2b6be;
+  --entry-blue: #70a7ff;
+  --entry-green: #a5eb65;
+  --entry-orange: #ff995b;
 }

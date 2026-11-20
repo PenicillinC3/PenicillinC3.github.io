@@ -1,859 +1,647 @@
 ---
-// §102 进站加载页 —— 瑞士版（新瑞士 / 国际主义排版 + 酸性装饰），玻璃球过渡收尾。
-//
-// **整套 DOM 由内联脚本自己创建，组件不渲染任何可见标记** —— 这是 §101 修的关键：
-// 客户端路由（点站名回首页等）会把目标页 body 换进来，但换入的内联脚本**不执行**，
-// 于是被换进来的 `#pl` 标记会以「无动画的灰屏」形式卡在屏幕上等 CSS 兜底淡出。
-// 不渲染标记 = 换页时根本没有东西可显示。
-//
-// 另外两道闸：① `document.readyState !== 'loading'` 直接返回（真·首次解析才会是
-// loading；换页塞进来的副本此时文档早已 complete）；② sessionStorage `plPlayed`
-// 保证一个标签页只播一次。样式仍是内联且**必须排在脚本之前**（脚本要量覆盖层尺寸）。
-//
-// 视觉层历史：§101 是 CRT 灰屏 + 像素阶梯 + 管面变形；§102 整体换成瑞士版，
-// 旧的 Canvas 渲染器（BLOCKS / blit / drawTerm / applyBloom / 枕形条带）已全部移除。
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { prefetchPlan } from '../lib/prefetch-manifest';
-
-// §103 清单分两批：critical = 加载页期间必须拉完的（首页首屏 + 五个栏目首页 + 球的模型与字体）；
-// deferred = 首页渲染完、主线程空闲后才在后台拉的子页与正文大图。
-// `<` 转义防 `</script>` 逃逸（CLAUDE.md 坑 2）
-const plan = await prefetchPlan();
-const urlsJson = JSON.stringify(plan.critical).replace(/</g, '\\u003c');
-const lazyJson = JSON.stringify(plan.deferred).replace(/</g, '\\u003c');
-
-// 构建期内联 Helvetica 子集（7020 B → base64 9360 B）。
-// **加载页首帧就要有字**，不能等一次网络往返 —— 否则数字和 LOADING 会先以回退字体
-// 闪一下（回退到 Arial，字形骨架都不同）。9.4KB 换掉一次 FOUT，很划算。
-const fontB64 =
-  'data:font/woff2;base64,' +
-  readFileSync(resolve(process.cwd(), 'public/fonts/helv-swiss.woff2')).toString('base64');
-
-// MaplePre：加载页标签/眉标/数据栏改用的 Maple 子集（真粗体面，切法见 scripts/subset-maple.mjs）。
-// 同样必须内联 —— 理由和上面一模一样。12KB → base64 16KB。
-// 百分比（.pl-num / .pl-pct）仍留 Helvetica：它是这一版的视觉主角，字形骨架不能换。
-const mapleB64 =
-  'data:font/woff2;base64,' +
-  readFileSync(resolve(process.cwd(), 'public/fonts/maple-pre.woff2')).toString('base64');
-
-// 噪点：阈值化 alpha 的黑斑点（feColorMatrix 把噪声红通道映射成 alpha，A' = 3R − 2.1）。
-// RGB 全置 0 = 纯黑点 —— 是「撒颗粒」而不是「整体压灰」。color-interpolation-filters
-// 必须显式写 sRGB：SVG 滤镜默认走 linearRGB，会把阈值算歪。
-const GRAIN_URI =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E" +
-  "%3Cfilter id='n' color-interpolation-filters='sRGB'%3E" +
-  "%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E" +
-  "%3CfeColorMatrix type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 -2.1'/%3E" +
-  "%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E";
-
-// ⚠ 这一整段是**模板字符串**：里面（含注释）不得出现反引号，也不得出现 `${`。
-//   反引号会把模板提前闭合，后面的 CSS 被当成 JS 求值 —— 报错位置与真凶毫无关系
-//   （实测：注释里写 `.pl-stage` 换来一句 ⊂stage is not defined⊃，查了半天）。
-//   bootJs 那边一直写着这条，bootCss 之前漏了。要引类名就直接写，别加反引号。
-const bootCss = `
-  @font-face{
-    font-family:'HelvSwiss';
-    src:url("${fontB64}") format('woff2');
-    font-weight:100 900;
-    font-display:block;
-  }
-  /* 标签用的 Maple 子集，同样内联。只声明 700 —— 原件就是 Bold 面，
-     声明宽范围会让浏览器拿它去合成别的字重。 */
-  @font-face{
-    font-family:'MaplePre';
-    src:url("${mapleB64}") format('woff2');
-    font-weight:700;
-    font-display:block;
-  }
-
-  /* 兜底：脚本任何异常都不能留下白屏 —— 无条件淡出。
-     §105 起最坏路径 = MIN_MS 2.5s + BALL_WAIT_MS 6s + 过渡 1.6s + 交班 0.8s ≈ 10.9s，取 18s。 */
-  #pl{
-    position:fixed; inset:0; z-index:9999; overflow:hidden;
-    background:#f7f7f6; color:#1a1a1a;
-    font-family:'HelvSwiss','Helvetica Neue',Helvetica,Arial,sans-serif;
-    animation:pl-failsafe-out .5s ease 18s forwards;
-  }
-  @keyframes pl-failsafe-out{ to{ opacity:0; visibility:hidden; } }
-
-  /* 收尾淡出。**这条不能省**：done() 会加 .pl-out，没有对应规则就是硬切。
-     （这里用 animation 简写会覆盖上面的兜底动画 —— 正是想要的，兜底到此已无意义）*/
-  #pl.pl-out{ animation:pl-out .34s ease-out forwards; }
-  @keyframes pl-out{ to{ opacity:0; visibility:hidden; } }
-
-  .pl-scene{ position:absolute; inset:0; z-index:1; }
-
-  /* 标签 / 眉标 / 数据栏一律 Maple（用户指定）。栈首是内联子集 MaplePre（首屏不等网络），
-     其后是站点标准回退。**百分比不在其中** —— .pl-num / .pl-pct 仍继承 #pl 的 Helvetica，
-     那是这一版的视觉主角，字形骨架不跟着换。（底板 canvas 读的是计算样式的 fontFamily，
-     所以这里怎么改，烘出来的那张就跟到哪。） */
-  .pl-lbl, .pl-eyebrow, .pl-data{
-    font-family:'MaplePre','MapleUI Web','MapleMono Web',ui-monospace,monospace; }
-
-  /* 12 栏网格（版心内）。竖线高度由「构建」动效驱动：自上而下逐一落下。 */
-  .pl-grid{ position:absolute; left:4.5%; right:4.5%; top:10%; bottom:16%;
-    z-index:1; display:flex; pointer-events:none; }
-  .pl-grid i{ flex:1; position:relative; }
-  .pl-grid i::before{ content:''; position:absolute; left:0; top:0; width:1px;
-    background:rgba(26,26,26,.09); height:calc(var(--gh,0) * 100%); }
-  .pl-grid i:last-child{ flex:0; }
-
-  /* 上横线只跨 6 栏（瑞士的非对称手法），下横线通栏；都自左向右拉开 */
-  .pl-rule{ position:absolute; height:1px; background:rgba(26,26,26,.3); z-index:2;
-    transform-origin:left center; transform:scaleX(var(--rw,0)); }
-  .pl-rule-t{ left:4.5%; width:calc(91% / 12 * 6); top:10%; }
-  .pl-rule-b{ left:4.5%; right:4.5%; bottom:16%; }
-
-  .pl-res{ position:absolute; inset:0; z-index:4; }
-
-  .pl-lbl{ position:absolute; font-weight:700; font-size:clamp(10px,1.55vw,20px);
-    letter-spacing:calc(var(--ls,.5) * .13em); text-transform:uppercase; font-variant-numeric:tabular-nums; }
-  .pl-tl{ top:5%; left:4.5%; }
-  .pl-tr{ top:5%; right:4.5%; display:flex; align-items:center; gap:.62em; }
-  .pl-bl{ bottom:5.6%; left:4.5%; color:#8a8a88; }
-  .pl-br{ bottom:5.6%; right:4.5%; color:#8a8a88; }
-  .pl-dot{ width:.56em; height:.56em; border-radius:50%; background:#1a1a1a;
-    display:inline-block; animation:pl-blip 1.1s ease-in-out infinite; }
-  @keyframes pl-blip{ 0%,100%{opacity:1} 50%{opacity:.15} }
-
-  .pl-stage{ position:absolute; left:4.5%; right:4.5%; top:10%; bottom:16%;
-    display:flex; align-items:flex-end; justify-content:space-between; }
-  /* +24px = 14 + 10。14 不是随手写的：巨数的 line-height:.71 < 1，按 hhea 度量字形墨迹
-     会溢出到行框上方 0.092em（22vh 字号下 ≈10.7px），只给 5px 的话可见空隙只剩 0.4px、
-     等于贴上；另外 10 是用户要求再把眉标往上抬的。 */
-  .pl-left{ display:flex; flex-direction:column; gap:calc(.55vh + 24px); align-items:flex-start; }
-  .pl-eyebrow{ font-weight:700; font-size:clamp(13px,2.6vh,26px); letter-spacing:calc(var(--ls,.5) * .3em);
-    text-transform:uppercase; }
-  /* 悬挂左对齐：大字号自带左侧边距，不悬挂会看着内缩、与上方小字对不齐 */
-  .pl-hero{ display:flex; align-items:baseline; line-height:.71; margin-left:-.035em; }
-  .pl-num{ font-weight:700; letter-spacing:-.042em; font-size:22vh; color:#1a1a1a;
-    font-variant-numeric:tabular-nums; }
-  .pl-pct{ font-weight:700; font-size:6.6vh; color:#8a8a88; letter-spacing:0; }
-
-  /* 数据表：两列贴拢，标签右对齐紧贴数值；整块靠右 */
-  /* margin-bottom 由脚本量的 --data-lift 给：把本栏**最后一行**的基线抬到大数字那条线上。
-     .pl-stage 是 align-items:flex-end，所以本栏底边贴着版心底 —— 抬多少就是差多少。
-     （这里别用反引号包类名：bootCss 本身就是模板字符串，反引号会把它提前闭合。） */
-  .pl-data{ display:grid; grid-template-columns:auto auto; gap:.42em .7em; width:auto;
-    margin-bottom:var(--data-lift,0px);
-    font-weight:700; font-size:clamp(11px,1.62vw,21px); letter-spacing:calc(var(--ls,.5) * .15em);
-    text-transform:uppercase; }
-  .pl-data span{ grid-column:1; color:#8a8a88; text-align:right; }
-  .pl-data s{ grid-column:2; text-decoration:none; color:#1a1a1a;
-    font-variant-numeric:tabular-nums; text-align:right; }
-
-  /* 加载条：全画面唯一的彩色。渐变铺满整条轨道，由进度用 clip-path 揭开 ——
-     渐变若长在填充元素上，渐变宽度会等于填充宽度，进度 10% 时一小截里塞着整条彩虹。 */
-  .pl-prog{ position:absolute; left:4.5%; right:4.5%; bottom:calc(16% - 1px);
-    height:2px; background:rgba(26,26,26,.12); z-index:5; }
-  .pl-prog b{ display:block; height:2px; width:100%;
-    background:linear-gradient(90deg,#ff2d9b,#a24bff 22%,#00d4ff 44%,#7dff3d 64%,#ffe600 82%,#ff6b1a);
-    clip-path:inset(0 calc((1 - var(--p,0)) * 100%) 0 0); }
-
-.pl-mist{ position:absolute; inset:0; z-index:6; pointer-events:none;
-  background:linear-gradient(180deg, rgba(180,180,186,.30), rgba(156,156,164,.36));
-  opacity:var(--mist,1);
-  -webkit-backdrop-filter:blur(7px) saturate(.55);
-  backdrop-filter:blur(7px) saturate(.55); }
-  .pl-grain{ position:absolute; inset:-60%; pointer-events:none; z-index:8;
-    background-image:url("${GRAIN_URI}"); background-size:140px;
-    opacity:.32; animation:pl-grain .55s steps(1) infinite; }
-  @keyframes pl-grain{
-    0%{transform:translate(0,0)}      20%{transform:translate(-7%,3%)}
-    40%{transform:translate(4%,-6%)}  60%{transform:translate(-3%,-5%)}
-    80%{transform:translate(6%,2%)}   100%{transform:translate(0,0)} }
-
-  /* 脚本半死时的兜底文字（画布/场景出第一帧后撤掉） */
-  .pl-fallback{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
-    margin:0; font-size:clamp(1.6rem,7vw,3.4rem); font-weight:700; letter-spacing:.22em; }
-  #pl.pl-drawn .pl-fallback{ display:none; }
-
-  @media (prefers-reduced-motion: reduce){
-    .pl-grain,.pl-dot{ animation:none; }
-  }
-
-  /* §102 过渡的目标实现放在 3D 场景那一侧（见本文件 transition()）：
-     加载页版面烘成底板 → 球折射它 → 底板上的 alphaMap 圆洞 → 光学褪到 0 → 撤场。
-     ⚠ 旧的「在 DOM 加载层上开洞 + 一圈假折射边环」方案（pl-open / pl-rim / --pl-r）
-     已整套删除：DOM 在 WebGL 之上，球的 shader 碰不到它，那圈边环只能是近似。
-     现在加载页真的被折到了 —— 因为它已经进了那个 3D 场景。 */
-`;
-
-// 注意：下面这段是**拼进 HTML 的 JS 字符串**，内部一律用字符串拼接，
-// 不得出现模板字面量或 `${`（会被这里提前求值）。
-const bootJs = `
-(function () {
-  // ① 只在真正的首次解析里播：换页塞进来的副本此刻 readyState 已是 complete
-  if (document.readyState !== 'loading') return;
-  // ② 一个标签页只播一次
-  var KEY = 'plPlayed';
-  try {
-    if (sessionStorage.getItem(KEY) === '1') return;
-    sessionStorage.setItem(KEY, '1');
-  } catch (e) { /* 隐私模式：照样播 */ }
-
-  // §102：告诉 FluidGlass island「加载页在场」—— 它据此把球先藏起来（scale 0）。
-  // 本脚本在 body 最前同步执行，一定早于 island 水合。
-  window.__plPending = true;
-
-  var URLS = ${urlsJson};     // §105 critical：**只有首页自己**要的 4 项，下完就退场
-  var LAZY = ${lazyJson};     // §105 deferred：首页渲染完后空闲时按序再拉（顺序即优先级）
-  // ⚠ 这个值同时是**解密揭示的速度**：shown 到 0.9 时进度项就把揭示收干
-  //   （见 tickDecrypt 的 byProg），所以实际揭示时长 ≈ 0.9 × MIN_MS。
-  //   改它会同时改「看满多久」和「字锁定得多快」，别只按其中一个调。
-  var MIN_MS = 2500;
-  var HARD_BAIL_MS = 60000;    // 网络僵死时的唯一逃生口（不想要就设成 Infinity）
-  var IDLE_MS = 10000;         // 单个请求「多久没收到字节」算卡死（慢但在动的不会中招）
-  var CONC = 5;                // 并发数
-  var BALL_WAIT_MS = 6000;     // 资源到手后最多再等玻璃球就绪这么久（§102）
-  var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  // 开场解析（模糊）的起止。终点**不是 0** —— 100% 与球出来时停在「原来 48% 那一档」
-  // 的柔化上（用户指定）。起点随之抬高，保持同样的衰减区间（原 6.5→0，现 7.33→0.83）。
-  var BLUR_END = 6.5 * (1 - 0.48 / 0.55);   // ≈ 0.83px
-  var BLUR_SPAN = 6.5;                       // 衰减区间
-  var BLUR_POW = 2;                          // 缓入指数（见 paint()：开头慢、末尾快）
-
-  // 玻璃球能否参与过渡。island 会明确表态，避免我们傻等：
-  //   __ballReady = 折射管线已出帧（可用）    __ballNA = 根本没挂载（窄屏/减动效）
-  function ballState() {
-    if (window.__ballReady) return 'ready';
-    if (window.__ballNA) return 'na';
-    return 'wait';
-  }
-
-  // —— 建 DOM（首帧即它：脚本在 body 最前面同步执行，解析尚未走到可视内容）——
-  var grid = '';
-  for (var gi = 0; gi < 12; gi++) grid += '<i></i>';
-  var el = document.createElement('div');
-  el.id = 'pl';
-  el.innerHTML =
-    '<div class="pl-scene">' +
-      '<div class="pl-grid">' + grid + '</div>' +
-      '<div class="pl-rule pl-rule-t"></div>' +
-      '<div class="pl-rule pl-rule-b"></div>' +
-      '<div class="pl-res">' +
-        '<span class="pl-lbl pl-tl">Penicillinc3</span>' +
-        '<span class="pl-lbl pl-tr"><i class="pl-dot"></i>Syncing</span>' +
-        '<div class="pl-stage">' +
-          '<div class="pl-left">' +
-            '<span class="pl-eyebrow">///Loading</span>' +
-            '<div class="pl-hero"><span class="pl-num">000</span><span class="pl-pct">%</span></div>' +
-          '</div>' +
-          '<div class="pl-data">' +
-            '<span>Routes</span><s data-c="route">00 / 00</s>' +
-            '<span>Assets</span><s data-c="all">00 / 00</s>' +
-            '<span>Bytes</span><s data-c="bytes">0.0 MB</s>' +
-            '<span>Fonts</span><s data-c="font">0 / 0</s>' +
-          '</div>' +
-        '</div>' +
-        '<span class="pl-lbl pl-bl">Site Index</span>' +
-        '<span class="pl-lbl pl-br">Ingest 01</span>' +
-      '</div>' +
-      '<div class="pl-prog"><b></b></div>' +
-    '</div>' +
-    '<div class="pl-mist" aria-hidden="true"></div>' +
-    '<div class="pl-grain" aria-hidden="true"></div>' +
-    '<p class="pl-fallback" aria-hidden="true">LOADING</p>';
-  document.body.appendChild(el);
-  document.body.style.overflow = 'hidden';
-  window.__pl = { el: el, urls: URLS }; // 验收探针/调试用（无副作用）
-
-  var scene  = el.querySelector('.pl-scene');
-  var grain  = el.querySelector('.pl-grain');
-  var numEl  = el.querySelector('.pl-num');
-  var gcols  = el.querySelectorAll('.pl-grid i');
-  var cells  = {
-    route: el.querySelector('[data-c="route"]'),
-    all:   el.querySelector('[data-c="all"]'),
-    bytes: el.querySelector('[data-c="bytes"]'),
-    font:  el.querySelector('[data-c="font"]')
-  };
-  var lastTxt = {};
-  var t0 = Date.now();
-  var ended = false;
-
-  // 预加载内联字体（没就绪时前几帧走字链兜底，看不出来）
-  try { document.fonts.load('700 40px HelvSwiss'); } catch (e) { /* 忽略 */ }
-
-  function done() {
-    if (ended) return;
-    ended = true;
-    el.classList.add('pl-out');
-    setTimeout(function () {
-      if (el.isConnected) el.remove();
-      document.body.style.overflow = '';
-    }, 360);
-  }
-
-  // ================= §102 玻璃球过渡 =================
-  // 加载页冻结成快照，WebGL 接管底板和球。球心开口逐步露出底下的真实首页，
-  // 与快照一起放大的洞由同一条曲线驱动。
-  // ⚠ 下面每一处的百分比都必须与上面的 CSS 对齐，否则过渡期会看到「两份错位的加载页」。
-  // 量某个元素的**文字基线 y**。元素多半被块化了（position:absolute / flex item /
-  // grid item 都会块化），rect.top 是**行盒**顶而不是字形顶
-  // → 基线 = 行盒顶 + 半行距 + 上升部。asc/desc 取 canvas 的字体度量 ——
-  // 浏览器给 DOM 排版用的就是同一套表。
-  // ⚠ makePlate 烘底板时用的是**同一个函数**（baseOf → put），别再复制一份。
-  var _mc = document.createElement('canvas').getContext('2d');
-  function baselineY(e, cs) {
-    var r = e.getBoundingClientRect();
-    cs = cs || getComputedStyle(e);
-    _mc.font = cs.fontStyle + ' ' + cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
-    var m = _mc.measureText('M');
-    var a = m.fontBoundingBoxAscent, d = m.fontBoundingBoxDescent, lh = parseFloat(cs.lineHeight);
-    if (!isFinite(lh)) lh = a + d;      // line-height:normal 就是字体度量本身
-    return r.top + (lh - (a + d)) / 2 + a;
-  }
-
-  // 右侧数据栏**最后一行**的基线，拉到与大数字/百分号同一条线上。
-  // 为什么非得量、不能写死：这个差值既不正比于 vh 也不正比于字号 ——
-  //   720 高差 7.22px(/vh 1.00%)、1080 高差 14.34px(/vh 1.33%)。
-  // 因为 .pl-hero 里还叠着一根 16px 的固定结构行，比例关系被它破坏了。
-  // 量一次写进 --data-lift；之后字号/行距怎么改都不会失配（底板读的是 DOM，自动跟上）。
-  function alignData() {
-    var rows = el.querySelectorAll('.pl-data s'), num = el.querySelector('.pl-num');
-    if (!rows.length || !num) return;
-    // ⚠ 先归零再量：本函数会被 resize / fonts.ready 反复调用，而量的时候 --data-lift
-    //   已经生效 —— 不归零的话量到的是「抬过之后的残差」，每调一次就再抬一截，滚雪球。
-    //   （setProperty 后紧跟 getBoundingClientRect，后者强制回流，读到的是新布局。）
-    el.style.setProperty('--data-lift', '0px');
-    var lift = baselineY(rows[rows.length - 1]) - baselineY(num);
-    el.style.setProperty('--data-lift', lift.toFixed(2) + 'px');
-  }
-  alignData();
-  // 视口变了 clamp() 的字号就变，差值跟着变
-  addEventListener('resize', alignData);
-  // 内联字体是异步生效的，首帧量到的可能还是回退字体的度量
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(alignData);
-
-  // ── 开场解密揭示（§102）─────────────────────────────────────────────
-  // 除百分比外的文字，逐字从乱码**锁定**成真字（左→右），元素之间依次起步。单次。
-  // 加载期跑完；transition() 里还会显式收尾一次，保证交班烘进底板的是定格文字。
-  // ⚠ 乱码字符集必须落在 MaplePre 子集内（它只切了 A-Z a-z 0-9 与 / . : % ( ) - +）——
-  //   用了子集外的字，动画途中会**逐字回退到别的字体**，字形当场变样。
-  // ⚠ 这里在 bootJs 模板字符串里：注释中同样不得出现反引号或「美元花括号」。
-  //   （写这行时我自己就违反了一次 —— 把那个符号照原样写进注释，构建直接报
-  //     esbuild 错、位置指向这一行。要说它，就绕着说。）
-  var ORACLE = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/.:%()-+';
-  // ↓ 用户在预览页定的：基础 2000/160 的 2.8 倍，闪动 100ms。
-  // ⚠ 整段揭示 = 12×448 + 5600 ≈ 11s，**远超 MIN_MS(5s) 最短加载** ——
-  //   所以揭示走的是「虚拟时钟」（见 tickDecrypt）：加载够久就按这个时长原样跑，
-  //   不够久则自动跟上进度，保证**永远在交班前定格**，不会被切在半途。
-  var DECRYPT_MS = 5600;     // 单个元素内：首字到末字的揭示跨度
-  var DECRYPT_STAGGER = 448; // 元素之间依次起步的间隔
-  var FLICKER_MS = 100;      // 单个乱码字多久翻一次（小了糊成噪点，大了像卡住）
-  var dec = [], decOn = false;
-  // 虚拟时钟 v 的起点与总量（v 怎么取见 tickDecrypt）
-  var decStart = 0, decTotal = 0;
-
-  // 只动**第一个非空文本节点** —— 不能整块 textContent 赋值：
-  // .pl-tr 里还挂着闪动小圆点 <i>，整体覆写会把圆点抹掉。
-  function firstTextNode(e) {
-    for (var i = 0; i < e.childNodes.length; i++) {
-      var n = e.childNodes[i];
-      if (n.nodeType === 3 && n.nodeValue.trim()) return n;
-    }
-    return null;
-  }
-  // 乱码字**每 FLICKER_MS 才换一次**，不是每帧换。逐帧换等于 60 次/秒，
-  // 糊成一片噪点，根本看不出「字在跳」；拉开到 ~80ms 才有逐格翻滚的读感。
-  // 用「位置 + 时间刻度」的哈希代替 Math.random：同一刻度内稳定（同一帧内重画不变），
-  // 跨刻度才翻新 —— 也就不必给每个字符存 nextAt 之类的状态。
-  function flickChar(i, tick) {
-    var h = ((i + 1) * 2654435761) ^ ((tick + 1) * 40503);
-    h = (h ^ (h >>> 13)) >>> 0;
-    h = (h * 1274126177) >>> 0;
-    return ORACLE.charAt(h % ORACLE.length);
-  }
-  // u = 该元素自身的揭示进度（0..1）。第 i 个字在 u >= (i+1)/n 时定形；空格不动。
-  // now 传的是**虚拟时间** v —— 闪动也跟着一起压缩，否则揭示加速后字还没跳够就定形了。
-  function scramble(s, u, v) {
-    var out = '', n = s.length, tick = Math.floor(v / FLICKER_MS);
-    for (var i = 0; i < n; i++) {
-      var c = s.charAt(i);
-      out += (c === ' ' || u >= (i + 1) / n) ? c : flickChar(i, tick);
-    }
-    return out;
-  }
-  function startDecrypt() {
-    // ⚠ 先把上一轮收尾，再重新抓终值。终值取自**节点当前值**，本函数若在上一轮
-    //   中途被再次调用（预览页的滑块、重播都会），抓到的就是乱码 —— 那个乱码
-    //   会被当成终值，文字再也回不到真值。真组件只调一次，但这条防线要留住。
-    finishDecrypt();
-    dec = [];
-    var k = 0, t = performance.now();
-    var items = el.querySelectorAll('.pl-lbl, .pl-eyebrow, .pl-data span, .pl-data s');
-    for (var i = 0; i < items.length; i++) {
-      var n = firstTextNode(items[i]);
-      if (!n) continue;
-      dec.push({ n: n, final: n.nodeValue, off: k * DECRYPT_STAGGER, ms: DECRYPT_MS });
-      k++;
-    }
-    decStart = t;
-    decTotal = (k > 0 ? (k - 1) * DECRYPT_STAGGER : 0) + DECRYPT_MS;
-    decOn = dec.length > 0;
-  }
-
-  // 虚拟时钟：v = max(真实耗时, 进度 × 总时长)。
-  //   前半项 = 用户定的时长 —— 加载够久就按它跑完，手感原样保留；
-  //   后半项 = 硬保证 —— 进度到 1 时 v 必到 decTotal，揭示**一定在交班前定格**
-  //            （交班条件本身就要求 shown >= 0.995，所以「进度满」与「交班」天然同步）。
-  // ⚠ 别改回「预估加载时长、按需加速」那版：真正的瓶颈是等玻璃球就绪（BALL_WAIT_MS
-  //   最多 6s），从资源完成度上根本看不出来；估出的期限一收紧就是猛跳，
-  //   实测照样有 5 个元素被切。这里不预测任何东西。
-  function tickDecrypt(now) {
-    if (!decOn) return;
-    // 进度项留一成余量（到 90% 就收干）：shown 到 1 的那一刻就是交班，
-    // 踩着点定格等于把最后一个元素压在交班那一刻，探针和眼睛都判它「被切」。
-    var byProg = Math.min(1, (shown || 0) / 0.9) * decTotal;
-    var v = Math.max(now - decStart, byProg);
-    var left = 0;
-    for (var i = 0; i < dec.length; i++) {
-      var d = dec[i], u = (v - d.off) / d.ms;
-      if (u < 1) { left++; d.n.nodeValue = scramble(d.final, u, v); }
-      else if (d.n.nodeValue !== d.final) d.n.nodeValue = d.final;
-    }
-    decOn = left > 0;
-  }
-  // 收尾：把每个节点还原成真字，并清掉 paintCounts 的「上次写过什么」记忆 ——
-  // 否则计数列若恰好与记忆值相同就不再重写，屏幕上会留着解密期的乱码。
-  function finishDecrypt() {
-    for (var i = 0; i < dec.length; i++) dec[i].n.nodeValue = dec[i].final;
-    decOn = false;
-    lastTxt = {};
-  }
-  startDecrypt();
-
-  function makePlate() {
-    var dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-    var CW = innerWidth, CH = innerHeight;
-    var c = document.createElement('canvas');
-    c.width = Math.round(CW * dpr); c.height = Math.round(CH * dpr);
-    var o = c.getContext('2d');
-    o.scale(dpr, dpr);
-    // ── 几何与文字一律**从活着的 DOM 上量**，不再手写百分比和魔法系数 ──────────
-    // 教训：以前按 CSS 的百分比在 canvas 里重算一遍（baseY = boxTop + 0.625*numSize
-    // 之类），结果三块文字各错各的 —— 顶部标签高 3px、///LOADING 低 1px、大数字高 11px
-    // （探针实测，见 .superpowers/brainstorm/852-.../bisect.mjs）。根因是 canvas 与 CSS
-    // 本是三套独立度量（行高 .71 / flex 基线对齐 / textBaseline 'top'），手算的值只要
-    // CSS 动一下就重新失配 —— clamp 那次也是同一个病。改成量 DOM 之后 CSS 随便改都不会错。
-    // 时机是白拿的：makePlate 只在 transition() 里跑一次，此刻 el 还好端端在屏幕上。
-    var q = function (s) { return document.querySelector(s); };
-    var qa = function (s) { return document.querySelectorAll(s); };
-    var Rc = function (e) { return e ? e.getBoundingClientRect() : null; };
-
-    // 被块化的元素（position:absolute / flex item / grid item 都会块化）rect.top 是
-    // **行盒**顶、不是字形顶 → 基线 = 行盒顶 + 半行距 + 上升部。asc/desc 取 canvas 的
-    // 字体度量 —— 浏览器给 DOM 排版用的就是同一套表。
-    function font(e) {
-      var cs = getComputedStyle(e);
-      o.font = cs.fontStyle + ' ' + cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
-      o.letterSpacing = (parseFloat(cs.letterSpacing) || 0).toFixed(2) + 'px';
-      return cs;
-    }
-    function baseOf(e) {
-      var r = e.getBoundingClientRect(), cs = font(e);   // font() 设 o.font/字距，put() 要用
-      return { l: r.left, r: r.right, y: baselineY(e, cs), cs: cs };
-    }
-    // 文字内容、大小写、字距、颜色也全取自 DOM 计算值 —— canvas 只负责画。
-    // 「100」不再是写死的：停 99% 时画的就是 99。
-    function put(e, align) {
-      if (!e) return;
-      var g = baseOf(e), s = e.textContent.trim(), tt = g.cs.textTransform;
-      if (tt === 'uppercase') s = s.toUpperCase(); else if (tt === 'lowercase') s = s.toLowerCase();
-      o.fillStyle = g.cs.color; o.textAlign = align; o.textBaseline = 'alphabetic';
-      o.fillText(s, align === 'right' ? g.r : g.l, g.y);
-    }
-
-    o.fillStyle = '#f7f7f6'; o.fillRect(0, 0, CW, CH);
-
-    // 交班那层柔化也得烘进底板。DOM 的模糊是 CSS filter 打在 .pl-scene 上的，
-    // canvas 不带它的话，撤下 DOM 那一刻整页会「咔」地变清晰 —— 又一处交班跳变
-    // （终点改成 BLUR_END≈0.83px 之后才成为问题，以前终点是 0 就无所谓）。
-    // 从计算样式直接读，CSS 改多少这里跟多少（reduced-motion 下是 none → 不设）。
-    // 只罩场景内容：底板背景和后面的噪点纹都在 .pl-scene 之外，本来就不吃这层模糊。
-    var mBlur = /blur\(([\d.]+)px\)/.exec(getComputedStyle(q('.pl-scene')).filter);
-    if (mBlur && parseFloat(mBlur[1]) > 0.01) o.filter = 'blur(' + mBlur[1] + 'px)';
-
-    // 竖线：量每一列的左缘，含最后那根 flex:0 的零宽列（它正好压在版心右缘）。
-    // 旧代码靠「除以 11 而不是 12」硬凑 —— CSS 一改就废。
-    var gbox = Rc(q('.pl-grid')), gis = qa('.pl-grid i');
-    if (gbox) {
-      o.fillStyle = 'rgba(26,26,26,.09)';
-      for (var i = 0; i < gis.length; i++) o.fillRect(Rc(gis[i]).left, gbox.top, 1, gbox.height);
-    }
-    o.fillStyle = 'rgba(26,26,26,.3)';
-    var rt = Rc(q('.pl-rule-t')), rb = Rc(q('.pl-rule-b'));
-    if (rt) o.fillRect(rt.left, rt.top, rt.width, 1);     // 上横线只跨 6 栏
-    if (rb) o.fillRect(rb.left, rb.top, rb.width, 1);
-
-    put(q('.pl-tl'), 'left'); put(q('.pl-tr'), 'right');
-    put(q('.pl-bl'), 'left'); put(q('.pl-br'), 'right');
-    var dotEl = q('.pl-dot'), dr = Rc(dotEl);   // 闪动小圆点：以前漏画，交班瞬间会消失
-    if (dr) {
-      o.fillStyle = getComputedStyle(dotEl).backgroundColor;
-      o.beginPath(); o.arc(dr.left + dr.width / 2, dr.top + dr.height / 2, dr.width / 2, 0, Math.PI * 2); o.fill();
-    }
-    put(q('.pl-eyebrow'), 'left');
-    put(q('.pl-num'), 'left'); put(q('.pl-pct'), 'left');
-    var dl = qa('.pl-data span'), dv = qa('.pl-data s');
-    for (var r2 = 0; r2 < dl.length; r2++) put(dl[r2], 'right');   // 标签列右对齐
-    for (var r3 = 0; r3 < dv.length; r3++) put(dv[r3], 'right');   // 数值贴右缘
-
-    // 加载条：量轨道本身，渐变照旧（这段本就是满格）
-    var pg = Rc(q('.pl-prog b')) || Rc(q('.pl-prog'));
-    if (pg) {
-      var g = o.createLinearGradient(pg.left, 0, pg.right, 0);
-      g.addColorStop(0, '#ff2d9b'); g.addColorStop(.22, '#a24bff'); g.addColorStop(.44, '#00d4ff');
-      g.addColorStop(.64, '#7dff3d'); g.addColorStop(.82, '#ffe600'); g.addColorStop(1, '#ff6b1a');
-      o.fillStyle = g; o.fillRect(pg.left, pg.top, pg.width, pg.height);
-    }
-
-    // 噪点纹（.pl-grain，z-index 8 压在最上层）。少了它，交班瞬间整屏的颗粒感会消失，
-    // 是同一类「交班不能有跳」的漏网之鱼 —— 实测这层在空白区把亮度压掉 17.1/247，不是可忽略的。
-    //
-    // ⚠ **别改成把那张 SVG 用 drawImage 光栅化**：同一个 SVG，drawImage 路径解出来的
-    //   alpha 只有 CSS 背景渲染的 1/13（实测 meanAlpha 1.4/255，铺上去底板空白带仍是
-    //   246.6，等于没铺）。两条路径的栅格化就是不一样，跟参数无关。
-    //   所以这里照**屏幕上量到的强度**自己合成：黑像素、逐像素 alpha 在 [0, 0.432) 上均匀
-    //   （均值 0.216），再乘元素自身的 opacity → 有效均值 0.069，即暗 0.069×247 ≈ 17 ✓。
-    // 花纹与相位不必与 DOM 一致：本来就是随机噪点，而且它每 0.55s 抖一次，接缝看不出来。
-    o.filter = 'none';   // 噪点纹在 .pl-scene 之外，不受场景那层模糊影响
-    if (grain) {
-      var gcs = getComputedStyle(grain);
-      var ts = Math.round(parseFloat(gcs.backgroundSize) || 140);
-      var ga = parseFloat(gcs.opacity); if (!isFinite(ga)) ga = 0.32;
-      var tile = document.createElement('canvas');
-      tile.width = tile.height = ts;
-      var tc = tile.getContext('2d');
-      var id = tc.createImageData(ts, ts), pd = id.data;
-      var seed = 0x2f6e2b1;                       // 定值种子：每次交班花纹一致，便于复现
-      for (var pk = 0; pk < pd.length; pk += 4) { // RGB 默认 0 = 黑，只写 alpha
-        seed = (seed * 1103515245 + 12345) & 0x7fffffff;
-        pd[pk + 3] = 255 * 0.432 * ((seed >>> 8) / 8388608);
-      }
-      tc.putImageData(id, 0, 0);
-      o.save();
-      o.globalAlpha = ga;
-      o.fillStyle = o.createPattern(tile, 'repeat');
-      o.fillRect(0, 0, CW, CH);
-      o.restore();
-    }
-    o.letterSpacing = '0px';
-    return c;
-  }
-
-  /* §112–§113：进度真的到 100% 后才交给玻璃球。球与开口按屏幕像素展开，
-     光学并行消退，露出真实首页后清理底板。 */
-  var BALL_GAP_W = 0.2;
-  var MODEL_R_W = 1.009;
-  // 开口贴近球的外沿，缩窄外围保留的玻璃边。
-  var REVEAL_TO_BALL = 0.90;
-  var CAM_Z = 20, FOV = 15;  // 与 FluidGlass 的相机一致
-  var T_REVEAL = 840, T_OPTICS = 460, T_OUT = 260;
-
-  function smooth(t) { return t * t * (3 - 2 * t); }
-
-  function transition() {
-    ended = true;
-    // 交班前先把解密收干净：drive() 在 ended 置位后就不再跑，若此刻还在揭示中途，
-    // 烘出来的底板会**定格在乱码上**（用户要求：最后的 3D 场景里动画停掉）。
-    finishDecrypt();
-    // ⚠ 紧接着必须补一次计数：解密期间 paintCounts() 是被让出去的（decOn 早退），
-    //   而它平时只在 drive() 里跑 —— 本函数把 ended 一置位 drive() 就 return 了，
-    //   不在这里补，数值列会永远停在标记里的初始值 00 / 00，并被烘进底板。
-    paintCounts();
-    var plate = makePlate();               // 球边缘折射用的加载页快照
-    window.__lensScene = 0;
-    window.__plPlate = plate;
-    // 快照：停掉还在跑的 CSS 动画，画面彻底静止。
-    // ⚠ 只停 grain 的动画 —— **别再把 scene.style.filter 清成 'none'**：
-    //   模糊终点是 BLUR_END(≈0.83px) 而不是 0，清掉等于交班瞬间整页「咔」地变清晰。
-    //   主循环在 ended 置位后就不再调 paint()，滤镜本来就停在末值上，不需要额外干预。
-    grain.style.animation = 'none';
-    var root = document.documentElement;
-    var lastReveal = 0;
-    var revealFull = 0;
-    var focalPx = 0;
-    var tA = 0;
-    var failsafe;
-    var plateDeadline = performance.now() + 650;
-
-    // 先让新底板在加载层背后画好。缺一层就直接撤旧层，会看到中间的白帧。
-    requestAnimationFrame(function waitForPlate(now) {
-      if (window.__plPlatePresented !== plate) {
-        if (now < plateDeadline && el.isConnected) {
-          requestAnimationFrame(waitForPlate);
-          return;
-        }
-        delete window.__plPlate;
-        delete window.__plPlatePresented;
-        ended = false;
-        done();
-        return;
-      }
-      root.classList.add('pl-live');
-      el.remove();
-      document.body.style.overflow = '';
-      focalPx = innerHeight / (2 * Math.tan(FOV * Math.PI / 360));
-      revealFull = Math.hypot(innerWidth, innerHeight) / (2 * 0.82) + 2;
-      window.__lensBall = true;
-      tA = performance.now();
-      failsafe = setTimeout(settle, 2500);
-      requestAnimationFrame(frame);
-    });
-
-    function frame(now) {
-      var ms = Math.max(0, now - tA);
-      var reveal = revealFull * smooth(Math.min(1, ms / T_REVEAL));
-      window.__lensHolePx = reveal;
-      if (reveal !== lastReveal) {
-        root.style.setProperty('--pl-reveal', reveal + 'px');
-        lastReveal = reveal;
-      }
-
-      if (ms < T_REVEAL) {
-        // 球面距相机固定。由屏幕上的目标半径反推世界半径，抵消透视对速度的放大。
-        var projectedSlope = reveal / (REVEAL_TO_BALL * focalPx);
-        var worldRadius = BALL_GAP_W * projectedSlope * (projectedSlope + Math.hypot(1, projectedSlope));
-        window.__lensScale = worldRadius / MODEL_R_W;
-        window.__lensZ = CAM_Z - BALL_GAP_W - worldRadius;
-        window.__lensOptics = Math.pow(1 - Math.min(1, ms / T_OPTICS), 3);
-      } else {
-        // 开口保持铺满视口，底板淡出时加载进度不会重新冒出来。
-        window.__lensBall = false;
-        window.__lensScene = smooth(Math.min(1, (ms - T_REVEAL) / T_OUT));
-      }
-      if (ms < T_REVEAL + T_OUT) { requestAnimationFrame(frame); return; }
-      window.__lensHolePx = 0;              // 洞交还（底板此后全透明，有没有洞都一样）
-      // 加载页那几个量到此已无人读（首页那颗一个都不读），清掉免得留成陈旧状态
-      delete window.__lensScale;
-      delete window.__lensOptics;
-      delete window.__lensZ;
-      settle();
-    }
-
-    // ⑤ §103/§105 后台预加载 —— 首页首屏渲染完 + 主线程空闲时才启动。
-    //    LAZY **本身已按优先级排好序**（构建期定序：正文字体 → 栏目首页 → 封面 →
-    //    其余），这里是 FIFO + 并发 2，所以顺序就是优先级，不必再排序。
-    //    用 requestIdleCallback（Safari 不支持 → setTimeout 兜底）、priority:'low'，
-    //    全程不阻塞交互。用户点进子页时：拉到就直接渲染，没拉完就走 Astro 自己的
-    //    viewport 预取（§100）—— 不会因为这里而变慢。
-    function idlePrefetch() {
-      if (!LAZY.length) return;
-      var i = 0, running = 0, MAX = 2;
-      function schedule() {
-        if (i >= LAZY.length) return;
-        if (window.requestIdleCallback) requestIdleCallback(step, { timeout: 3000 });
-        else setTimeout(step, 200);          // Safari：退化成低优先级定时器
-      }
-      function step() {
-        while (running < MAX && i < LAZY.length) {
-          running++;
-          fetch(LAZY[i++], { priority: 'low', cache: 'force-cache' })
-            .catch(function () {})           // 单个失败不影响其余，也不上报
-            .then(function () { running--; schedule(); });
-        }
-      }
-      schedule();
-    }
-
-    function settle() {
-      clearTimeout(failsafe);
-      root.classList.remove('pl-live');
-      root.style.removeProperty('--pl-reveal');
-      delete window.__plPlate;
-      delete window.__plPlatePresented;
-      idlePrefetch();
-    }
-  }
-
-  // ================= 预取引擎：真实字节驱动 =================
-  var conn = navigator.connection || {};
-  var frugal = !!conn.saveData || /(^|-)2g$/.test(conn.effectiveType || '');
-  var urls = URLS.filter(function (u) {
-    return !frugal || u.charAt(u.length - 1) === '/';   // 省流量/2G 只取 HTML
-  });
-
-  // 分类：路由 / 字体 / 其余算资源。计数与清单同源 —— 显示出来的永远是**真数**，不是演的。
-  function kindOf(u) {
-    if (u.charAt(u.length - 1) === '/') return 'route';
-    return /\\.woff2$/.test(u) ? 'font' : 'img';
-  }
-  var totalN = { route: 0, font: 0, img: 0, all: 0 };
-  var doneN  = { route: 0, font: 0, img: 0, all: 0 };
-  for (var ui = 0; ui < urls.length; ui++) { totalN[kindOf(urls[ui])]++; totalN.all++; }
-
-  var state = (window.__plState = {
-    done: 0, total: urls.length, bytes: 0, frugal: frugal, finished: false,
-    byKind: totalN,
-  });
-  var received = 0, seenBytes = 0, seenCount = 0, doneCount = 0;
-  var realP = 0, shown = 0;
-
-  function estimate() {
-    var avg = seenCount ? seenBytes / seenCount : 20000;
-    return seenBytes + (urls.length - seenCount) * avg;
-  }
-  function addBytes(n) {
-    received += n;
-    state.bytes = received;
-    var total = estimate();
-    var p = total > 0 ? Math.min(1, received / total) : 0;
-    if (p > realP) realP = p;
-  }
-
-  function grab(u) {
-    var idle = null, aborted = false;
-    function arm(rd) {
-      clearTimeout(idle);
-      idle = setTimeout(function () {
-        aborted = true;
-        try { rd.cancel(); } catch (e) {}
-      }, IDLE_MS);
-    }
-    return fetch(u, { priority: 'low', cache: 'force-cache' }).then(function (r) {
-      var len = Number(r.headers.get('content-length')) || 0;
-      seenCount++;
-      seenBytes += len || 12000;
-      if (!r.body || !r.body.getReader) {
-        return r.arrayBuffer().then(function (b) { addBytes(b.byteLength || len); });
-      }
-      var rd = r.body.getReader();
-      arm(rd);
-      function pump() {
-        return rd.read().then(function (res) {
-          if (res.done) { clearTimeout(idle); return; }
-          arm(rd);
-          addBytes(res.value ? res.value.length : 0);
-          return pump();
-        }, function () { clearTimeout(idle); });
-      }
-      return pump().then(function () { clearTimeout(idle); });
-    }).catch(function () { clearTimeout(idle); });
-  }
-
-  var idx = 0;
-  function worker() {
-    if (idx >= urls.length) return Promise.resolve();
-    var u = urls[idx++];
-    var k = kindOf(u);
-    return grab(u).then(function () {
-      state.done = ++doneCount;
-      doneN[k]++; doneN.all++;
-    }).then(worker);
-  }
-  for (var i = 0; i < CONC && i < urls.length; i++) worker();
-
-  // ================= 渲染 =================
-  // 计数补零到目标位数 —— 宽度恒定，标签不会在 9→10 那一刻被顶歪；
-  // 也与巨数同一个约定（它是 000→100），整套读数语言一致。
-  function pad(v, w) { var t = String(v); while (t.length < w) t = '0' + t; return t; }
-
-  function paintCounts() {
-    // 解密期间把这一列让给揭示动画 —— 否则还没定形的乱码会被计数立刻盖掉，
-    // 那几格就完全不参与了。（解密一结束本轮全量重写，见 finishDecrypt 清 lastTxt）
-    if (decOn) return;
-    var wR = String(totalN.route).length;
-    var wA = String(totalN.all).length;
-    var wF = String(totalN.font).length;
-    var t = {
-      route: pad(doneN.route, wR) + ' / ' + totalN.route,
-      all:   pad(doneN.all, wA)   + ' / ' + totalN.all,
-      bytes: (received / 1048576).toFixed(1) + ' MB',
-      font:  pad(doneN.font, wF)  + ' / ' + totalN.font
-    };
-    for (var k in t) {
-      if (lastTxt[k] !== t[k] && cells[k]) { cells[k].textContent = t[k]; lastTxt[k] = t[k]; }
-    }
-  }
-
-  // 渲染一帧。p = 0..1（显示进度，时间轴主导、未就绪时封顶 99%）
-  function paint(p) {
-    el.style.setProperty('--p', p.toFixed(4));
-    if (numEl) numEl.textContent = String(Math.round(p * 100)).padStart(3, '0');
-
-    // 构建网格：竖线自上而下逐一落下（每根错开 0.012 进度、0.10 内长满），
-    // 横线自左向右拉开。前 ~16% 进度内建完，之后网格静止。
-    for (var i = 0; i < gcols.length; i++) {
-      var gh = (p - i * 0.012) / 0.10;
-      gcols[i].style.setProperty('--gh', (gh < 0 ? 0 : gh > 1 ? 1 : gh).toFixed(3));
-    }
-    var rw = p / 0.16;
-    el.style.setProperty('--rw', (rw > 1 ? 1 : rw).toFixed(3));
-
-    // 解析：整个场景（网格 / 横线 / 文字 / 加载条）从模糊到清晰。
-    // 前 55% 内收干到 BLUR_END，**且是缓入的**（1 − u^POW）：开头几乎不动、末尾猛收，
-    // 即「先糊着，快加载完才啪地对上焦」（用户指定）。u² 之下 p=0.3 还剩 5.4px，
-    // 到 p=0.5 才跌到 2.2px；线性的话 p=0.3 就只剩 3.0px 了，糊不住。
-    // ⚠ 终点是 BLUR_END(≈0.83px) 而不是 0 —— 用户要求 100% 和球出来时保留那一档柔化，
-    //   所以永远走 blur()，不再有 filter:none 那一档（代价：末段文字会关掉次像素抗锯齿、
-    //   比纯 filter:none 略软 —— 这正是要的效果，别顺手「优化」回去）。
-    var u = Math.min(1, p / 0.55);
-    var bv = reduce ? 0 : BLUR_END + BLUR_SPAN * (1 - Math.pow(u, BLUR_POW));
-    scene.style.filter = bv > 0.02 ? 'blur(' + bv.toFixed(2) + 'px)' : 'none';
-    // 灰雾：开场最浓，前 70% 内散尽
-    el.style.setProperty('--mist', (reduce ? 0 : Math.max(0, 1 - p / 0.70)).toFixed(3));
-
-    // 颗粒：起点重、终点留一档（不降到 0，留住质感）
-    if (grain) grain.style.opacity = reduce ? 0.08 : (0.07 + 0.25 * (1 - p)).toFixed(3);
-  }
-
-  // ================= 帧循环：时间轴主导 + 未就绪封顶 99% =================
-  // §105：进度推进**必须帧率无关**。原来是 shown += (target-shown)*0.12 每帧一次 ——
-  //   系数是按 60fps 调的，帧率一掉，收敛就等比变慢：实测 5.3fps 下从 0.43 爬到 0.99
-  //   要 7 秒（31 帧），整个加载页被拖到 10s+，而资源其实 1.9s 就下完了。
-  //   玻璃球初始化那一下能卡掉一整帧（实测最长 2145ms），所以低配机/手机会实打实中招。
-  //   换算成「每 16.67ms 推进 0.12」后，60fps 下手感与原来完全一致，低帧率下不再变慢。
-  var lastFrameT = 0;
-  function drive(now) {
-    if (ended || !el.isConnected) return;
-    now = now || performance.now();                      // rAF 会给时间戳；直调时兜底
-    var el_ms = Date.now() - t0;
-    var tt = Math.min(1, el_ms / MIN_MS);
-    var target = tt * tt * (3 - 2 * tt);                 // smoothstep，起步收尾都不突
-
-    // §102：资源没下完、或者玻璃球还没就绪，都压在 99%。
-    // 超过 BALL_WAIT_MS 就不再等球（否则窄屏/减动效下会无限停在 99%）。
-    var bs = ballState();
-    var holdingForBall = bs === 'wait' && el_ms < BALL_WAIT_MS;
-    if (doneCount < urls.length || holdingForBall) target = Math.min(target, 0.99);
-
-    // dt 封顶 250ms：切标签页回来时 rAF 会一次跳好几秒，不封顶会让进度瞬间冲到顶
-    var dt = lastFrameT ? Math.min(now - lastFrameT, 250) : 16.67;
-    lastFrameT = now;
-    var k = 1 - Math.pow(1 - 0.12, dt / 16.67);          // 60fps 下 k === 0.12
-    if (target > shown) shown += (target - shown) * k;   // 只升不降
-    else if (target < shown) shown = target;
-    window.__plReal = shown;
-    window.__plProgress = shown;
-
-    tickDecrypt(performance.now());
-    paint(shown);
-    paintCounts();
-    if (!el.classList.contains('pl-drawn')) el.classList.add('pl-drawn');
-
-    if (doneCount >= urls.length && !holdingForBall && el_ms >= MIN_MS && shown >= 0.995) {
-      state.finished = true;
-      window.__plReal = 1;
-      paint(1);
-      paintCounts();
-      // §102：球就绪 → 走玻璃球过渡；否则（窄屏 / 减动效 / 等超时）退回原来的淡出
-      return bs === 'ready' ? transition() : done();
-    }
-    if (el_ms >= HARD_BAIL_MS) {                         // 逃生口：网络僵死
-      state.finished = true;
-      return done();
-    }
-    requestAnimationFrame(drive);
-  }
-  paint(0);
-  requestAnimationFrame(drive);
-})();
-`;
+import { devPreloadUrls } from '../lib/prefetch-manifest';
+import { site } from '../site.config';
+import regular from '../../_font/Anthropic Sans/AnthropicSans-Text-Regular-Static.otf?url';
+import bold from '../../_font/Anthropic Sans/AnthropicSans-Display-Bold-Static.otf?url';
+
+interface Props { preview?: boolean }
+const { preview = false } = Astro.props;
+const devUrls = import.meta.env.DEV && !preview ? [...await devPreloadUrls(), regular, bold] : null;
+const rowInterval = 900;
+const typeDuration = 380;
+const logRows = [
+  'document.ready()', 'load(pages)', 'load(styles, scripts)', 'load(fonts)',
+];
+
+const animals = {
+  rabbit: {
+    frames: [
+      [' (\\_/) ', ' (o.o) ', 'c(")(")'],
+      [' (\\_/) ', ' (-.-) ', 'c(")(")'],
+    ],
+    marks: '.  v',
+  },
+  fish: {
+    frames: [
+      ['       o', '><((*> .', '        '],
+      ['        ', '><((*> o', '        '],
+    ],
+    marks: '~  .',
+  },
+  turtle: {
+    frames: [
+      ['  _____   ', ' /_/_/_\\o_', '  "   "   '],
+      ['  _____   ', ' /_/_/_\\_o', '   " "    '],
+    ],
+    marks: '+  .',
+  },
+  frog: {
+    frames: [
+      [' o   o ', '(  -  )', '/(> <)\\', '  ^ ^  '],
+      [' o   o ', '(  _  )', ' (> <) ', '/_^ ^_\\'],
+    ],
+    marks: ".  ''",
+  },
+};
+
+const animalSides = [
+  { side: 'left', names: ['rabbit', 'turtle'] },
+  { side: 'right', names: ['fish', 'frog'] },
+] as const;
 ---
 
-<style is:inline set:html={bootCss}></style>
+<style is:inline set:html={`
+  @font-face { font-family: 'Anthropic Sans'; src: url(${JSON.stringify(regular)}) format('opentype'); font-weight: 400; font-display: swap; }
+  @font-face { font-family: 'Anthropic Sans'; src: url(${JSON.stringify(bold)}) format('opentype'); font-weight: 700; font-display: swap; }
+`} />
 
-<script is:inline set:html={bootJs}></script>
+<style is:inline>
+  html:has(> body > #entry-loader) {
+    background-color: var(--entry-canvas);
+    overflow: hidden;
+  }
+
+  #entry-loader {
+    --entry-open-time: 520ms;
+    --entry-open-ease: cubic-bezier(.68, 0, .22, 1);
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    overflow: hidden;
+    isolation: isolate;
+    color: var(--entry-ink);
+    font-family: 'Anthropic Sans', sans-serif;
+  }
+
+  .entry-pane {
+    position: absolute;
+    inset-block: 0;
+    width: calc(50% + 1px);
+    background: var(--entry-canvas);
+    transition: transform var(--entry-open-time) var(--entry-open-ease);
+  }
+
+  .entry-pane-left { left: 0; }
+  .entry-pane-right { right: 0; }
+  [data-phase="open"] .entry-pane-left { transform: translateX(-100%); }
+  [data-phase="open"] .entry-pane-right { transform: translateX(100%); }
+
+  .entry-log {
+    position: absolute;
+    top: clamp(20px, 8vh, 76px);
+    left: clamp(16px, 6vw, 96px);
+    right: 12px;
+    display: grid;
+    gap: .7em;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 1.125rem;
+    line-height: 1.2;
+    transition: opacity 140ms ease-out;
+  }
+
+  .entry-log-row {
+    display: flex;
+    align-items: baseline;
+    gap: .8em;
+    white-space: nowrap;
+    animation: entry-log-shift 250ms cubic-bezier(.2, .7, .2, 1)
+      calc(var(--log-delay) + var(--log-type-time)) both;
+  }
+
+  .entry-log-code {
+    color: var(--entry-code);
+    animation: entry-type var(--log-type-time) steps(var(--log-steps), end) var(--log-delay) both;
+  }
+
+  .entry-log-keyword { color: var(--entry-blue); }
+
+  .entry-log-state {
+    color: var(--entry-code);
+    font-size: .85em;
+    animation: entry-show 1ms calc(var(--log-delay) + var(--log-type-time)) both;
+  }
+
+  .entry-log-row[data-state="ready"] .entry-log-state { color: var(--entry-green); }
+  .entry-log-row[data-state="error"] .entry-log-state { color: var(--entry-orange); }
+
+  .entry-animal {
+    position: absolute;
+    left: var(--animal-x);
+    top: var(--animal-y);
+    display: grid;
+    transform: translate(-50%, -50%);
+    color: var(--animal-color);
+    opacity: 0;
+  }
+
+  .entry-animal.is-cued {
+    animation: entry-animal-pass 590ms steps(1, end) var(--animal-delay) both;
+  }
+
+  .entry-animal-rabbit {
+    --animal-x: 44%;
+    --animal-y: 31%;
+    --animal-color: var(--entry-ink);
+    --animal-cycle: 1220ms;
+    --animal-dy: -2px;
+  }
+
+  .entry-animal-fish {
+    --animal-x: 58%;
+    --animal-y: 26%;
+    --animal-color: var(--entry-blue);
+    --animal-cycle: 1060ms;
+    --animal-dx: 8px;
+    --animal-dy: -2px;
+  }
+
+  .entry-animal-turtle {
+    --animal-x: 59%;
+    --animal-y: 72%;
+    --animal-color: var(--entry-orange);
+    --animal-cycle: 1480ms;
+    --animal-dx: 4px;
+  }
+
+  .entry-animal-frog {
+    --animal-x: 42%;
+    --animal-y: 68%;
+    --animal-color: var(--entry-green);
+    --animal-cycle: 970ms;
+    --animal-dy: -7px;
+  }
+
+  .entry-animal-art {
+    display: grid;
+  }
+
+  .entry-animal.is-cued .entry-animal-art {
+    animation: entry-animal-motion var(--animal-cycle) steps(3, end) var(--animal-delay) infinite both;
+  }
+
+  .entry-animal-frame {
+    grid-area: 1 / 1;
+    margin: 0;
+    font: inherit;
+    line-height: 1.06;
+    font-variant-ligatures: none;
+    white-space: pre;
+  }
+
+  .entry-animal-line { display: block; min-height: 1.06em; }
+  .entry-animal-line span { display: inline-block; width: .72em; text-align: center; }
+
+  .entry-animal.is-cued .entry-animal-frame {
+    animation: entry-animal-frame var(--animal-cycle) steps(1, end) var(--animal-delay) infinite both;
+  }
+
+  .entry-animal-frame + .entry-animal-frame {
+    --frame-rest: 0;
+    --frame-action: 1;
+  }
+
+  .entry-animal-marks {
+    position: absolute;
+    top: -.85em;
+    left: calc(100% + .45em);
+    color: var(--entry-green);
+    font-size: .75em;
+    line-height: 1;
+    white-space: pre;
+  }
+
+  .entry-animal.is-cued .entry-animal-marks {
+    animation: entry-animal-marks var(--animal-cycle) steps(1, end) var(--animal-delay) infinite both;
+  }
+
+  .entry-pane-right .entry-animal-marks {
+    top: auto;
+    bottom: -.75em;
+    right: calc(100% + .5em);
+    left: auto;
+    color: var(--entry-blue);
+  }
+
+  .entry-heading {
+    position: absolute;
+    top: calc(50% - clamp(35px, 5.2vw, 48px));
+    left: 50%;
+    transform: translate(-50%, -100%);
+    display: grid;
+    justify-items: center;
+    text-align: center;
+    gap: clamp(14px, 2.2vw, 22px);
+    width: max-content;
+    transition: opacity 140ms ease-out;
+  }
+
+  .entry-name {
+    margin: 0;
+    font-size: 3.875rem;
+    line-height: 1.04;
+    font-weight: 700;
+    padding-inline: .07em;
+    animation: entry-type 360ms steps(12, end) both;
+  }
+
+  .entry-meter {
+    display: flex;
+    gap: .55em;
+    font-size: 1.125rem;
+    line-height: 1;
+    animation: entry-show 1ms 210ms both;
+  }
+
+  .entry-number {
+    min-width: 4ch;
+    text-align: left;
+    color: var(--entry-blue);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .entry-track {
+    --entry-cell: clamp(21px, 3.6vw, 38px);
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max-content;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    column-gap: .12em;
+    font-size: 5rem;
+    line-height: 1;
+    animation: entry-show 1ms 260ms both;
+  }
+
+  .entry-dot {
+    display: grid;
+    place-items: center;
+    flex: 0 0 var(--entry-cell);
+    height: var(--entry-cell);
+    color: var(--entry-blue);
+  }
+
+  .entry-dot::after {
+    content: '';
+    width: 66%;
+    aspect-ratio: 1;
+    background: currentColor;
+    border-radius: 50%;
+  }
+
+  .entry-dot.is-ready { color: var(--entry-green); }
+  .entry-dot[hidden] { display: none; }
+  #entry-loader:not([data-phase="load"]) :is(.entry-heading, .entry-log) { opacity: 0; }
+  #entry-loader[data-phase="open"] .entry-track {
+    width: calc(100% + 2em);
+    transition: width var(--entry-open-time) var(--entry-open-ease);
+  }
+
+  @keyframes entry-type {
+    from { clip-path: inset(0 100% 0 0); }
+    to { clip-path: inset(0); }
+  }
+  @keyframes entry-show { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes entry-log-shift {
+    from { transform: translate(1.3em, .45em); }
+    to { transform: translate(0, 0); }
+  }
+  @keyframes entry-animal-pass {
+    0% { opacity: 0; translate: 0 0; }
+    12% { opacity: .85; translate: 0 0; }
+    38% { opacity: .65; translate: 0 -4px; }
+    71%, 100% { opacity: .85; translate: 0 -4px; }
+  }
+  @keyframes entry-animal-motion {
+    0%, 20%, 80%, 100% { translate: 0 0; }
+    50% { translate: var(--animal-dx, 0px) var(--animal-dy, 0px); }
+  }
+  @keyframes entry-animal-frame {
+    0%, 65% { opacity: var(--frame-rest, 1); }
+    40% { opacity: var(--frame-action, 0); }
+  }
+  @keyframes entry-animal-marks {
+    0%, 65% { opacity: .5; }
+    40% { opacity: .2; }
+  }
+  @media (max-width: 600px) {
+    .entry-name { font-size: 2rem; }
+    .entry-meter { font-size: .875rem; }
+    .entry-track { font-size: 3rem; }
+    .entry-log, .entry-animal { font-size: .8125rem; }
+    .entry-animal-rabbit { --animal-y: 24%; }
+    .entry-animal-fish { --animal-y: 19%; }
+    .entry-animal-turtle { --animal-y: 77%; }
+    .entry-animal-frog { --animal-y: 72%; }
+  }
+
+  @media (max-height: 580px) {
+    .entry-log { top: 14px; gap: .32em; font-size: .8125rem; }
+    .entry-animal-rabbit, .entry-animal-fish { --animal-y: 17%; }
+    .entry-animal-turtle, .entry-animal-frog { --animal-y: 80%; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #entry-loader * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<!-- The template stays inert on client-side navigation and without JavaScript. -->
+<template id="entry-loader-template">
+  <div id="entry-loader" data-phase="load">
+    {animalSides.map(({ side, names }) => (
+      <div class:list={['entry-pane', 'entry-pane-' + side]} aria-hidden="true">
+        {names.map(name => (
+          <div class:list={['entry-animal', 'entry-animal-' + name]}>
+            <div class="entry-animal-art">
+              {animals[name].frames.map(lines => (
+                <div class="entry-animal-frame">
+                  {lines.map(line => (
+                    <span class="entry-animal-line">{[...line].map(char => <span>{char}</span>)}</span>
+                  ))}
+                </div>
+              ))}
+            </div>
+            <span class="entry-animal-marks">{animals[name].marks}</span>
+          </div>
+        ))}
+      </div>
+    ))}
+    <ol class="entry-log" aria-hidden="true" style={'--log-type-time:' + typeDuration + 'ms'}>
+      {logRows.map((command, index) => (
+        <li class="entry-log-row" style={'--log-delay:' + index * rowInterval + 'ms;--log-steps:' + (command.length + 6)}>
+          <span class="entry-log-code"><span class="entry-log-keyword">await</span>{' '}{command}</span>
+          <span class="entry-log-state">waiting</span>
+        </li>
+      ))}
+    </ol>
+    <div class="entry-heading">
+      <p class="entry-name">{site.title}</p>
+      <div class="entry-meter" role="progressbar" aria-label="全站加载进度" aria-valuenow="0">
+        <span>Loading</span><span class="entry-number">0%</span>
+      </div>
+    </div>
+    <div class="entry-track" aria-hidden="true">
+      <span>[</span>
+      {Array.from({ length: 6 }, () => <span class="entry-dot"></span>)}
+      <span>]</span>
+    </div>
+  </div>
+</template>
+
+<script is:inline define:vars={{ devUrls, preview, rowInterval, typeDuration }}>
+  (function runLoader() {
+    if (!preview && document.readyState !== 'loading') return;
+    const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const playedKey = 'plPlayed';
+    if (!preview) {
+      try {
+        if (sessionStorage.getItem(playedKey)) return;
+        sessionStorage.setItem(playedKey, '1');
+      } catch { /* Storage can be disabled. */ }
+    }
+
+    const template = document.getElementById('entry-loader-template');
+    const loader = template.content.firstElementChild.cloneNode(true);
+    const meter = loader.querySelector('.entry-meter');
+    const number = loader.querySelector('.entry-number');
+    const dots = [...loader.querySelectorAll('.entry-dot')];
+    const rows = [...loader.querySelectorAll('.entry-log-row')];
+    const animals = ['rabbit', 'fish', 'turtle', 'frog'].map(name => loader.querySelector('.entry-animal-' + name));
+    const minPlaybackTime = 5000;
+    const completedHold = 135;
+    const compactHold = 95;
+    const dotInterval = 90;
+    const openTime = 520;
+    const openBuffer = 40;
+    const dotPairs = [[0, 5], [1, 4], [2, 3]];
+    const exitTime = compactHold + dotPairs.length * dotInterval + openTime + openBuffer;
+    const progressDelay = 200;
+    const progressDuration = minPlaybackTime - completedHold - exitTime - progressDelay;
+    const started = performance.now();
+    document.body.append(loader);
+
+    let lastValue = -1;
+
+    function showProgress(value) {
+      if (value === lastValue) return;
+      lastValue = value;
+      number.textContent = value + '%';
+      meter.setAttribute('aria-valuenow', value);
+      const readyDots = Math.floor(value * dots.length / 100);
+      dots.forEach((dot, index) => dot.classList.toggle('is-ready', index < readyDots));
+    }
+
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    const stages = rows.map(() => ({ done: 0, total: 0, failed: 0 }));
+    const knownResources = new Set();
+    let frame;
+
+    function cueAnimal(index) {
+      if (reduceMotion) return;
+      const animal = animals[index];
+      const earliestTime = index * rowInterval + typeDuration + 65;
+      const delay = Math.max(0, earliestTime - (performance.now() - started));
+      animal.style.setProperty('--animal-delay', delay + 'ms');
+      animal.classList.add('is-cued');
+    }
+
+    function paintStage(index) {
+      const row = rows[index];
+      const { done, total, failed } = stages[index];
+      const complete = done + failed === total;
+      if (complete) {
+        row.dataset.state = failed ? 'error' : 'ready';
+        if (!failed) cueAnimal(index);
+      }
+      row.querySelector('.entry-log-state').textContent =
+        failed ? done + '/' + total + ' · ' + failed + ' failed' : done + '/' + total + (complete ? ' OK' : '');
+    }
+
+    async function read(url, mode = 'buffer') {
+      for (let attempt = 0; ; attempt++) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 60000);
+        try {
+          const response = await fetch(url, { cache: 'force-cache', signal: controller.signal });
+          const requestedUrl = new URL(url, location.origin);
+          const responseUrl = new URL(response.url);
+          const expectedNotFound = requestedUrl.pathname === '/404.html'
+            && responseUrl.href === requestedUrl.href
+            && response.status === 404
+            && response.headers.get('content-type')?.startsWith('text/html');
+          if ((!response.ok && !expectedNotFound) || responseUrl.origin !== location.origin) {
+            throw new Error('Failed to preload ' + url);
+          }
+          if (mode === 'json') return await response.json();
+          if (mode === 'text') return await response.text();
+          return await response.arrayBuffer();
+        } catch (error) {
+          if (attempt || controller.signal.aborted) throw error;
+          await wait(350);
+        } finally {
+          clearTimeout(timeout);
+        }
+      }
+    }
+
+    async function loadStage(index, urls, load = read) {
+      const stage = stages[index];
+      stage.total = urls.length;
+      paintStage(index);
+      const queue = urls.values();
+      async function worker() {
+        for (const url of queue) {
+          try {
+            await load(url);
+            stage.done++;
+          } catch {
+            stage.failed++;
+          }
+          paintStage(index);
+        }
+      }
+      await Promise.all(Array.from({ length: Math.min(5, urls.length) }, worker));
+    }
+
+    function devDependencies(html, pageUrl) {
+      const page = document.createElement('template');
+      page.innerHTML = html;
+      const links = page.content.querySelectorAll('link[rel="stylesheet"][href], link[rel="modulepreload"][href], script[src], astro-island[component-url], astro-island[renderer-url]');
+      for (const link of links) {
+        for (const attribute of ['href', 'src', 'component-url', 'renderer-url']) {
+          const value = link.getAttribute(attribute);
+          if (value) {
+            const url = new URL(value, pageUrl);
+            if (url.origin === location.origin) knownResources.add(url.href);
+          }
+        }
+      }
+    }
+
+    async function loadSite() {
+      if (preview) {
+        const sampleTotals = [1, 14, 12, 10];
+        await Promise.all(sampleTotals.map((total, index) => (async () => {
+          const stage = stages[index];
+          stage.total = total;
+          paintStage(index);
+          await wait(index * rowInterval + 480);
+          for (let done = 0; done < total; done++) {
+            await wait(90);
+            stage.done++;
+            paintStage(index);
+          }
+        })()));
+        return;
+      }
+
+      const documentReady = loadStage(0, [location.href], () =>
+        new Promise(resolve => addEventListener('DOMContentLoaded', resolve, { once: true })),
+      );
+      let urls;
+      try {
+        urls = devUrls ?? await read('/site-preload.json', 'json');
+      } catch {
+        stages[1].total = stages[1].failed = 1;
+        paintStage(1);
+        await documentReady;
+        return;
+      }
+      const pages = [];
+      const scripts = [];
+      const fonts = [];
+      for (const path of urls) {
+        const url = new URL(path, location.origin);
+        if (url.origin !== location.origin) continue;
+        if (url.pathname.endsWith('/') || url.pathname.endsWith('.html')) pages.push(url.href);
+        if (/\.(css|m?js)$/i.test(url.pathname)) scripts.push(url.href);
+        if (/\.(woff2?|otf|ttf)$/i.test(url.pathname)) fonts.push(url.href);
+      }
+      const activePage = window.location.origin + window.location.pathname;
+      const pageLoading = loadStage(1, pages, async url => {
+        if (url === activePage && !devUrls) return documentReady;
+        if (devUrls) return devDependencies(await read(url, 'text'), url);
+        await read(url);
+      });
+      const fontLoading = loadStage(3, fonts);
+      if (devUrls) {
+        await pageLoading;
+        scripts.push(...knownResources);
+      }
+      await Promise.all([documentReady, pageLoading, fontLoading, loadStage(2, scripts)]);
+    }
+
+    function tick(now) {
+      const done = stages.reduce((sum, stage) => sum + stage.done, 0);
+      const total = stages.reduce((sum, stage) => sum + stage.total, 0);
+      const target = total ? 100 * done / total : 0;
+      const paced = 100 * (now - started - progressDelay) / progressDuration;
+      showProgress(Math.max(0, Math.floor(Math.min(target, paced, 99))));
+      frame = requestAnimationFrame(tick);
+    }
+    frame = requestAnimationFrame(tick);
+
+    async function play() {
+      await loadSite();
+      const loaded = stages.every(stage => !stage.failed);
+
+      if (preview) {
+        await wait(Math.max(0, minPlaybackTime - (performance.now() - started)));
+        cancelAnimationFrame(frame);
+        showProgress(100);
+        if (!reduceMotion) {
+          await wait(1100);
+          loader.remove();
+          runLoader();
+        }
+        return;
+      }
+
+      if (reduceMotion) {
+        await wait(Math.max(0, minPlaybackTime - (performance.now() - started)));
+        cancelAnimationFrame(frame);
+        loader.remove();
+        return;
+      }
+
+      const availableTime = minPlaybackTime - (performance.now() - started);
+      const fullExitTime = exitTime + (loaded ? completedHold : 0);
+      // Fit the exit into the minimum playback window when resources settle in time.
+      const exitScale = availableTime > 0 ? Math.min(1, availableTime / fullExitTime) : 1;
+      if (availableTime > fullExitTime) await wait(availableTime - fullExitTime);
+
+      cancelAnimationFrame(frame);
+      if (loaded) {
+        showProgress(100);
+        await wait(completedHold * exitScale);
+      }
+      loader.dataset.phase = 'compact';
+      await wait(compactHold * exitScale);
+      for (const [start, end] of dotPairs) {
+        dots[start].hidden = true;
+        dots[end].hidden = true;
+        await wait(dotInterval * exitScale);
+      }
+
+      // Give the empty brackets a frame at their natural width before opening.
+      const track = loader.querySelector('.entry-track');
+      track.style.width = track.getBoundingClientRect().width + 'px';
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      track.style.removeProperty('width');
+      loader.style.setProperty('--entry-open-time', openTime * exitScale + 'ms');
+      loader.dataset.phase = 'open';
+      await wait(Math.max((openTime + openBuffer) * exitScale, minPlaybackTime - (performance.now() - started)));
+      loader.remove();
+    }
+    void play().catch(async () => {
+      cancelAnimationFrame(frame);
+      await wait(Math.max(0, minPlaybackTime - (performance.now() - started)));
+      loader.remove();
+    });
+  })();
+</script>

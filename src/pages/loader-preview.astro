@@ -1,0 +1,33 @@
+---
+import '../styles/tokens.css';
+import '../styles/base.css';
+import Preloader from '../components/Preloader.astro';
+import ThemeInit from '../components/ThemeInit.astro';
+
+if (!import.meta.env.DEV) {
+  return new Response(null, { status: 404 });
+}
+---
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <ThemeInit />
+    <title>加载页预览</title>
+    <style>
+      html, body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: var(--entry-canvas);
+      }
+    </style>
+  </head>
+  <body>
+    <Preloader preview />
+  </body>
+</html>

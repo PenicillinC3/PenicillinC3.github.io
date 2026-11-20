@@ -99,17 +99,3 @@ const uiFont = await subsetFont(await readFile(FONTS[0].in), [...coreChars].join
 const UI_OUT = join(ROOT, 'public/fonts/maple-ui.woff2');
 await writeFile(UI_OUT, uiFont);
 console.log(`MapleUI 子集完成: ${coreChars.size} 字形 -> ${Math.round(uiFont.length / 1024)} KB  maple-ui.woff2`);
-
-// —— §102 加载页子集：加载页是首屏，字体必须 base64 内联进它自己的 <style>，
-//    等不起一次网络往返（否则数字和标签会先以回退字体闪一下）。页面文案全是
-//    ASCII（大写标签 + 数字 + `/ . %`），切全 ASCII 95 个字形就够，且留足余量。
-//    取 **Bold 面**而不是 Medium —— 标签是 font-weight:700，用 Medium 会被合成加粗
-//    （伪粗），与站内 §98 的真粗体不是一回事。
-// 字符集刻意收窄：全 ASCII 要 30KB（base64 后 40KB，首页 HTML 直接翻倍），
-// 而加载页文案只有大写标签 + 数字 + 几个符号。带上小写是防「哪天有人去掉
-// text-transform:uppercase 或加了小写串」——只多 4KB，换掉一整类缺字回退风险。
-const PRE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 /.:%()-+';
-const preFont = await subsetFont(await readFile(FONTS[2].in), PRE_CHARS, { targetFormat: 'woff2' });
-const PRE_OUT = join(ROOT, 'public/fonts/maple-pre.woff2');
-await writeFile(PRE_OUT, preFont);
-console.log(`MaplePre 子集完成: ASCII ${PRE_CHARS.length} 字形 -> ${Math.round(preFont.length / 1024)} KB  maple-pre.woff2`);

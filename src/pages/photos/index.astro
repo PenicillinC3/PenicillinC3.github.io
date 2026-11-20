@@ -31,8 +31,8 @@ const n = covers.length;
 ---
 <!-- 长胶卷画廊（spec §30）：所有卷封面 3:2 等宽排成一条连续 135 底片（上下齿孔带
      贯穿整条）；视口中心 = 当前卷，左右邻卷在画面边缘半露；翻卷 = 整条底片
-     缓出非线性平移（spec §38 去弹簧过冲）；首尾以纯灰色底片占位。dark + gallery 由 Base 挂类 -->
-<Base title="摄影作品集" description="暗房 · 摄影作品集" dark gallery>
+     缓出非线性平移（spec §38 去弹簧过冲）；首尾以纯灰色底片占位。 -->
+<Base title="摄影作品集" description="暗房 · 摄影作品集" photography gallery>
   <section class="gallery" data-gallery>
     <div class="arena" data-arena tabindex="0" aria-label="摄影作品浏览">
       {/* 射线叠光：统一使用默认配方（spec §32.1 用户选定） */}
@@ -50,7 +50,7 @@ const n = covers.length;
       {
         n > 0 ? (
           <>
-            <div class="reel" data-reel>
+            <div class="reel" data-reel style={`--roll-position: ${n}`}>
               {/* 首端纯灰占位（最左 = 没有更老的卷；§77 左→右 = 老→新） */}
               <div class="frame frame--ghost" data-ghost-l aria-hidden="true"></div>
 
@@ -79,68 +79,31 @@ const n = covers.length;
       <p class="hint">左右胶片切换 · 点击居中胶片进入备忘录 · ←/→ 键</p>
       <p class="count" data-count>{n ? `${covers[n - 1].count} 张` : ''}</p>
     </div>
+    <script is:inline type="application/json" data-rolls set:html={json}></script>
   </section>
 </Base>
 
-<!-- Task 6 实测教训：is:inline 脚本内容不插值（{json} 会按字面输出）→
-     改用 set:html 注入；json 已做 < 预转义，无 </script> 逃逸风险 -->
-<script is:inline type="application/json" id="roll-data" set:html={json}></script>
 <script>
-  const covers = JSON.parse(document.getElementById('roll-data')!.textContent ?? '[]') as {
-    slug: string; title: string; date: string; location: string; workName: string; count: number; wide: boolean;
-    src: string; srcset?: string;
-  }[];
-  const arena = document.querySelector<HTMLElement>('[data-arena]');
-  if (arena && covers.length > 0) {
-    const reel = arena.querySelector<HTMLElement>('[data-reel]')!;
-    const frames = [...arena.querySelectorAll<HTMLButtonElement>('[data-frame]')];
-    const ts = document.querySelector<HTMLElement>('[data-ts]')!;
-    const loc = document.querySelector<HTMLElement>('[data-loc]')!;
-    const cnt = document.querySelector<HTMLElement>('[data-count]')!;
-    let i = covers.length - 1; // §77：默认居中 = 最新卷（最右）
-    let geom = { step: 0, fw: 0 };
+  const initialized = new WeakSet<HTMLElement>();
 
-    // 几何变量统一挂 .arena（reel 与日期/地点 caption 都从它继承消费 var）
-    const setGeom = (silent: boolean) => {
-      const W = arena.clientWidth;
-      const H = arena.clientHeight;
-      const bh = 22;
-      // 胶片再扩一档（spec §50）：宽限 →66%、封顶 1300px；H 余量 196→176
-      // （帧上下留白 = 余量/2：176 → 字幕上缘距 arena 顶 ~12px，属最小安全余量）
-      // §82 移动端：窄屏胶片放大到 86% 宽、上下字幕让位（余量 176→150），
-      // 邻卷露出量缩小以适配窄侧廊
-      const mobile = W <= 760;
-      const fw = Math.min(W * (mobile ? 0.86 : 0.66), (H - (mobile ? 150 : 176)) * 1.5, 1300);
-      const fh = fw / 1.5;
-      // 帧距改小（spec §43）：显式 gap = 侧廊 − 邻卷露出量；露出量抬到 150–220px
-      // （间距与露出的总预算 = 侧廊宽度，帧越近邻卷自然露越多）
-      const corridor = W / 2 - fw / 2;
-      const peek = mobile ? Math.min(70, Math.max(40, W * 0.1)) : Math.min(220, Math.max(150, W * 0.12));
-      const gap = Math.max(64, corridor - peek);
-      const step = fw + gap; // 相邻中心距
-      const st = arena.style;
-      st.setProperty('--fw', `${fw}px`);
-      st.setProperty('--fh', `${fh}px`);
-      st.setProperty('--bh', `${bh}px`);
-      st.setProperty('--gap', `${step - fw}px`);
-      geom = { step, fw };
-      if (silent) reel.style.transition = 'none';
-      reel.style.setProperty('--tx', `${W / 2 - ((i + 1) * step + fw / 2)}px`);
-      if (silent) {
-        void reel.offsetWidth;
-        reel.style.transition = '';
-      }
-    };
-    let rsT: number | undefined;
-    window.addEventListener('resize', () => {
-      window.clearTimeout(rsT);
-      rsT = window.setTimeout(() => setGeom(true), 120);
-    });
-    setGeom(true); // 首帧直落（无平移动画）
+  function initGallery() {
+    const gallery = document.querySelector<HTMLElement>('[data-gallery]');
+    if (!gallery || initialized.has(gallery)) return;
+    const reel = gallery.querySelector<HTMLElement>('[data-reel]');
+    if (!reel) return;
+
+    const covers = JSON.parse(gallery.querySelector('[data-rolls]')!.textContent!) as {
+      slug: string; date: string; location: string; workName: string; count: number;
+    }[];
+    const arena = gallery.querySelector<HTMLElement>('[data-arena]')!;
+    const ts = gallery.querySelector<HTMLElement>('[data-ts]')!;
+    const loc = gallery.querySelector<HTMLElement>('[data-loc]')!;
+    const cnt = gallery.querySelector<HTMLElement>('[data-count]')!;
+    initialized.add(gallery);
+    let i = covers.length - 1; // §77：默认居中 = 最新卷（最右）
 
     const pan = () => {
-      const W = arena.clientWidth;
-      reel.style.setProperty('--tx', `${W / 2 - ((i + 1) * geom.step + geom.fw / 2)}px`); // CSS 缓出 → 非线性平移
+      reel.style.setProperty('--roll-position', String(i + 1));
     };
 
     const applyMeta = () => {
@@ -176,11 +139,7 @@ const n = covers.length;
     // 「时间窗」抑制随后的 click（§93 教训：pointercancel 方案不可靠）。
     // 映射 = 拖动胶片方向：右滑拖出更老卷、左滑拖回更新卷；首尾为边界。
     let tx0 = 0, ty0 = 0, suppressUntil = 0;
-    let dragging = false, dragBaseTx = 0;
-    const txFor = (idx: number) => {
-      const W = arena.clientWidth;
-      return W / 2 - ((idx + 1) * geom.step + geom.fw / 2);
-    };
+    let dragging = false;
     arena.addEventListener('touchstart', (e) => {
       const t = e.touches[0];
       tx0 = t.clientX; ty0 = t.clientY;
@@ -193,22 +152,25 @@ const n = covers.length;
       if (!dragging) {
         if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) {
           dragging = true;
-          dragBaseTx = txFor(i);
           reel.style.transition = 'none'; // 拖动期间取消过渡，纯跟手
         } else return; // 竖向滑动/微小移动：不接管
       }
       // 边缘阻尼：已到最新卷再向左拖 / 已到最老卷再向右拖 → 阻力 0.35
       const atEdge = (i === covers.length - 1 && dx < 0) || (i === 0 && dx > 0);
-      reel.style.transform = `translateX(${dragBaseTx + (atEdge ? dx * 0.35 : dx)}px)`;
+      reel.style.setProperty('--drag-x', `${atEdge ? dx * 0.35 : dx}px`);
     }, { passive: true });
+    const stopDragging = () => {
+      dragging = false;
+      reel.style.transition = '';
+      reel.style.removeProperty('--drag-x');
+    };
+    arena.addEventListener('touchcancel', stopDragging, { passive: true });
     arena.addEventListener('touchend', (e) => {
       const t = e.changedTouches[0];
       const dx = t.clientX - tx0;
       const dy = t.clientY - ty0;
       if (dragging) {
-        dragging = false;
-        reel.style.transition = ''; // 交还 CSS 缓出过渡
-        reel.style.transform = ''; // 清内联位移：未翻卷则动画弹回原位
+        stopDragging();
         suppressUntil = Date.now() + 450; // 拖动收尾的 click 不算点按
         if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy)) {
           go(dx < 0 ? 1 : -1); // 过阈值 → 吸附到相邻卷
@@ -226,13 +188,16 @@ const n = covers.length;
       else if (e.key === 'ArrowRight') go(1);
       else if (e.key === 'Enter') enter();
     });
-    applyMeta();
   }
+
+  initGallery();
+  document.addEventListener('astro:page-load', initGallery);
 </script>
 
 <style>
   .gallery {
     display: flex;
+    color: #eceef4;
     flex-direction: column;
     height: 100%;
     min-height: 0;
@@ -240,10 +205,12 @@ const n = covers.length;
       radial-gradient(120% 100% at 50% 30%, #0a0b10, #05060a 70%);
   }
   .arena {
-    --fw: 660px;
-    --fh: 440px;
+    --fw: max(1px, min(66cqw, calc((100cqh - 176px) * 1.5), 1300px));
+    --fh: calc(var(--fw) / 1.5);
     --bh: 22px;
-    --gap: 300px; /* 帧间距（JS setGeom 按半露余量重算） */
+    --peek: clamp(150px, 12cqw, 220px);
+    --gap: max(64px, calc((100cqw - var(--fw)) / 2 - var(--peek)));
+    container-type: size;
     position: relative;
     flex: 1 1 0;
     min-height: 0;
@@ -262,16 +229,16 @@ const n = covers.length;
 
   /* —— 长胶卷（spec §30.1）：一条连续 135 底片，含上下贯穿齿孔带 —— */
   .reel {
-    --tx: 0px;
     position: absolute;
-    left: 0;
+    left: 50%;
     top: calc(50% - (var(--fh) + 2 * var(--bh)) / 2);
     display: flex;
     align-items: flex-start;
     padding-block: var(--bh); /* 帧区缩进，避开上/下齿孔带 */
     will-change: transform;
     transition: transform 0.56s cubic-bezier(0.22, 1, 0.36, 1); /* 非线性缓出平移（spec §38：去弹簧过冲） */
-    transform: translateX(var(--tx));
+    /* The starting position is rendered with the markup, including the leading spacer. */
+    transform: translateX(calc(var(--drag-x, 0px) - var(--roll-position) * (var(--fw) + var(--gap)) - var(--fw) / 2));
   }
   /* 每个单元（含纯灰占位）后跟等宽间距 → 帧中心距 = step 恒定 */
   .reel > * { margin-right: var(--gap); }
@@ -404,6 +371,10 @@ const n = covers.length;
   }
 
   @media (max-width: 760px) {
+    .arena {
+      --fw: max(1px, min(86cqw, calc((100cqh - 150px) * 1.5)));
+      --peek: clamp(40px, 10cqw, 70px);
+    }
     .hint { display: none; }
     .dock { justify-content: flex-end; }
     /* §82：窄屏字幕上/下移近胶片（原 76/44 为宽屏留白） */

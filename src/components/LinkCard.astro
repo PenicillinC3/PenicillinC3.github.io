@@ -54,9 +54,10 @@ const initial = link.host.charAt(0).toUpperCase();
     border-radius: 15px;
     font-weight: 500;
     font-size: 1.2rem;
-    color: #fff;
-    background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 45%, #b26be0));
-    box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 35%, transparent);
+    color: var(--text-1);
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-inset), 0 3px 9px rgba(0, 0, 0, 0.1);
   }
   .ids { min-width: 0; }
   .lt { margin: 0; font-size: clamp(1.2rem, 1.5vw, 1.4rem); }

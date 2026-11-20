@@ -1,15 +1,13 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
 import react from '@astrojs/react';
+import sitePreload from './scripts/site-preload.mjs';
 
 // 主页仓 = PenicillinC3.github.io → 站点根路径部署（base '/'）
 export default defineConfig({
   site: 'https://penicillinc3.github.io',
   base: '/',
-  // React 栈（spec §69 / §107）：首页两个 island —— HomeTitle（TechText 站名画布）
-  // 与 FluidGlass（首访加载页的玻璃球舞台，首页不再显示球）。其余页面零框架
-  // （ogl 供 Rays）。
-  integrations: [react()],
+  integrations: [react(), sitePreload()],
   // §100：链接点击「像没反应」的根治 —— 客户端路由点击后要先取回目标页 HTML
   // 才换页，这段等待期 URL 不变、页面不动。Astro 预取默认只在 hover（悬停 80ms）
   // 时触发，移动端没有 hover = 完全不预取 → 点一下干等一整轮网络往返。
@@ -25,6 +23,11 @@ export default defineConfig({
     enabled: false, // 隐藏底部 Astro 开发工具栏（仅影响本地 dev）
   },
   vite: {
+    plugins: [{
+      name: 'separate-vite-caches',
+      // Astro runs content sync through Vite's dev server during production builds.
+      config: (_, { mode }) => ({ cacheDir: `node_modules/.vite/${mode}` }),
+    }],
     // §88：ogl 排除出依赖预打包 —— 多次出现「504 Outdated Optimize Dep」致
     // Rays/玻璃球模块加载失败、光效画布不创建（重装依赖后尤甚）。直接按源码
     // 提供可根治该 dev 环境问题（不影响构建产物）

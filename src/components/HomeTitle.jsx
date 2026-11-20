@@ -25,24 +25,19 @@ export default function HomeTitle() {
   useEffect(() => () => document.documentElement.classList.remove('tt-on'), []);
 
   return (
-    <div className="title-stage">
-      <h1 className="name" aria-label={site.title}>{site.title}</h1>
-      <div className="tech-layer" aria-hidden="true">
-        {/* §107：线框/选中框/specks 全部跟随文字色（currentColor = --text-1），
-            不再用蓝色 accent；sweep 关闭 —— 只有鼠标在标题上时才动。 */}
-        <TechText
-          text={site.title}
-          fontFamily={TITLE_STACK}
-          fontWeight={400}
-          fontSize={200}
-          letterSpacing={0.02}
-          align="center"
-          pad={36}
-          sweep={false}
-          idleChar="C"
-          onReady={onReady}
-        />
-      </div>
+    <div className="tech-layer" aria-hidden="true">
+      <TechText
+        text={site.title}
+        fontFamily={TITLE_STACK}
+        fontWeight={400}
+        fontSize={200}
+        letterSpacing={0.02}
+        align="center"
+        pad={36}
+        sweep={false}
+        idleChar="C"
+        onReady={onReady}
+      />
     </div>
   );
 }
