@@ -126,6 +126,47 @@ const animalSides = [
   .entry-log-row[data-state="ready"] .entry-log-state { color: var(--entry-green); }
   .entry-log-row[data-state="error"] .entry-log-state { color: var(--entry-orange); }
 
+  .entry-accent {
+    position: absolute;
+    display: flex;
+    gap: .4em;
+    color: var(--entry-code);
+    font-size: clamp(.875rem, 1.5vw, 1.25rem);
+    line-height: 1;
+    opacity: .65;
+  }
+
+  .entry-accent > span {
+    animation: entry-show 1ms calc(var(--accent-delay) + var(--glyph-delay, 0ms)) both;
+  }
+
+  .entry-accent > span:nth-child(2) { --glyph-delay: 90ms; }
+  .entry-accent > span:nth-child(3) { --glyph-delay: 180ms; }
+
+  .entry-accent-braces {
+    --accent-delay: 620ms;
+    top: 14%;
+    right: clamp(16px, 7vw, 110px);
+  }
+
+  .entry-accent-prompt {
+    --accent-delay: 1450ms;
+    bottom: 12%;
+    left: clamp(16px, 8vw, 124px);
+  }
+
+  .entry-accent .entry-accent-spark {
+    color: var(--entry-blue);
+    animation: entry-show 1ms calc(var(--accent-delay) + var(--glyph-delay)) both,
+      entry-spark 1600ms steps(1, end) calc(var(--accent-delay) + 260ms) infinite;
+  }
+
+  .entry-accent .entry-accent-cursor {
+    color: var(--entry-green);
+    animation: entry-show 1ms calc(var(--accent-delay) + var(--glyph-delay)) both,
+      entry-cursor 1450ms steps(1, end) calc(var(--accent-delay) + 260ms) infinite;
+  }
+
   .entry-animal {
     position: absolute;
     left: var(--animal-x);
@@ -262,9 +303,9 @@ const animalSides = [
   }
 
   .entry-track {
-    --entry-cell: clamp(21px, 3.6vw, 38px);
+    --entry-cell: clamp(25px, 4.4vw, 46px);
     position: absolute;
-    top: 50%;
+    top: calc(50% + clamp(14px, 3vh, 24px));
     left: 50%;
     width: max-content;
     transform: translate(-50%, -50%);
@@ -272,7 +313,7 @@ const animalSides = [
     align-items: center;
     justify-content: space-between;
     column-gap: .12em;
-    font-size: 5rem;
+    font-size: 6rem;
     line-height: 1;
     animation: entry-show 1ms 260ms both;
   }
@@ -306,6 +347,16 @@ const animalSides = [
     to { clip-path: inset(0); }
   }
   @keyframes entry-show { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes entry-spark {
+    0%, 100% { transform: scale(.8); }
+    24% { transform: translateY(-2px) scale(1.3); }
+    40% { transform: scale(1); }
+  }
+  @keyframes entry-cursor {
+    0%, 100% { transform: translateX(0); }
+    40% { transform: translateX(.35em); }
+    70% { transform: translateX(.7em); }
+  }
   @keyframes entry-log-shift {
     from { transform: translate(1.3em, .45em); }
     to { transform: translate(0, 0); }
@@ -331,7 +382,9 @@ const animalSides = [
   @media (max-width: 600px) {
     .entry-name { font-size: 2rem; }
     .entry-meter { font-size: .875rem; }
-    .entry-track { font-size: 3rem; }
+    .entry-track { font-size: 3.5rem; }
+    .entry-accent-braces { top: 29%; }
+    .entry-accent-prompt { bottom: 9%; }
     .entry-log, .entry-animal { font-size: .8125rem; }
     .entry-animal-rabbit { --animal-y: 24%; }
     .entry-animal-fish { --animal-y: 19%; }
@@ -355,6 +408,15 @@ const animalSides = [
   <div id="entry-loader" data-phase="load">
     {animalSides.map(({ side, names }) => (
       <div class:list={['entry-pane', 'entry-pane-' + side]} aria-hidden="true">
+        {side === 'left' ? (
+          <div class="entry-accent entry-accent-prompt">
+            <span>&gt;</span><span>·</span><span class="entry-accent-cursor">_</span>
+          </div>
+        ) : (
+          <div class="entry-accent entry-accent-braces">
+            <span>&#123;</span><span class="entry-accent-spark">*</span><span>&#125;</span>
+          </div>
+        )}
         {names.map(name => (
           <div class:list={['entry-animal', 'entry-animal-' + name]}>
             <div class="entry-animal-art">
