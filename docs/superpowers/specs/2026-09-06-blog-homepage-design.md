@@ -1310,3 +1310,35 @@ Edge 在 1440×900 和 1024×768 的同帧对比中确认白边收窄。320 ms �
 加载页顶部按顺序打出首页文档解析和两份关键字体请求，每一行写入后短暂移位，并在真实任务完成或失败时更新状态。小动物随对应阶段闪过，百分比和圆点继续显示汇总进度。纯加载页预览使用模拟任务循环演示。
 
 背景代码使用字库中的 Helvetica Bold。原始 WOFF2 只有 MacRoman 字符映射，浏览器无法将它作为网页字体渲染；转换时保留原映射并补上标准 Unicode cmap。Edge 确认 Helvetica 和 Maple 字体均实际加载。构建生成 15 页，加载页预览路由只在开发服务器开放。
+
+## §117（2026-11-27）加载页改 Anthropic Sans + 整站深浅主题（订正 §116）
+
+§116 写的「背景代码使用 Helvetica Bold」**已作废**。那份 Helvetica 实现连同它的
+转换产物一起被 Anthropic Sans 取代，`public/fonts/helvetica-code.woff2` 已删除，
+三处把它列进排除过滤器的代码也一并去掉。
+
+**加载页**：站名、进度数字、逐行日志、方括号与字符动物统一用 `Anthropic Sans`
+（`_font/Anthropic Sans/` 下的 Text-Regular 与 Display-Bold，经 Vite `?url` 导入
+进构建，不再走 `public/fonts/` 子集）。站名 3.875rem / 字重 700，窄屏 2rem。
+
+**预取范围**：从「首页自己 + 栏目首页」扩到**全站非图片资源**。
+`scripts/site-preload.mjs` 作为 Astro 集成挂在 `astro:build:done`，直接枚举
+`dist/` 里实际产出的 html/css/js/字体，写成 `site-preload.json`（约 33 项）。
+加载页据此分四阶段真实 fetch：文档 → 页面 → 样式与脚本 → 字体，进度按实际
+完成数计算，失败项转为橙色状态且不计为成功。开发环境走
+`devPreloadUrls()` 现场拼清单，没有静态产物可扫。
+
+**时长**：最低播放 5 秒（含收尾转场）。资源提前就绪则播满；未就绪则继续等，
+单请求 60 秒超时、非超时失败重试一次。
+
+**主题**：`ThemeInit.astro` 在首屏就把 `data-theme` 写到 `<html>`（`localStorage`
+优先，否则跟随 `prefers-color-scheme`），换页时经 `astro:before-swap` 同步到新文档，
+避免闪回浅色。手动切换用 View Transition 从按钮中心做 `clip-path: circle()`
+扩散，520ms，`prefers-reduced-motion` 下直接切换。
+
+**例外**：`body.page-gallery`（摄影作品集列表）固定半透明黑顶栏、底色钉在暗房，
+切换**不做**圆形扩散 —— 否则透出的页面底色会让顶栏明暗跳变。摄影**详情页**
+（`body.page-dark`）不在此列，顶栏与正文都跟随全站主题。
+
+验收：`npm run build` 15 页；`node --test --test-isolation=none
+tests/site-preload.test.mjs` 通过；Edge 实测快网约 5.03s 退场、延迟一个请求约 6.61s。
