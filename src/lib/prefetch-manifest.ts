@@ -15,7 +15,7 @@ export async function devPreloadUrls() {
     ...notes.map(entry => `/notes/${entry.slug}/`),
     ...musings.map(entry => `/musings/${entry.slug}/`),
     ...rolls.map(({ entry }) => `/photos/${entry.slug}/`),
-    ...fonts.filter(file => /\.(woff2?|otf|ttf)$/i.test(file) && file !== 'helvetica-code.woff2')
+    ...fonts.filter(file => /\.(woff2?|otf|ttf)$/i.test(file))
       .map(file => `/fonts/${file}`),
   ];
 }

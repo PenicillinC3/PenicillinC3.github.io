@@ -7,7 +7,7 @@ test('production manifest covers all built pages, styles, modules and fonts with
   const manifest = JSON.parse(await readFile(new URL('site-preload.json', dist), 'utf8'));
   const files = await readdir(dist, { recursive: true });
   const eligible = files.map(file => file.replaceAll('\\', '/'))
-    .filter(file => /\.(html|css|m?js|woff2?|otf|ttf)$/i.test(file) && file !== 'fonts/helvetica-code.woff2');
+    .filter(file => /\.(html|css|m?js|woff2?|otf|ttf)$/i.test(file));
   const urls = eligible.map(file => '/' + file.replace(/(^|\/)index\.html$/, '$1'));
   assert.deepEqual([...manifest].sort(), urls.sort());
   assert.ok(manifest.includes('/'));
